@@ -44,9 +44,9 @@ namespace Nagorik.Api.Controllers
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var token = new JwtSecurityToken(
               claims: new[] {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Role, user.Role)
-                },
+                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                 new Claim(ClaimTypes.Role, user.Role)
+                 },
                 expires: DateTime.Now.AddDays(7),
                 signingCredentials: creds
             );

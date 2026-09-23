@@ -1,5 +1,5 @@
-   bin/
-   obj/
-   nagorik.db
-   nagorik.db-shm
-   nagorik.db-wal
+bin/
+obj/
+nagorik.db
+nagorik.db-shm
+nagorik.db-wal
