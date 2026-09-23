@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Nagorik.Api;
+using Nagorik.Api.Models;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=nagorik.db"));
@@ -28,6 +29,19 @@ builder.Services.AddAuthorization();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (!db.WaterloggingRisks.Any())
+    {
+        db.WaterloggingRisks.AddRange(
+            new WaterloggingRisk { ZoneId = "Z1", ZoneName = "Dhanmondi", Latitude = 23.7461, Longitude = 90.3742, RiskLevel = "High", LastUpdated = DateTime.Now },
+            new WaterloggingRisk { ZoneId = "Z2", ZoneName = "Mirpur", Latitude = 23.8223, Longitude = 90.3654, RiskLevel = "Medium", LastUpdated = DateTime.Now },
+            new WaterloggingRisk { ZoneId = "Z3", ZoneName = "Gulshan", Latitude = 23.7925, Longitude = 90.4078, RiskLevel = "Low", LastUpdated = DateTime.Now }
+        );
+        db.SaveChanges();
+    }
+}
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
