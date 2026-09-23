@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html><body>
+  <h2>Login</h2>
+  <input id="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <button onclick="login()">Login</button>
+  <p id="error" style="color:red"></p>
+  <script>
+    async function login() {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("token", data.token);
+        document.getElementById("error").style.color = "green";
+        document.getElementById("error").innerText = "Logged in!";
+      } else {
+        document.getElementById("error").innerText = "Invalid email or password.";
+      }
+    }
+  </script>
+</body></html>
