@@ -17,6 +17,10 @@ namespace Nagorik.Api.Controllers
         [HttpPost("register")]
         public IActionResult Register(RegisterDto dto)
         {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (_db.Users.Any(u => u.Email == dto.Email))
+                return BadRequest(new { message = "Email already registered" });
+
             var user = new User
             {
                 Name = dto.Name,
@@ -27,9 +31,8 @@ namespace Nagorik.Api.Controllers
             _db.Users.Add(user);
             _db.SaveChanges();
             return Created("", new { user.Id, user.Name, user.Email });
-
         }
-        
+
         [HttpPost("login")]
         public IActionResult Login(LoginDto dto)
         {
