@@ -1,3 +1,5 @@
    bin/
    obj/
    nagorik.db
+   nagorik.db-shm
+   nagorik.db-wal
