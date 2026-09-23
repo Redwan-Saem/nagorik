@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-
+using Microsoft.AspNetCore.Authorization;
 namespace Nagorik.Api.Controllers
 {
     [ApiController]
@@ -16,6 +16,7 @@ namespace Nagorik.Api.Controllers
             if (zone == null) return NotFound(new { message = "No data for this zone" });
             return Ok(zone);
         }
+        [Authorize(Roles = "Official")]
         [HttpGet("map")]
         public IActionResult GetMap()
         {

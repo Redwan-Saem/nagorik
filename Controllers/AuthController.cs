@@ -43,7 +43,10 @@ namespace Nagorik.Api.Controllers
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("ThisIsMySecretKeyForNagorikPleaseChangeLater123!"));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var token = new JwtSecurityToken(
-                claims: new[] { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()) },
+              claims: new[] {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Role, user.Role)
+                },
                 expires: DateTime.Now.AddDays(7),
                 signingCredentials: creds
             );

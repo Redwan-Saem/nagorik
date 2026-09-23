@@ -160,4 +160,4 @@ F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Nagorik.Api.staticwebassets.runtime.jso
 F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\necbmef9t4-{0}-x3oenkm5u5-x3oenkm5u5.gz
 F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\qtct23rvem-{0}-gjpud3vlp3-gjpud3vlp3.gz
 F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\frwkc02er6-{0}-aef0q1mp62-aef0q1mp62.gz
-F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\kwu9c8iicx-{0}-pl93cwka34-pl93cwka34.gz
+F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\kwu9c8iicx-{0}-yod5shcjjz-yod5shcjjz.gz
