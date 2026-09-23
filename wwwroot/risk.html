@@ -18,12 +18,18 @@
       return best;
     }
     async function loadRisk(zoneId) {
-      const res = await fetch(`/api/zones/${zoneId}/risk`);
-      const card = document.getElementById("riskCard");
-      if (!res.ok) { card.innerHTML = "Risk data not available for this zone yet."; return; }
-      const data = await res.json();
-      card.innerHTML = `<h3>${data.zoneName}</h3><p>Risk: ${data.riskLevel}</p><p>Updated: ${data.lastUpdated}</p>`;
-    }
+  const res = await fetch(`/api/zones/${zoneId}/risk`);
+  const card = document.getElementById("riskCard");
+  if (!res.ok) { card.innerHTML = "Risk data not available for this zone yet."; return; }
+  const data = await res.json();
+  const colors = { Low: "green", Medium: "orange", High: "red" };
+  card.innerHTML = `
+    <div style="border:2px solid ${colors[data.riskLevel]}; padding:10px; width:250px;">
+      <h3>${data.zoneName}</h3>
+      <p style="color:${colors[data.riskLevel]}; font-weight:bold;">Risk: ${data.riskLevel}</p>
+      <p>Updated: ${data.lastUpdated}</p>
+    </div>`;
+}
     document.getElementById("zoneSelect").addEventListener("change", e => loadRisk(e.target.value));
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(pos => {

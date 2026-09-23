@@ -159,4 +159,4 @@ F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
 F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Nagorik.Api.staticwebassets.runtime.json
 F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\necbmef9t4-{0}-x3oenkm5u5-x3oenkm5u5.gz
 F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\qtct23rvem-{0}-gjpud3vlp3-gjpud3vlp3.gz
-F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\frwkc02er6-{0}-bp70o1l3kh-bp70o1l3kh.gz
+F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\compressed\frwkc02er6-{0}-8f9p3yg7ke-8f9p3yg7ke.gz
