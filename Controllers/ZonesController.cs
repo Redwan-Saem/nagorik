@@ -16,5 +16,11 @@ namespace Nagorik.Api.Controllers
             if (zone == null) return NotFound(new { message = "No data for this zone" });
             return Ok(zone);
         }
+        [HttpGet("map")]
+        public IActionResult GetMap()
+        {
+            var zones = _db.ZoneMapData.ToList();
+            return Ok(zones);
+        }
     }
 }
