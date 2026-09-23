@@ -147,3 +147,12 @@ F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\runtimes\win-x64\native\e_sqlite3.dll
 F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\runtimes\win-x86\native\e_sqlite3.dll
 F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\BCrypt-Net-Next.dll
 F:\Nagorik\Nagorik.Api\obj\Debug\net10.0\Nagorik.Api.sourcelink.json
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.Bcl.Cryptography.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Abstractions.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.IdentityModel.JsonWebTokens.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Logging.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
+F:\Nagorik\Nagorik.Api\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll

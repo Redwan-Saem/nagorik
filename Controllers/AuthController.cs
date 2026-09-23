@@ -1,3 +1,7 @@
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Nagorik.Api.Models;
 
@@ -23,6 +27,24 @@ namespace Nagorik.Api.Controllers
             _db.Users.Add(user);
             _db.SaveChanges();
             return Created("", new { user.Id, user.Name, user.Email });
+
+        }
+        
+        [HttpPost("login")]
+        public IActionResult Login(LoginDto dto)
+        {
+            var user = _db.Users.FirstOrDefault(u => u.Email == dto.Email);
+            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+                return Unauthorized(new { message = "Invalid email or password" });
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("ThisIsMySecretKeyForNagorikPleaseChangeLater123!"));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var token = new JwtSecurityToken(
+                claims: new[] { new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()) },
+                expires: DateTime.Now.AddDays(7),
+                signingCredentials: creds
+            );
+            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
         }
     }
 }
