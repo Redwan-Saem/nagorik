@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Nagorik.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d2ea6f5c993b51f31d41c11ce809542594081819")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5e24bc3298a844f05292d4e1700ee2f251f02e9f")]
 [assembly: System.Reflection.AssemblyProductAttribute("Nagorik.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Nagorik.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

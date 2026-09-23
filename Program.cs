@@ -7,7 +7,7 @@ using Nagorik.Api.Models;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=nagorik.db"));
-     builder.Services.AddControllers();
+builder.Services.AddControllers();
 
 
 var jwtKey = "ThisIsMySecretKeyForNagorikPleaseChangeLater123!";
@@ -41,6 +41,33 @@ using (var scope = app.Services.CreateScope())
         );
         db.SaveChanges();
     }
+    if (!db.ZoneMapData.Any())
+    {
+        db.ZoneMapData.AddRange(
+            new ZoneMapData
+            {
+                ZoneId = "Z1",
+                RiskLevel = "High",
+                DrainagePumpStatus = "Working",
+                BoundaryGeoJson = "[[23.744,90.372],[23.748,90.372],[23.748,90.376],[23.744,90.376]]"
+            },
+            new ZoneMapData
+            {
+                ZoneId = "Z2",
+                RiskLevel = "Medium",
+                DrainagePumpStatus = "Faulty",
+                BoundaryGeoJson = "[[23.820,90.363],[23.824,90.363],[23.824,90.368],[23.820,90.368]]"
+            },
+            new ZoneMapData
+            {
+                ZoneId = "Z3",
+                RiskLevel = "Low",
+                DrainagePumpStatus = "Working",
+                BoundaryGeoJson = "[[23.790,90.406],[23.795,90.406],[23.795,90.410],[23.790,90.410]]"
+            }
+        );
+        db.SaveChanges();
+    }
 }
 app.UseStaticFiles();
 app.UseAuthentication();
@@ -61,7 +88,7 @@ var summaries = new[]
 
 app.MapGet("/weatherforecast", () =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
+    var forecast = Enumerable.Range(1, 5).Select(index =>
         new WeatherForecast
         (
             DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
@@ -73,7 +100,7 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast");
 
- app.MapControllers();
+app.MapControllers();
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
