@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html><body>
+  <h2>Waterlogging Risk</h2>
+  <select id="zoneSelect">
+    <option value="Z1">Dhanmondi</option>
+    <option value="Z2">Mirpur</option>
+    <option value="Z3">Gulshan</option>
+  </select>
+  <div id="riskCard"></div>
+  <script>
+    const zones = { Z1: [23.7461, 90.3742], Z2: [23.8223, 90.3654], Z3: [23.7925, 90.4078] };
+    function nearestZone(lat, lon) {
+      let best = "Z1", bestDist = Infinity;
+      for (const [id, [zlat, zlon]] of Object.entries(zones)) {
+        const d = Math.sqrt((lat - zlat) ** 2 + (lon - zlon) ** 2);
+        if (d < bestDist) { bestDist = d; best = id; }
+      }
+      return best;
+    }
+    async function loadRisk(zoneId) {
+      const res = await fetch(`/api/zones/${zoneId}/risk`);
+      const card = document.getElementById("riskCard");
+      if (!res.ok) { card.innerHTML = "Risk data not available for this zone yet."; return; }
+      const data = await res.json();
+      card.innerHTML = `<h3>${data.zoneName}</h3><p>Risk: ${data.riskLevel}</p><p>Updated: ${data.lastUpdated}</p>`;
+    }
+    document.getElementById("zoneSelect").addEventListener("change", e => loadRisk(e.target.value));
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const detected = nearestZone(pos.coords.latitude, pos.coords.longitude);
+        document.getElementById("zoneSelect").value = detected;
+        loadRisk(detected);
+      }, () => loadRisk("Z1"));
+    } else { loadRisk("Z1"); }
+  </script>
+</body></html>
