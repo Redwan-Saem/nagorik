@@ -3,3 +3,5 @@ obj/
 nagorik.db
 nagorik.db-shm
 nagorik.db-wal
+wwwroot/uploads/
+Nagorik.Web/ClientTests/node_modules/
