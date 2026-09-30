@@ -61,7 +61,7 @@
         <div id="Photo-error" class="text-danger small"></div>
     </div>
 
-    @* Labiba's partial goes here once merged *@
+    @await Html.PartialAsync("_LocationPicker")
 
     <div id="submit-error"
          class="alert alert-danger"
@@ -85,5 +85,6 @@
 </form>
 
 @section Scripts {
+    <script src="~/js/submit-logic.js"></script>
     <script src="~/js/report-form.js"></script>
 }

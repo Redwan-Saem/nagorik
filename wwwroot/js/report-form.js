@@ -115,38 +115,90 @@ if (typeof document !== 'undefined') {
 
     document.addEventListener('location-changed', refresh);
 
-    $('report-form').addEventListener('submit', async e => {
+    let isSubmitting = false;
 
-      e.preventDefault();
+    async function sendReport() {
 
-      const fd = new FormData($('report-form'));
+      if (isSubmitting) return;
 
-      const res = await fetch('/api/reports', {
-        method: 'POST',
-        body: fd,
-        headers: {
-          'RequestVerificationToken':
-            document.querySelector(
-              'input[name="__RequestVerificationToken"]'
-            ).value
+      isSubmitting = true;
+
+      $('submit-report').disabled = true;
+      $('retry-submit').style.display = 'none';
+      $('submit-error').style.display = 'none';
+
+      try {
+
+        const res = await fetch('/api/reports', {
+          method: 'POST',
+          body: new FormData($('report-form')),
+          headers: {
+            'RequestVerificationToken':
+              document.querySelector(
+                'input[name="__RequestVerificationToken"]'
+              ).value
+          }
+        });
+
+        const kind = classifyResponse(res.status);
+
+        if (kind === 'success') {
+
+          const j = await res.json();
+
+          window.location.href =
+            '/Reports/Confirmation/' + j.id;
+
+          return;
         }
-      });
 
-      if (res.ok) {
+        if (kind === 'validation') {
 
-        const j = await res.json();
+          const fe = extractFieldErrors(await res.json());
 
-        window.location.href =
-          '/Reports/Confirmation/' + j.id;
+          if (fe.Photo) {
+            $('Photo-error').textContent = fe.Photo;
+          }
 
-      } else {
+          if (fe.Location) {
+            $('location-error').textContent = fe.Location;
+          }
 
-        $('submit-error').textContent =
-          'Something went wrong. Please check the form.';
+          showError(
+            'Please fix the highlighted problems and submit again.'
+          );
 
-        $('submit-error').style.display = 'block';
+        } else {
+
+          showError(
+            'We could not send your report. Your information is saved on this page. Please retry.'
+          );
+        }
+
+      } catch {
+
+        showError(
+          'No connection. Your information is saved on this page. Please retry.'
+        );
       }
+
+      isSubmitting = false;
+
+      $('submit-report').disabled = false;
+      $('retry-submit').style.display = 'inline-block';
+    }
+
+    function showError(msg) {
+      $('submit-error').textContent = msg;
+      $('submit-error').style.display = 'block';
+    }
+
+    $('report-form').addEventListener('submit', e => {
+      e.preventDefault();
+      sendReport();
     });
+
+    $('retry-submit').addEventListener('click', sendReport);
 
     refresh();
   });
