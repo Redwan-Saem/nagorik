@@ -1,0 +1,10 @@
+@if (User.IsInRole("Resident"))
+{
+    <li class="nav-item">
+        <a class="nav-link"
+           asp-controller="Reports"
+           asp-action="Create">
+            Report an Issue
+        </a>
+    </li>
+}

@@ -1,0 +1,89 @@
+@model ReportFormViewModel
+
+<h2>Report an Issue</h2>
+
+<form id="report-form" novalidate>
+    @Html.AntiForgeryToken()
+
+    <input type="hidden"
+           id="SubmissionToken"
+           name="SubmissionToken"
+           value="@Model.SubmissionToken" />
+
+    <div class="mb-3">
+        <label for="Category" class="form-label">Category</label>
+        <select id="Category" name="Category" class="form-select">
+            <option value="">-- choose --</option>
+            @foreach (var c in Model.Categories)
+            {
+                <option value="@c.Value">@c.Text</option>
+            }
+        </select>
+        <div id="Category-error" class="text-danger small"></div>
+    </div>
+
+    <div class="mb-3">
+        <label for="Description" class="form-label">Description</label>
+        <textarea id="Description"
+                  name="Description"
+                  class="form-control"
+                  rows="4"
+                  maxlength="500"></textarea>
+
+        <div class="small">
+            <span id="char-count">0</span>/500
+        </div>
+
+        <div id="Description-error" class="text-danger small"></div>
+    </div>
+
+    <div class="mb-3">
+        <label for="Photo" class="form-label">Photo</label>
+
+        <input type="file"
+               id="Photo"
+               name="Photo"
+               class="form-control"
+               accept="image/jpeg,image/png" />
+
+        <img id="photo-preview"
+             class="img-thumbnail mt-2"
+             style="max-width:200px;display:none"
+             alt="Preview" />
+
+        <button type="button"
+                id="remove-photo"
+                class="btn btn-sm btn-outline-danger mt-2"
+                style="display:none">
+            Remove photo
+        </button>
+
+        <div id="Photo-error" class="text-danger small"></div>
+    </div>
+
+    @* Labiba's partial goes here once merged *@
+
+    <div id="submit-error"
+         class="alert alert-danger"
+         style="display:none"
+         role="alert">
+    </div>
+
+    <button type="button"
+            id="retry-submit"
+            class="btn btn-warning"
+            style="display:none">
+        Retry
+    </button>
+
+    <button type="submit"
+            id="submit-report"
+            class="btn btn-primary"
+            disabled>
+        Submit report
+    </button>
+</form>
+
+@section Scripts {
+    <script src="~/js/report-form.js"></script>
+}
