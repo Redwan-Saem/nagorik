@@ -18,6 +18,19 @@ public class Report
 
     public string? ImageUrl { get; set; }
 
+
+    // Location coordinates (T-022.5)
+    public double Latitude { get; set; }
+
+    public double Longitude { get; set; }
+
+
+    // Duplicate detection (T-022.5)
+    public bool IsPossibleDuplicate { get; set; }
+
+    public int? DuplicateOfReportId { get; set; }
+
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
 

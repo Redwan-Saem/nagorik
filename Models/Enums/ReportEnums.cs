@@ -1,23 +1,30 @@
-namespace Nagorik.Api.Models
+namespace Nagorik.Api.Models;
+
+public enum ReportCategory
 {
-    public enum ReportCategory
-    {
-        Complaint,
-        Request,
-        Emergency
-    }
+    Complaint,
+    Request,
+    Emergency,
+    WaterLogging,
+    RoadDamage,
+    PowerOutage,
+    Other
+}
 
-    public enum Authority
-    {
-        Police,
-        LocalGovernment,
-        Other
-    }
+public enum Authority
+{
+    Police,
+    LocalGovernment,
+    CityCorporation,
+    DpdcDesco,
+    Other
+}
 
-    public enum ReportStatus
-    {
-        Pending,
-        Approved,
-        Rejected
-    }
+public enum ReportStatus
+{
+    Pending,
+    Approved,
+    InProgress,
+    Completed,
+    Rejected
 }
