@@ -17,4 +17,13 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Nagorik.Tests\**" />
+    <Compile Remove="Nagorik.UiTests\**" />
+    <Content Remove="Nagorik.Tests\**" />
+    <Content Remove="Nagorik.UiTests\**" />
+    <None Remove="Nagorik.Tests\**" />
+    <None Remove="Nagorik.UiTests\**" />
+  </ItemGroup>
+
 </Project>
