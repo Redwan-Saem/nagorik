@@ -1,23 +1,41 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Nagorik.Web.Data;
-using Nagorik.Web.Models;
+using Nagorik.Api;
+using Nagorik.Api.Models;
 
 public static class TestDb
 {
-    public static (ApplicationDbContext ctx, SqliteConnection conn) Create()
+    public static (AppDbContext ctx, SqliteConnection conn) Create()
     {
         var conn = new SqliteConnection("DataSource=:memory:");
         conn.Open();
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(conn).Options;
-        var ctx = new ApplicationDbContext(options);
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(conn)
+            .Options;
+
+        var ctx = new AppDbContext(options);
+
         ctx.Database.EnsureCreated();
+
         return (ctx, conn);
     }
 
-    public static ApplicationUser AddUser(ApplicationDbContext ctx, string id = "u1")
+    public static User AddUser(AppDbContext ctx, int id = 1)
     {
-        var u = new ApplicationUser { Id = id, UserName = id + "@t.com", Email = id + "@t.com" };
-        ctx.Users.Add(u); ctx.SaveChanges(); return u;
+        var user = new User
+        {
+            Id = id,
+            Name = "Test User",
+            Email = $"user{id}@test.com",
+            PhoneNumber = "01700000000",
+            PasswordHash = "test",
+            Role = "Resident"
+        };
+
+        ctx.Users.Add(user);
+        ctx.SaveChanges();
+
+        return user;
     }
 }

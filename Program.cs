@@ -4,10 +4,14 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Nagorik.Api;
 using Nagorik.Api.Models;
+using Nagorik.Api.Services;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=nagorik.db"));
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 
 var jwtKey = "ThisIsMySecretKeyForNagorikPleaseChangeLater123!";
