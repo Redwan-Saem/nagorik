@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -13,7 +14,11 @@ namespace Nagorik.Api.Controllers
             var vm = new ReportFormViewModel
             {
                 Categories = Enum.GetValues<ReportCategory>()
-                    .Select(c => new SelectListItem(c.ToString(), c.ToString()))
+                    .Select(c => new SelectListItem(
+                        c.ToString(),
+                        c.ToString()
+                    ))
+                    .ToList()
             };
 
             return View(vm);

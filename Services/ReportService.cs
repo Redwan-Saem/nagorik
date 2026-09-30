@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Nagorik.Api.Models;
 
 namespace Nagorik.Api.Services;
@@ -80,6 +79,7 @@ public class ReportService : IReportService
         if (errors.Count > 0)
             return ReportResult.Fail(errors);
 
+
         string imageUrl;
 
         await using (var stream = request.Photo.OpenReadStream())
@@ -90,6 +90,7 @@ public class ReportService : IReportService
                     .ToLowerInvariant());
         }
 
+
         if (!int.TryParse(userId, out var userIdValue))
         {
             return ReportResult.Fail(new Dictionary<string, string>
@@ -98,18 +99,45 @@ public class ReportService : IReportService
             });
         }
 
+
+        var nearby = await DuplicateDetector.FindNearbyOpenAsync(
+            _db,
+            request.Category!.Value,
+            request.Latitude.Value,
+            request.Longitude.Value
+        );
+
+
         var report = new Report
         {
-            Title = request.Category!.Value.ToString(),
+            Title = request.Category.Value.ToString(),
+
             Description = request.Description.Trim(),
+
             Category = request.Category.Value,
-            Authority = Authority.Other,
+
+            Authority = ReportRouting.GetAuthority(
+                request.Category.Value),
+
             Status = ReportStatus.Pending,
+
             Location = request.AddressText.Trim(),
+
             ImageUrl = imageUrl,
+
             UserId = userIdValue,
+
+            Latitude = request.Latitude.Value,
+
+            Longitude = request.Longitude.Value,
+
+            IsPossibleDuplicate = nearby != null,
+
+            DuplicateOfReportId = nearby?.Id,
+
             CreatedAt = DateTime.UtcNow
         };
+
 
         _db.Reports.Add(report);
 
