@@ -1,24 +1,32 @@
-using Microsoft.AspNetCore.Identity;
+using Nagorik.Api;
+using Nagorik.Api.Models;
+
 public static class DevDataSeeder
 {
     public static async Task SeedAsync(IServiceProvider sp)
     {
-        var roles = sp.GetRequiredService<RoleManager<IdentityRole>>();
-        var users = sp.GetRequiredService<UserManager<ApplicationUser>>();
-        foreach (var r in new[] { "Resident", "Dispatcher", "Crew" })
-            if (!await roles.RoleExistsAsync(r)) await roles.CreateAsync(new IdentityRole(r));
+        var db = sp.GetRequiredService<AppDbContext>();
+        var users = db.Set<User>();
 
-        async Task Add(string email, string role)
+        async Task Add(string name, string email, string role)
         {
-            if (await users.FindByEmailAsync(email) != null) return;
-            var u = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true };
-            await users.CreateAsync(u, "Test@12345");
-            await users.AddToRoleAsync(u, role);
+            if (users.Any(u => u.Email == email)) return;
+
+            users.Add(new User
+            {
+                Name = name,
+                Email = email,
+                PhoneNumber = "",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test@12345"),
+                Role = role
+            });
+            await db.SaveChangesAsync();
         }
-        await Add("resident1@test.com", "Resident");
-        await Add("resident2@test.com", "Resident");
-        await Add("dispatcher1@test.com", "Dispatcher");
-        await Add("crew1@test.com", "Crew");
-        await Add("crew2@test.com", "Crew");
+
+        await Add("Resident One", "resident1@test.com", "Resident");
+        await Add("Resident Two", "resident2@test.com", "Resident");
+        await Add("Dispatcher One", "dispatcher1@test.com", "Dispatcher");
+        await Add("Crew One", "crew1@test.com", "Crew");
+        await Add("Crew Two", "crew2@test.com", "Crew");
     }
 }
