@@ -1,0 +1,16 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="~/js/location-picker.js"></script>
+
+<div class="mb-3">
+  <label class="form-label">Location</label>
+  <button type="button" id="use-my-location" class="btn btn-outline-primary btn-sm mb-2">Use my current location</button>
+  <div id="location-map" style="height:300px;"></div>
+  <div id="location-error" class="text-danger small" role="alert"></div>
+
+  <label for="AddressText" class="form-label mt-2">Address or landmark</label>
+  <input type="text" id="AddressText" name="AddressText" class="form-control" maxlength="300" />
+
+  <input type="hidden" id="Latitude" name="Latitude" />
+  <input type="hidden" id="Longitude" name="Longitude" />
+</div>
