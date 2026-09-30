@@ -12,7 +12,7 @@ builder.Services.AddControllers();
 
 builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
 builder.Services.AddScoped<IReportService, ReportService>();
-
+builder.Services.AddScoped<NotificationSettingsService>();
 
 var jwtKey = "ThisIsMySecretKeyForNagorikPleaseChangeLater123!";
 
