@@ -1,0 +1,20 @@
+@model Nagorik.Api.Models.Report
+
+<h2>Report Submitted Successfully</h2>
+
+<p>Your report has been submitted successfully.</p>
+
+<p>
+    Your report code is:
+    <strong id="report-code">R-@Model.Id.ToString("D6")</strong>
+</p>
+
+<div class="mt-3">
+    <a class="btn btn-primary" asp-controller="Reports" asp-action="Mine">
+        My Reports
+    </a>
+
+    <a class="btn btn-secondary" asp-controller="Reports" asp-action="Create">
+        Report another issue
+    </a>
+</div>
