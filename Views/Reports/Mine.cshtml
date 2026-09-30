@@ -1,0 +1,50 @@
+@model IEnumerable<Nagorik.Api.Models.Report>
+
+<h2>My Reports</h2>
+
+@if (!Model.Any())
+{
+    <p>You haven't submitted any reports yet.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Photo</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var r in Model)
+            {
+                <tr class="report-row" data-report-id="@r.Id">
+                    <td>R-@r.Id.ToString("D6")</td>
+
+                    <td>@r.Category</td>
+
+                    <td>
+                        <span class="report-status badge bg-secondary">
+                            @r.Status
+                        </span>
+                    </td>
+
+                    <td>@r.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+
+                    <td>
+                        @if (!string.IsNullOrEmpty(r.ImageUrl))
+                        {
+                            <img src="@r.ImageUrl"
+                                 alt="Report photo"
+                                 style="width:60px;height:60px;object-fit:cover;" />
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
