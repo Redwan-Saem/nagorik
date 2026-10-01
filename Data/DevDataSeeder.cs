@@ -20,6 +20,7 @@ public static class DevDataSeeder
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test@12345"),
                 Role = role
             });
+
             await db.SaveChangesAsync();
         }
 
@@ -28,5 +29,35 @@ public static class DevDataSeeder
         await Add("Dispatcher One", "dispatcher1@test.com", "Dispatcher");
         await Add("Crew One", "crew1@test.com", "Crew");
         await Add("Crew Two", "crew2@test.com", "Crew");
+
+
+        // T-004.1: Seed crews
+        var crew1User = users.FirstOrDefault(
+            u => u.Email == "crew1@test.com");
+
+        var crew2User = users.FirstOrDefault(
+            u => u.Email == "crew2@test.com");
+
+        if (crew1User != null &&
+            !db.Crews.Any(c => c.UserId == crew1User.Id))
+        {
+            db.Crews.Add(new Crew
+            {
+                Name = "Crew A",
+                UserId = crew1User.Id
+            });
+        }
+
+        if (crew2User != null &&
+            !db.Crews.Any(c => c.UserId == crew2User.Id))
+        {
+            db.Crews.Add(new Crew
+            {
+                Name = "Crew B",
+                UserId = crew2User.Id
+            });
+        }
+
+        await db.SaveChangesAsync();
     }
 }

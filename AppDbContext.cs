@@ -10,7 +10,6 @@ namespace Nagorik.Api
         {
         }
 
-
         public DbSet<User> Users { get; set; }
 
         public DbSet<WaterloggingRisk> WaterloggingRisks { get; set; }
@@ -28,6 +27,12 @@ namespace Nagorik.Api
         public DbSet<UserPushSubscription> UserPushSubscriptions { get; set; }
 
         public DbSet<NotificationLog> NotificationLogs { get; set; }
+
+
+        // T-004.1 Crew assignment schema
+        public DbSet<Crew> Crews { get; set; }
+
+        public DbSet<CrewAssignment> CrewAssignments { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -58,8 +63,13 @@ namespace Nagorik.Api
                 e.HasOne(r => r.User)
                     .WithMany()
                     .HasForeignKey(r => r.UserId);
-            });
 
+                // T-004.1 Assigned crew relationship
+                e.HasOne(r => r.AssignedCrew)
+                    .WithMany()
+                    .HasForeignKey(r => r.AssignedCrewId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
 
 
             // AreaSubscription
@@ -68,11 +78,9 @@ namespace Nagorik.Api
                 .IsUnique();
 
 
-
             // NotificationPreference
             builder.Entity<NotificationPreference>()
                 .HasKey(x => x.UserId);
-
 
 
             // UserPushSubscription
@@ -85,10 +93,35 @@ namespace Nagorik.Api
                 .IsUnique();
 
 
-
             // NotificationLog
             builder.Entity<NotificationLog>()
                 .HasIndex(x => new { x.UserId, x.SentAtUtc });
+
+
+            // T-004.1 Crew
+            builder.Entity<Crew>()
+                .HasIndex(c => c.UserId)
+                .IsUnique();
+
+            builder.Entity<Crew>()
+                .HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId);
+
+
+            // T-004.1 CrewAssignment
+            builder.Entity<CrewAssignment>()
+                .HasIndex(a => new { a.ReportId, a.AssignedAtUtc });
+
+            builder.Entity<CrewAssignment>()
+                .HasOne(a => a.Report)
+                .WithMany()
+                .HasForeignKey(a => a.ReportId);
+
+            builder.Entity<CrewAssignment>()
+                .HasOne(a => a.Crew)
+                .WithMany()
+                .HasForeignKey(a => a.CrewId);
         }
     }
 }
