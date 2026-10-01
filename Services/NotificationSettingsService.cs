@@ -1,191 +1,141 @@
 using Microsoft.EntityFrameworkCore;
 using Nagorik.Api.Models;
 
-namespace Nagorik.Api.Services
+namespace Nagorik.Api.Services;
+
+public class NotificationSettingsService
 {
-    public record NotificationSettingsDto(
-        bool Enabled,
-        List<int> SelectedZoneIds,
-        List<ZoneOption> Zones
-    );
+    private readonly AppDbContext _db;
 
-    public record ZoneOption(
-        int Id,
-        string Name
-    );
-
-
-    public class NotificationSettingsService
+    public NotificationSettingsService(AppDbContext db)
     {
-        private readonly AppDbContext _db;
+        _db = db;
+    }
 
+    public async Task<(bool Enabled, List<string> ZoneIds)> GetAsync(string userId)
+    {
+        var preference = await _db.NotificationPreferences
+            .FirstOrDefaultAsync(x => x.UserId == userId);
 
-        public NotificationSettingsService(AppDbContext db)
+        var zoneIds = await _db.AreaSubscriptions
+            .Where(x => x.UserId == userId)
+            .Select(x => x.ZoneId)
+            .ToListAsync();
+
+        return (
+            preference?.NotificationsEnabled ?? false,
+            zoneIds
+        );
+    }
+
+    public async Task<(bool Success, string? Error)> UpdateAsync(
+        string userId,
+        bool enabled,
+        List<string> zoneIds)
+    {
+        zoneIds ??= new List<string>();
+
+        var validZoneIds = await _db.ZoneMapData
+            .Select(x => x.ZoneId)
+            .Distinct()
+            .ToListAsync();
+
+        var invalidZoneIds = zoneIds
+            .Except(validZoneIds)
+            .ToList();
+
+        if (invalidZoneIds.Count > 0)
         {
-            _db = db;
-        }
-
-
-        public async Task<NotificationSettingsDto> GetAsync(string userId)
-        {
-            var pref = await _db.NotificationPreferences
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.UserId == userId);
-
-
-            var selected = await _db.AreaSubscriptions
-                .Where(a => a.UserId == userId)
-                .Select(a => int.Parse(a.ZoneId))
-                .ToListAsync();
-
-
-            var zones = await _db.ZoneMapData
-                .OrderBy(z => z.ZoneId)
-                .Select(z => new ZoneOption(
-                    z.Id,
-                    z.ZoneId
-                ))
-                .ToListAsync();
-
-
-            return new NotificationSettingsDto(
-                pref?.NotificationsEnabled ?? false,
-                selected,
-                zones
+            return (
+                false,
+                $"Invalid zone ID(s): {string.Join(", ", invalidZoneIds)}"
             );
         }
 
+        var preference = await _db.NotificationPreferences
+            .FirstOrDefaultAsync(x => x.UserId == userId);
 
-
-        public async Task<(bool ok, string? error)> SaveAsync(
-            string userId,
-            bool enabled,
-            List<int> zoneIds)
+        if (preference == null)
         {
-            zoneIds = zoneIds
-                .Distinct()
-                .ToList();
-
-
-            var valid = await _db.ZoneMapData
-                .CountAsync(z => zoneIds.Contains(z.Id));
-
-
-            if (valid != zoneIds.Count)
+            preference = new NotificationPreference
             {
-                return (
-                    false,
-                    "One or more selected areas do not exist."
-                );
-            }
+                UserId = userId,
+                NotificationsEnabled = enabled
+            };
 
+            _db.NotificationPreferences.Add(preference);
+        }
+        else
+        {
+            preference.NotificationsEnabled = enabled;
+        }
 
+        var existingSubscriptions = await _db.AreaSubscriptions
+            .Where(x => x.UserId == userId)
+            .ToListAsync();
 
-            var pref = await _db.NotificationPreferences
-                .FindAsync(userId);
+        _db.AreaSubscriptions.RemoveRange(existingSubscriptions);
 
+        var uniqueZoneIds = zoneIds
+            .Distinct()
+            .ToList();
 
-            if (pref == null)
+        foreach (var zoneId in uniqueZoneIds)
+        {
+            _db.AreaSubscriptions.Add(new AreaSubscription
             {
-                _db.NotificationPreferences.Add(
-                    new NotificationPreference
-                    {
-                        UserId = userId,
-                        NotificationsEnabled = enabled
-                    });
-            }
-            else
+                UserId = userId,
+                ZoneId = zoneId
+            });
+        }
+
+        await _db.SaveChangesAsync();
+
+        return (true, null);
+    }
+
+    public async Task SubscribePushAsync(
+        string userId,
+        string endpoint,
+        string p256dh,
+        string auth)
+    {
+        var existing = await _db.UserPushSubscriptions
+            .FirstOrDefaultAsync(x => x.Endpoint == endpoint);
+
+        if (existing != null)
+        {
+            existing.UserId = userId;
+            existing.P256dh = p256dh;
+            existing.Auth = auth;
+        }
+        else
+        {
+            _db.UserPushSubscriptions.Add(new UserPushSubscription
             {
-                pref.NotificationsEnabled = enabled;
-            }
+                UserId = userId,
+                Endpoint = endpoint,
+                P256dh = p256dh,
+                Auth = auth
+            });
+        }
 
+        await _db.SaveChangesAsync();
+    }
 
+    public async Task UnsubscribePushAsync(
+        string userId,
+        string endpoint)
+    {
+        var subscription = await _db.UserPushSubscriptions
+            .FirstOrDefaultAsync(
+                x => x.UserId == userId &&
+                     x.Endpoint == endpoint);
 
-            _db.AreaSubscriptions.RemoveRange(
-                _db.AreaSubscriptions
-                    .Where(a => a.UserId == userId)
-            );
-
-
-
-            _db.AreaSubscriptions.AddRange(
-                zoneIds.Select(z =>
-                    new AreaSubscription
-                    {
-                        UserId = userId,
-                        ZoneId = z.ToString()
-                    })
-            );
-
-
-
+        if (subscription != null)
+        {
+            _db.UserPushSubscriptions.Remove(subscription);
             await _db.SaveChangesAsync();
-
-
-            return (true, null);
-        }
-
-
-
-
-        public async Task SavePushSubscriptionAsync(
-            string userId,
-            string endpoint,
-            string p256dh,
-            string auth)
-        {
-            var existing =
-                await _db.UserPushSubscriptions
-                .FirstOrDefaultAsync(
-                    s => s.Endpoint == endpoint);
-
-
-
-            if (existing == null)
-            {
-                _db.UserPushSubscriptions.Add(
-                    new UserPushSubscription
-                    {
-                        UserId = userId,
-                        Endpoint = endpoint,
-                        P256dh = p256dh,
-                        Auth = auth
-                    });
-            }
-            else
-            {
-                existing.UserId = userId;
-                existing.P256dh = p256dh;
-                existing.Auth = auth;
-            }
-
-
-
-            await _db.SaveChangesAsync();
-        }
-
-
-
-
-
-        public async Task RemovePushSubscriptionAsync(
-            string userId,
-            string endpoint)
-        {
-            var subscription =
-                await _db.UserPushSubscriptions
-                .FirstOrDefaultAsync(
-                    x => x.Endpoint == endpoint &&
-                         x.UserId == userId);
-
-
-
-            if (subscription != null)
-            {
-                _db.UserPushSubscriptions.Remove(subscription);
-
-                await _db.SaveChangesAsync();
-            }
         }
     }
 }
