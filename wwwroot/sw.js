@@ -27,9 +27,9 @@ self.addEventListener('notificationclick', event => {
             type: 'window',
             includeUncontrolled: true
         }).then(list => {
-            for (const c of list) {
-                if (c.url.includes(url) && 'focus' in c) {
-                    return c.focus();
+            for (const client of list) {
+                if (client.url.includes(url) && 'focus' in client) {
+                    return client.focus();
                 }
             }
 
