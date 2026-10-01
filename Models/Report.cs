@@ -31,6 +31,12 @@ public class Report
     public int? DuplicateOfReportId { get; set; }
 
 
+    // Crew assignment (T-004.1)
+    public int? AssignedCrewId { get; set; }
+
+    public Crew? AssignedCrew { get; set; }
+
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
 
