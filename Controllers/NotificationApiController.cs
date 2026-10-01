@@ -13,7 +13,6 @@ namespace Nagorik.Api.Controllers
         private readonly NotificationSettingsService _service;
         private readonly IConfiguration _config;
 
-
         public NotificationApiController(
             NotificationSettingsService service,
             IConfiguration config)
@@ -22,44 +21,38 @@ namespace Nagorik.Api.Controllers
             _config = config;
         }
 
-
-
         private string UserId =>
             User.FindFirstValue(ClaimTypes.NameIdentifier)!;
-
-
-
 
         [HttpGet("notification-settings")]
         public async Task<IActionResult> GetSettings()
         {
             var result = await _service.GetAsync(UserId);
 
-            return Ok(result);
+            return Ok(new
+            {
+                enabled = result.Enabled,
+                zoneIds = result.ZoneIds
+            });
         }
-
-
-
 
         [HttpPut("notification-settings")]
         public async Task<IActionResult> SaveSettings(
             [FromBody] NotificationSettingsRequest request)
         {
-            var result = await _service.SaveAsync(
+            var result = await _service.UpdateAsync(
                 UserId,
                 request.Enabled,
-                request.ZoneIds ?? new List<int>()
+                request.ZoneIds ?? new List<string>()
             );
 
-
-            if (!result.ok)
+            if (!result.Success)
             {
                 return BadRequest(new
                 {
-                    error = result.error
+                    error = result.Error
                 });
             }
-
 
             return Ok(new
             {
@@ -67,16 +60,13 @@ namespace Nagorik.Api.Controllers
             });
         }
 
-
-
-
         [HttpPost("push/subscribe")]
         public async Task<IActionResult> Subscribe(
             [FromBody] PushSubscriptionRequest request)
         {
-            if (string.IsNullOrEmpty(request.Endpoint) ||
-                string.IsNullOrEmpty(request.P256dh) ||
-                string.IsNullOrEmpty(request.Auth))
+            if (string.IsNullOrWhiteSpace(request.Endpoint) ||
+                string.IsNullOrWhiteSpace(request.P256dh) ||
+                string.IsNullOrWhiteSpace(request.Auth))
             {
                 return BadRequest(new
                 {
@@ -84,14 +74,12 @@ namespace Nagorik.Api.Controllers
                 });
             }
 
-
-            await _service.SavePushSubscriptionAsync(
+            await _service.SubscribePushAsync(
                 UserId,
                 request.Endpoint,
                 request.P256dh,
                 request.Auth
             );
-
 
             return Ok(new
             {
@@ -99,27 +87,28 @@ namespace Nagorik.Api.Controllers
             });
         }
 
-
-
-
         [HttpPost("push/unsubscribe")]
         public async Task<IActionResult> Unsubscribe(
             [FromBody] RemovePushSubscriptionRequest request)
         {
-            await _service.RemovePushSubscriptionAsync(
+            if (string.IsNullOrWhiteSpace(request.Endpoint))
+            {
+                return BadRequest(new
+                {
+                    error = "Endpoint is required."
+                });
+            }
+
+            await _service.UnsubscribePushAsync(
                 UserId,
                 request.Endpoint
             );
-
 
             return Ok(new
             {
                 message = "Push subscription removed."
             });
         }
-
-
-
 
         [HttpGet("push/public-key")]
         public IActionResult PublicKey()
@@ -131,17 +120,12 @@ namespace Nagorik.Api.Controllers
         }
     }
 
-
-
-
     public class NotificationSettingsRequest
     {
         public bool Enabled { get; set; }
 
-        public List<int>? ZoneIds { get; set; }
+        public List<string>? ZoneIds { get; set; }
     }
-
-
 
     public class PushSubscriptionRequest
     {
@@ -151,8 +135,6 @@ namespace Nagorik.Api.Controllers
 
         public string Auth { get; set; } = "";
     }
-
-
 
     public class RemovePushSubscriptionRequest
     {
