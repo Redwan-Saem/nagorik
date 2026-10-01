@@ -15,4 +15,22 @@
             My Reports
         </a>
     </li>
+
+    <li class="nav-item">
+        <a class="nav-link"
+           asp-controller="Notifications"
+           asp-action="Settings">
+            Alerts
+        </a>
+    </li>
+}
+
+@if (User.IsInRole("Crew") || User.IsInRole("Dispatcher"))
+{
+    <li class="nav-item">
+        <button id="enable-push"
+                class="btn btn-sm btn-outline-light">
+            Enable notifications
+        </button>
+    </li>
 }
