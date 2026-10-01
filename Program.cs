@@ -20,6 +20,10 @@ builder.Services.AddScoped<NotificationSettingsService>();
 builder.Services.AddSingleton<IPushSender, WebPushSender>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
+// T-002.5 Alert processing
+builder.Services.AddScoped<AlertService>();
+builder.Services.AddHostedService<AlertBackgroundService>();
+
 var jwtKey = "ThisIsMySecretKeyForNagorikPleaseChangeLater123!";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -63,7 +67,7 @@ using (var scope = app.Services.CreateScope())
                 Latitude = 23.7461,
                 Longitude = 90.3742,
                 RiskLevel = "High",
-                LastUpdated = DateTime.Now
+                LastUpdated = DateTime.UtcNow
             },
             new WaterloggingRisk
             {
@@ -72,7 +76,7 @@ using (var scope = app.Services.CreateScope())
                 Latitude = 23.8223,
                 Longitude = 90.3654,
                 RiskLevel = "Medium",
-                LastUpdated = DateTime.Now
+                LastUpdated = DateTime.UtcNow
             },
             new WaterloggingRisk
             {
@@ -81,7 +85,7 @@ using (var scope = app.Services.CreateScope())
                 Latitude = 23.7925,
                 Longitude = 90.4078,
                 RiskLevel = "Low",
-                LastUpdated = DateTime.Now
+                LastUpdated = DateTime.UtcNow
             }
         );
 
@@ -126,7 +130,6 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
