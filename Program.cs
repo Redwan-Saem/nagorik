@@ -5,14 +5,20 @@ using Microsoft.EntityFrameworkCore;
 using Nagorik.Api;
 using Nagorik.Api.Models;
 using Nagorik.Api.Services;
+
 var builder = WebApplication.CreateBuilder(args);
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=nagorik.db"));
+
 builder.Services.AddControllers();
 
 builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
+
+builder.Services.AddSingleton<IPushSender, WebPushSender>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 var jwtKey = "ThisIsMySecretKeyForNagorikPleaseChangeLater123!";
 
@@ -24,32 +30,64 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = false,
             ValidateAudience = false,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey))
         };
     });
+
 builder.Services.AddAuthorization();
+
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     await DevDataSeeder.SeedAsync(scope.ServiceProvider);
 }
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
     if (!db.WaterloggingRisks.Any())
     {
         db.WaterloggingRisks.AddRange(
-            new WaterloggingRisk { ZoneId = "Z1", ZoneName = "Dhanmondi", Latitude = 23.7461, Longitude = 90.3742, RiskLevel = "High", LastUpdated = DateTime.Now },
-            new WaterloggingRisk { ZoneId = "Z2", ZoneName = "Mirpur", Latitude = 23.8223, Longitude = 90.3654, RiskLevel = "Medium", LastUpdated = DateTime.Now },
-            new WaterloggingRisk { ZoneId = "Z3", ZoneName = "Gulshan", Latitude = 23.7925, Longitude = 90.4078, RiskLevel = "Low", LastUpdated = DateTime.Now }
+            new WaterloggingRisk
+            {
+                ZoneId = "Z1",
+                ZoneName = "Dhanmondi",
+                Latitude = 23.7461,
+                Longitude = 90.3742,
+                RiskLevel = "High",
+                LastUpdated = DateTime.Now
+            },
+            new WaterloggingRisk
+            {
+                ZoneId = "Z2",
+                ZoneName = "Mirpur",
+                Latitude = 23.8223,
+                Longitude = 90.3654,
+                RiskLevel = "Medium",
+                LastUpdated = DateTime.Now
+            },
+            new WaterloggingRisk
+            {
+                ZoneId = "Z3",
+                ZoneName = "Gulshan",
+                Latitude = 23.7925,
+                Longitude = 90.4078,
+                RiskLevel = "Low",
+                LastUpdated = DateTime.Now
+            }
         );
+
         db.SaveChanges();
     }
+
     if (!db.ZoneMapData.Any())
     {
         db.ZoneMapData.AddRange(
@@ -58,27 +96,33 @@ using (var scope = app.Services.CreateScope())
                 ZoneId = "Z1",
                 RiskLevel = "High",
                 DrainagePumpStatus = "Working",
-                BoundaryGeoJson = "[[23.744,90.372],[23.748,90.372],[23.748,90.376],[23.744,90.376]]"
+                BoundaryGeoJson =
+                    "[[23.744,90.372],[23.748,90.372],[23.748,90.376],[23.744,90.376]]"
             },
             new ZoneMapData
             {
                 ZoneId = "Z2",
                 RiskLevel = "Medium",
                 DrainagePumpStatus = "Faulty",
-                BoundaryGeoJson = "[[23.820,90.363],[23.824,90.363],[23.824,90.368],[23.820,90.368]]"
+                BoundaryGeoJson =
+                    "[[23.820,90.363],[23.824,90.363],[23.824,90.368],[23.820,90.368]]"
             },
             new ZoneMapData
             {
                 ZoneId = "Z3",
                 RiskLevel = "Low",
                 DrainagePumpStatus = "Working",
-                BoundaryGeoJson = "[[23.790,90.406],[23.795,90.406],[23.795,90.410],[23.790,90.410]]"
+                BoundaryGeoJson =
+                    "[[23.790,90.406],[23.795,90.406],[23.795,90.410],[23.790,90.410]]"
             }
         );
+
         db.SaveChanges();
     }
 }
+
 app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -92,7 +136,16 @@ app.UseHttpsRedirection();
 
 var summaries = new[]
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+    "Freezing",
+    "Bracing",
+    "Chilly",
+    "Cool",
+    "Mild",
+    "Warm",
+    "Balmy",
+    "Hot",
+    "Sweltering",
+    "Scorching"
 };
 
 app.MapGet("/weatherforecast", () =>
@@ -105,14 +158,20 @@ app.MapGet("/weatherforecast", () =>
             summaries[Random.Shared.Next(summaries.Length)]
         ))
         .ToArray();
+
     return forecast;
 })
 .WithName("GetWeatherForecast");
 
 app.MapControllers();
+
 app.Run();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+record WeatherForecast(
+    DateOnly Date,
+    int TemperatureC,
+    string? Summary)
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    public int TemperatureF =>
+        32 + (int)(TemperatureC / 0.5556);
 }
