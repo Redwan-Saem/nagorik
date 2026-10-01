@@ -13,10 +13,16 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddControllers();
 
+// Existing services
 builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 
+// T-004.2 Crew assignment services
+builder.Services.AddScoped<ICrewTaskNotifier, NullCrewTaskNotifier>();
+builder.Services.AddScoped<CrewAssignmentService>();
+
+// Notification services
 builder.Services.AddSingleton<IPushSender, WebPushSender>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
