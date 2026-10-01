@@ -24,6 +24,7 @@ public enum ReportStatus
 {
     Pending,
     Approved,
+    Assigned,
     InProgress,
     Completed,
     Rejected
