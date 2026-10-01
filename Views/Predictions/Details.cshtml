@@ -1,0 +1,21 @@
+@model Nagorik.Api.Models.PredictionDetailsViewModel
+
+<h2 id="prediction-zone">@Model.ZoneName</h2>
+
+<p>
+    Severity:
+    <span id="prediction-severity" class="badge bg-danger">
+        @Model.RiskLevel
+    </span>
+</p>
+
+<p id="prediction-window">
+    @Model.WindowText
+</p>
+
+<p>
+    Issued:
+    <span id="prediction-issued">
+        @Model.IssuedAtText
+    </span>
+</p>
