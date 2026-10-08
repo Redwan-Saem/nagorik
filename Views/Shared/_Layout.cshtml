@@ -1,36 +1,66 @@
-@if (User.IsInRole("Resident"))
-{
-    <li class="nav-item">
-        <a class="nav-link"
-           asp-controller="Reports"
-           asp-action="Create">
-            Report an Issue
-        </a>
-    </li>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Nagorik</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header>
+        <span class="brand">Nagorik</span>
+        <nav>
+            <ul>
+                @if (User.IsInRole("Resident"))
+                {
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           asp-controller="Reports"
+                           asp-action="Create">
+                            Report an Issue
+                        </a>
+                    </li>
 
-    <li class="nav-item">
-        <a class="nav-link"
-           asp-controller="Reports"
-           asp-action="Mine">
-            My Reports
-        </a>
-    </li>
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           asp-controller="Reports"
+                           asp-action="Mine">
+                            My Reports
+                        </a>
+                    </li>
 
-    <li class="nav-item">
-        <a class="nav-link"
-           asp-controller="Notifications"
-           asp-action="Settings">
-            Alerts
-        </a>
-    </li>
-}
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           asp-controller="Notifications"
+                           asp-action="Settings">
+                            Alerts
+                        </a>
+                    </li>
+                }
 
-@if (User.IsInRole("Crew") || User.IsInRole("Dispatcher"))
-{
-    <li class="nav-item">
-        <button id="enable-push"
-                class="btn btn-sm btn-outline-light">
-            Enable notifications
-        </button>
-    </li>
-}
+                @if (User.IsInRole("Crew") || User.IsInRole("Dispatcher"))
+                {
+                    <li class="nav-item">
+                        <button id="enable-push"
+                                class="btn btn-sm btn-outline-light">
+                            Enable notifications
+                        </button>
+                    </li>
+                }
+            </ul>
+        </nav>
+    </header>
+
+    <main id="main">
+        @RenderBody()
+    </main>
+
+    @if (User.IsInRole("Crew") || User.IsInRole("Dispatcher"))
+    {
+        <script src="~/js/push-subscribe.js"></script>
+    }
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
