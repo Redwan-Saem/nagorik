@@ -1,0 +1,7 @@
+#official-reports [hidden] { display: none !important; }
+#reports-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1rem; }
+#reports-rows td:nth-child(2) { min-width: 12rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }
+.report-sort { padding: .3rem .4rem; min-height: 2.75rem; background: transparent; color: var(--river-strong); border-color: var(--line); border-radius: var(--radius-s); font-size: inherit; }
+.report-sort:hover { background: var(--river-tint); color: var(--river-strong); }
+th[aria-sort="ascending"] .report-sort::after { content: " ↑"; }
+th[aria-sort="descending"] .report-sort::after { content: " ↓"; }

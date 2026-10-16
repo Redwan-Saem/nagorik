@@ -46,6 +46,12 @@
                     </li>
                 }
 
+                @if (Nagorik.Api.Authorization.OfficialAccess.IsOfficial(User))
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="OfficialReports" asp-action="Index">City reports</a>
+                    </li>
+                }
 
                 @if (User.IsInRole("Crew"))
                 {

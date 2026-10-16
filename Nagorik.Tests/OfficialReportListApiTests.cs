@@ -90,6 +90,35 @@ public class OfficialReportListApiTests : IAsyncLifetime
         _queries.Sql.Clear();
     }
 
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.OK)]
+    [InlineData("CityOfficial", HttpStatusCode.OK)]
+    public async Task ReportListPageEnforcesRolesAndRendersTableOrPermissionMessage(string? role, HttpStatusCode expected)
+    {
+        if (role != null) Authenticate(role);
+        using var response = await _client.GetAsync("/official/reports");
+        Assert.Equal(expected, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        if (expected == HttpStatusCode.Forbidden)
+        {
+            Assert.Contains("You do not have permission", html);
+            Assert.DoesNotContain("id=\"reports-rows\"", html);
+        }
+        if (expected == HttpStatusCode.OK)
+        {
+            Assert.Contains("id=\"reports-rows\"", html);
+            Assert.Contains("data-sort=\"urgency\"", html);
+            Assert.Contains("Next page", html);
+            Assert.Contains("official-reports.js", html);
+            Assert.Contains("Loading reports", html);
+            Assert.Contains("href=\"/official/reports\"", html);
+        }
+        Assert.Empty(_queries.Sql);
+    }
 
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
