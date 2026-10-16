@@ -91,10 +91,98 @@ public class OfficialReportListApiTests : IAsyncLifetime
     }
 
 
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.OK)]
+    [InlineData("CityOfficial", HttpStatusCode.OK)]
+    public async Task OfficialDetailRequiresRoleOrAlias(string? role, HttpStatusCode expected)
+    {
+        if (role != null) Authenticate(role);
+        using var response = await _client.GetAsync("/api/official/reports/1");
+        Assert.Equal(expected, response.StatusCode);
+        if (expected != HttpStatusCode.OK) Assert.Empty(_queries.Sql);
+    }
 
+    [Fact]
+    public async Task OfficialDetailProjectsLocationPhotoCrewAndOrderedHistoryWithoutUserGraph()
+    {
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options))
+        {
+            TestDb.AddUser(db, 3);
+            db.Crews.Add(new Crew { Id = 10, UserId = 3, Name = "Road crew" });
+            var report = await db.Reports.SingleAsync(r => r.Id == 1);
+            report.AreaId = 1; report.Urgency = ReportUrgency.High; report.Authority = Authority.CityCorporation;
+            report.Location = "Road 5, Dhaka"; report.Latitude = 23.81; report.Longitude = 90.41;
+            report.ImageUrl = "/uploads/report-1.jpg"; report.AssignedCrewId = 10; report.Status = ReportStatus.InProgress;
+            var time = DateTime.UtcNow.AddHours(-1);
+            db.ReportStatusHistories.AddRange(
+                new ReportStatusHistory { ReportId = 1, Status = ReportStatus.InProgress, PreviousStatus = ReportStatus.Assigned, ChangedByUserId = 3, ChangedAtUtc = time.AddMinutes(3) },
+                new ReportStatusHistory { ReportId = 1, Status = ReportStatus.Approved, PreviousStatus = ReportStatus.Pending, ChangedByUserId = 1, ChangedAtUtc = time.AddMinutes(1) },
+                new ReportStatusHistory { ReportId = 1, Status = ReportStatus.Assigned, PreviousStatus = ReportStatus.Approved, ChangedByUserId = 1, ChangedAtUtc = time.AddMinutes(1) },
+                new ReportStatusHistory { ReportId = 1, Status = ReportStatus.Pending, ChangedByUserId = 2, ChangedAtUtc = time });
+            await db.SaveChangesAsync();
+        }
+        Authenticate("Official", cookie: true);
+        using var response = await _client.GetAsync("/api/official/reports/1");
+        response.EnsureSuccessStatusCode();
+        Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+        var detail = (await response.Content.ReadFromJsonAsync<OfficialReportDetailDto>())!;
+        Assert.Equal("Private detail 1", detail.Description);
+        Assert.Equal("R-000001", detail.Code);
+        Assert.Equal("Road 5, Dhaka", detail.Location);
+        Assert.Equal(23.81, detail.Latitude); Assert.Equal(90.41, detail.Longitude);
+        Assert.Equal("/uploads/report-1.jpg", detail.ImageUrl);
+        Assert.Equal("Dhanmondi", detail.AreaName); Assert.Equal("High", detail.Urgency);
+        Assert.Equal("CityCorporation", detail.Authority);
+        Assert.Equal(10, detail.AssignedCrewId); Assert.Equal("Road crew", detail.AssignedCrewName);
+        Assert.Equal(new[] { "Pending", "Approved", "Assigned", "InProgress" }, detail.StatusHistory.Select(h => h.Status));
+        Assert.Equal(new int?[] { 2, 1, 1, 3 }, detail.StatusHistory.Select(h => h.ChangedByUserId));
+        Assert.Null(detail.StatusHistory[0].PreviousStatus);
+        Assert.Equal("Assigned", detail.StatusHistory[3].PreviousStatus);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.False(json.RootElement.TryGetProperty("user", out _));
+        Assert.False(json.RootElement.TryGetProperty("passwordHash", out _));
+        Assert.Equal(2, _queries.Sql.Count);
+        Assert.DoesNotContain(_queries.Sql, sql => sql.Contains("PasswordHash") || sql.Contains("Email") || sql.Contains("PhoneNumber"));
+    }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task MissingOptionalDetailFieldsReturnNullAndEmptyHistory(string? photo)
+    {
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options))
+            await db.Reports.Where(r => r.Id == 7).ExecuteUpdateAsync(s => s.SetProperty(r => r.ImageUrl, photo));
+        Authenticate("Official");
+        var detail = (await _client.GetFromJsonAsync<OfficialReportDetailDto>("/api/official/reports/7"))!;
+        Assert.Null(detail.ImageUrl); Assert.Null(detail.AreaId); Assert.Null(detail.AreaName);
+        Assert.Null(detail.AssignedCrewId); Assert.Null(detail.AssignedCrewName);
+        Assert.Empty(detail.StatusHistory);
+    }
 
+    [Fact]
+    public async Task MissingOfficialDetailReturns404WithoutHistoryQuery()
+    {
+        Authenticate("Official");
+        using var response = await _client.GetAsync("/api/official/reports/999");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Single(_queries.Sql);
+    }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task InvalidDetailIdReturns400WithoutQuery(int id)
+    {
+        Authenticate("Official");
+        using var response = await _client.GetAsync($"/api/official/reports/{id}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Empty(_queries.Sql);
+    }
 
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]

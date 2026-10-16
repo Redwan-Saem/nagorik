@@ -9,8 +9,35 @@ public sealed record OfficialReportListItem(int Id, string Code, string Title, s
 public sealed record OfficialReportPage(IReadOnlyList<OfficialReportListItem> Items,
     int Page, int PageSize, int TotalCount, int TotalPages);
 
+public sealed record OfficialReportHistoryItem(string Status, string? PreviousStatus,
+    int? ChangedByUserId, DateTime ChangedAtUtc);
+
+public sealed record OfficialReportDetailDto(int Id, string Code, string Title, string Description,
+    string Category, string Authority, string Status, string Urgency, int? AreaId, string? AreaName,
+    string Location, double Latitude, double Longitude, string? ImageUrl, DateTime CreatedAt,
+    int? AssignedCrewId, string? AssignedCrewName, IReadOnlyList<OfficialReportHistoryItem> StatusHistory);
+
 public class OfficialReportQueryService(AppDbContext db)
 {
+    public async Task<OfficialReportDetailDto?> GetByIdAsync(int id, CancellationToken ct = default)
+    {
+        var report = await db.Reports.AsNoTracking().Where(r => r.Id == id)
+            .Select(r => new OfficialReportDetailDto(r.Id, $"R-{r.Id:D6}", r.Title, r.Description,
+                r.Category.ToString(), r.Authority.ToString(), r.Status.ToString(), r.Urgency.ToString(),
+                r.AreaId, r.Area == null ? null : r.Area.Name, r.Location, r.Latitude, r.Longitude,
+                string.IsNullOrWhiteSpace(r.ImageUrl) ? null : r.ImageUrl, r.CreatedAt,
+                r.AssignedCrewId, r.AssignedCrew == null ? null : r.AssignedCrew.Name,
+                Array.Empty<OfficialReportHistoryItem>()))
+            .SingleOrDefaultAsync(ct);
+        if (report == null) return null;
+        var history = await db.ReportStatusHistories.AsNoTracking().Where(h => h.ReportId == id)
+            .OrderBy(h => h.ChangedAtUtc).ThenBy(h => h.Id)
+            .Select(h => new OfficialReportHistoryItem(h.Status.ToString(),
+                h.PreviousStatus.HasValue ? h.PreviousStatus.Value.ToString() : null,
+                h.ChangedByUserId, h.ChangedAtUtc))
+            .ToListAsync(ct);
+        return report with { StatusHistory = history };
+    }
 
     public async Task<OfficialReportPage> ListAsync(OfficialReportListQuery request, CancellationToken ct = default)
     {

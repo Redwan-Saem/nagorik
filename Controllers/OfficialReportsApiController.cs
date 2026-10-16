@@ -17,5 +17,10 @@ public class OfficialReportsApiController(OfficialReportQueryService reports) : 
     public async Task<ActionResult<OfficialReportPage>> List([FromQuery] OfficialReportListQuery query, CancellationToken ct) =>
         Ok(await reports.ListAsync(query, ct));
 
-
+    [HttpGet("/api/official/reports/{id:int}")]
+    public async Task<ActionResult<OfficialReportDetailDto>> Detail([Range(1, int.MaxValue)] int id, CancellationToken ct)
+    {
+        var report = await reports.GetByIdAsync(id, ct);
+        return report == null ? Problem(statusCode: 404, title: "Report not found.") : Ok(report);
+    }
 }
