@@ -96,6 +96,44 @@ test('paging preserves filters, updates browser history, and sorting resets the 
     assert.ok(s.history.length >= 3);
 });
 
+test('report code is a real keyboard-accessible link and row click preserves applied list state', async () => {
+    const query = '?page=2&categories=RoadDamage&categories=WaterLogging&areaId=1&sort=urgency&direction=asc';
+    const s = setup(undefined, query); await flush();
+    const row = s.get('reports-rows').children[0];
+    const link = row.children[0].children[0];
+    assert.equal(link.tag, 'a'); assert.equal(link.textContent, 'R-000001');
+    assert.match(link.attributes['aria-label'], /View report R-000001/);
+    const destination = new URL(link.href, 'http://local');
+    assert.equal(destination.pathname, '/official/reports/1');
+    assert.equal(destination.searchParams.get('returnUrl'), '/official/reports' + query);
+    row.fire('click', { button: 0, target: { closest: () => null } });
+    assert.deepEqual(s.navigations, [link.href]);
+});
+
+test('row navigation leaves links, modifier clicks, prevented clicks, and text selection alone', async () => {
+    const s = setup(); await flush();
+    const row = s.get('reports-rows').children[0];
+    row.fire('click', { button: 0, target: { closest: () => ({ tag: 'a' }) } });
+    for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey', 'defaultPrevented'])
+        row.fire('click', { button: 0, [modifier]: true, target: { closest: () => null } });
+    row.fire('click', { button: 2, target: { closest: () => null } });
+    s.window.getSelection = () => ({ toString: () => 'Selected report text' });
+    row.fire('click', { button: 0, target: { closest: () => null } });
+    assert.equal(s.navigations.length, 0);
+});
+
+test('detail links reflect the current applied query after paging and sorting', async () => {
+    const s = setup(async url => ok(page({ page: Number(new URL(url, 'http://local').searchParams.get('page')) })), '?categories=PowerOutage&areaId=2');
+    await flush(); s.get('reports-next').fire('click'); await flush();
+    const link = () => s.get('reports-rows').children[0].children[0].children[0];
+    let back = new URL(new URL(link().href, 'http://local').searchParams.get('returnUrl'), 'http://local');
+    assert.equal(back.searchParams.get('page'), '2');
+    s.sorts[1].fire('click'); await flush();
+    back = new URL(new URL(link().href, 'http://local').searchParams.get('returnUrl'), 'http://local');
+    assert.equal(back.searchParams.get('page'), '1'); assert.equal(back.searchParams.get('sort'), 'status');
+    assert.equal(back.searchParams.get('categories'), 'PowerOutage'); assert.equal(back.searchParams.get('areaId'), '2');
+});
+
 test('empty results show an empty state without stale rows or pagination', async () => {
     const s = setup(async () => ok(page({ items: [], totalCount: 0, totalPages: 0 })));
     await flush();

@@ -1,0 +1,82 @@
+@model Nagorik.Api.Models.OfficialReportDetailViewModel
+@using Nagorik.Api.Models
+@{
+    var report = Model.Report;
+    ViewData["Title"] = report == null ? "Report not found" : $"Report {report.Code}";
+    string StatusLabel(string value) => value == "InProgress" ? "In Progress" : value;
+    var photoUrl = report?.ImageUrl;
+    var hasPhoto = photoUrl?.StartsWith("/uploads/", StringComparison.Ordinal) == true && Url.IsLocalUrl(photoUrl);
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/official-reports.css" asp-append-version="true" />
+}
+<section id="official-report-detail" aria-labelledby="official-detail-heading">
+    <a id="official-detail-back" href="@Model.ListUrl">Back to city reports</a>
+    @if (report == null)
+    {
+        <h1 id="official-detail-heading">Report not found</h1>
+        <p>The report may have been removed. Return to city reports to choose another report.</p>
+    }
+    else
+    {
+        <h1 id="official-detail-heading">Report @report.Code</h1>
+        <article class="card official-report-content">
+            <h2>@report.Title</h2>
+            <p class="official-report-description">@report.Description</p>
+            <dl class="official-report-facts">
+                <dt>Category</dt><dd>@(ReportLookups.Categories.FirstOrDefault(c => c.Category.ToString() == report.Category)?.Name ?? report.Category)</dd>
+                <dt>Area</dt><dd>@(report.AreaName ?? "Unclassified")</dd>
+                <dt>Location</dt><dd>@report.Location</dd>
+                <dt>Coordinates</dt><dd>@FormattableString.Invariant($"{report.Latitude:F5}, {report.Longitude:F5}")</dd>
+                <dt>Current status</dt><dd><span class="badge">@StatusLabel(report.Status)</span></dd>
+                <dt>Urgency</dt><dd>@report.Urgency</dd>
+                <dt>Authority</dt><dd>@report.Authority</dd>
+                <dt>Assigned crew</dt><dd>@(report.AssignedCrewName ?? "Not assigned")</dd>
+                <dt>Submitted (UTC)</dt>
+                <dd><time datetime="@report.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@report.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</time></dd>
+            </dl>
+        </article>
+        <section aria-labelledby="official-photo-heading">
+            <h2 id="official-photo-heading">Report photo</h2>
+            @if (hasPhoto)
+            {
+                <figure id="official-photo-preview">
+                    <img id="official-report-photo" src="@photoUrl" alt="Photo of the issue reported in @report.Code" />
+                    <figcaption><a href="@photoUrl">Open original photo</a></figcaption>
+                </figure>
+                <p id="official-photo-unavailable" hidden>The report photo could not be loaded.</p>
+            }
+            else
+            {
+                <p>No report photo is available.</p>
+            }
+        </section>
+        <section aria-labelledby="official-history-heading">
+            <h2 id="official-history-heading">Status history</h2>
+            @if (report.StatusHistory.Count == 0)
+            {
+                <p>No status history is available yet.</p>
+            }
+            else
+            {
+                <ol class="official-report-history">
+                    @foreach (var entry in report.StatusHistory)
+                    {
+                        <li>
+                            @if (entry.PreviousStatus != null)
+                            {
+                                <span>@StatusLabel(entry.PreviousStatus) → </span>
+                            }
+                            <strong>@StatusLabel(entry.Status)</strong>
+                            <time datetime="@entry.ChangedAtUtc.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@entry.ChangedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</time>
+                            <span class="muted">@(entry.ChangedByUserId.HasValue ? $"by user #{entry.ChangedByUserId}" : "Actor not recorded")</span>
+                        </li>
+                    }
+                </ol>
+            }
+        </section>
+    }
+</section>
+@section Scripts {
+    <script src="~/js/official-report-detail.js" asp-append-version="true"></script>
+}

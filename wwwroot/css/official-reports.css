@@ -12,3 +12,15 @@
 .report-sort:hover { background: var(--river-tint); color: var(--river-strong); }
 th[aria-sort="ascending"] .report-sort::after { content: " ↑"; }
 th[aria-sort="descending"] .report-sort::after { content: " ↓"; }
+.official-report-row { cursor: pointer; }
+.official-report-row:hover, .official-report-row:focus-within { background: var(--river-tint); }
+#reports-rows a { display: inline-block; padding: .5rem 0; text-underline-offset: .2em; }
+#official-report-detail [hidden] { display: none !important; }
+.official-report-content, .official-report-facts dd { overflow-wrap: anywhere; }
+.official-report-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.official-report-facts dt { font-weight: 600; margin-top: .75rem; }
+.official-report-facts dd { margin-left: 0; }
+#official-photo-preview { margin: 0; }
+#official-report-photo { display: block; max-width: 100%; max-height: 32rem; object-fit: contain; border-radius: var(--radius-s); }
+.official-report-history li { margin-bottom: 1rem; }
+.official-report-history time { display: block; }
