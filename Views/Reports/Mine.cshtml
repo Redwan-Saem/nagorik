@@ -23,7 +23,7 @@ else
             @foreach (var r in Model)
             {
                 <tr class="report-row" data-report-id="@r.Id">
-                    <td>R-@r.Id.ToString("D6")</td>
+                    <td><a asp-controller="Reports" asp-action="Detail" asp-route-id="@r.Id">R-@r.Id.ToString("D6")</a></td>
 
                     <td>@r.Category</td>
 
