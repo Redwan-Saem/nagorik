@@ -88,6 +88,37 @@ public class SosApiTests : IAsyncLifetime
 
 
 
+    [Fact]
+    public async Task SosScreens_RequireAuthenticationAndShowReviewThenOwnerConfirmationAndCancellation()
+    {
+        using var anonymous = await _client.GetAsync("/sos");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Authenticate("1");
+        var triggerPage = await _client.GetStringAsync("/sos");
+        Assert.Contains("Hold to prepare SOS", triggerPage);
+        Assert.Contains("Review SOS without holding", triggerPage);
+        Assert.Contains("Confirm and send SOS", triggerPage);
+        Assert.Contains("Address or landmark", triggerPage);
+        await using (var before = CreateDb()) Assert.Empty(await before.SosAlerts.ToListAsync());
+        var alert = await Trigger();
+        var confirmation = await _client.GetStringAsync($"/sos/{alert.Id}");
+        Assert.Contains("SOS alert recorded", confirmation);
+        Assert.Contains($"SOS-{alert.Id:D6}", confirmation);
+        Assert.Contains("Cancel this SOS alert?", confirmation);
+        Assert.Contains("Keep alert active", confirmation);
+        using var existing = await _client.GetAsync("/sos");
+        Assert.EndsWith("/sos/active", existing.RequestMessage!.RequestUri!.AbsolutePath);
+        Authenticate("2");
+        using var hidden = await _client.GetAsync($"/sos/{alert.Id}");
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        Authenticate("1");
+        using var cancelled = await _client.PostAsync($"/api/sos/{alert.Id}/cancel", null);
+        cancelled.EnsureSuccessStatusCode();
+        var finalPage = await _client.GetStringAsync($"/sos/{alert.Id}");
+        Assert.Contains("SOS alert cancelled", finalPage);
+        Assert.DoesNotContain("id=\"sos-active\"", finalPage);
+        Assert.DoesNotContain("id=\"sos-cancel-confirm\"", finalPage);
+    }
 
     [Fact]
     public async Task Trigger_NotifiesOnlyConfiguredResponderAfterCommitWithinTargetAndLinkIsProtected()

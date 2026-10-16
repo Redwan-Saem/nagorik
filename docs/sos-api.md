@@ -1,5 +1,6 @@
 # SOS API
 
+The authenticated SOS screen is `/sos`. It redirects to `/sos/active` when an alert is already active. A two-second pointer/keyboard hold followed by release opens a review dialog; an alternative Review button supports users who cannot hold. Only the separate confirmation sends the alert. GPS permission denial leaves the manual address path available. The saved-alert screen is `/sos/{id}`, restricted to its owner, and offers an explicit cancellation confirmation. Cancellation stops this page's GPS watch before submitting and shows the saved terminal status after success.
 
 All endpoints require authentication using the existing `auth_token` cookie (or a valid JWT bearer token). Alert ownership comes from the authenticated user; caller-supplied owner, responder, and status fields are ignored.
 

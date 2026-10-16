@@ -1,0 +1,24 @@
+@model Nagorik.Api.Services.SosAlertDto
+@{
+    var active = Model.Status is "Active" or "Responding";
+    ViewData["Title"] = active ? "SOS alert recorded" : $"SOS alert {Model.Status.ToLowerInvariant()}";
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/sos.css" asp-append-version="true" />
+}
+<h1>@ViewData["Title"]</h1>
+@if (active)
+{
+    <p>Your SOS alert is saved. Its reference is <strong>SOS-@Model.Id.ToString("D6")</strong>.</p>
+    @await Html.PartialAsync("_ActiveAlert", Model)
+}
+else
+{
+    <p>SOS-@Model.Id.ToString("D6") is <strong>@Model.Status.ToLowerInvariant()</strong>.</p>
+    <p>Live location sharing for this alert has stopped.</p>
+    <a class="btn" asp-controller="Sos" asp-action="Index">Request SOS assistance</a>
+}
+@section Scripts {
+    <script src="~/js/sos-live-location.js" asp-append-version="true"></script>
+    <script src="~/js/sos-active.js" asp-append-version="true"></script>
+}

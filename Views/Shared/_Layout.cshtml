@@ -13,6 +13,12 @@
         <span class="brand">Nagorik</span>
         <nav>
             <ul>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="Sos" asp-action="Index">SOS assistance</a>
+                    </li>
+                }
                 @if (User.IsInRole("Resident"))
                 {
                     <li class="nav-item">
