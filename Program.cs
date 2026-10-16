@@ -37,6 +37,7 @@ builder.Services.AddOptions<SosOptions>().Bind(builder.Configuration.GetSection(
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddScoped<SosResponderDirectory>();
 builder.Services.AddScoped<SosResponderNotifier>();
+builder.Services.AddScoped<OfficialReportQueryService>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
