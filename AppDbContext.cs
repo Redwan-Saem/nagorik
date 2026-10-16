@@ -33,13 +33,28 @@ namespace Nagorik.Api
         public DbSet<Crew> Crews { get; set; }
 
         public DbSet<CrewAssignment> CrewAssignments { get; set; }
-
+        public DbSet<ReportStatusHistory> ReportStatusHistories
+            => Set<ReportStatusHistory>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
+            builder.Entity<ReportStatusHistory>(entity =>
+            {
+                entity.Property(x => x.Status)
+                    .HasConversion<string>();
 
+                entity.HasIndex(x => new
+                {
+                    x.ReportId,
+                    x.ChangedAtUtc
+                });
+
+                entity.HasOne(x => x.Report)
+                    .WithMany()
+                    .HasForeignKey(x => x.ReportId);
+            });
             // Report configuration
             builder.Entity<Report>(e =>
             {

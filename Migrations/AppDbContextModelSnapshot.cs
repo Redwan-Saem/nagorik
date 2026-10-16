@@ -201,6 +201,29 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("Reports");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.ReportStatusHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ReportId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportId", "ChangedAtUtc");
+
+                    b.ToTable("ReportStatusHistories");
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -380,6 +403,17 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("AssignedCrew");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ReportStatusHistory", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.Report", "Report")
+                        .WithMany()
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Report");
                 });
 #pragma warning restore 612, 618
         }

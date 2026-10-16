@@ -121,11 +121,20 @@ public class CrewTaskNotifierTests
         await WithDb(async db =>
         {
             TestDb.AddUser(db, 1);
+            TestDb.AddUser(db, 101);
+
             db.Reports.Add(new Report
             {
-                Id = 1, Title = "Road", Description = "x", Category = ReportCategory.RoadDamage,
-                Authority = Authority.CityCorporation, Status = ReportStatus.Approved,
-                Location = "Dhaka", Latitude = 23.75, Longitude = 90.39, UserId = 1
+                Id = 1,
+                Title = "Road",
+                Description = "x",
+                Category = ReportCategory.RoadDamage,
+                Authority = Authority.CityCorporation,
+                Status = ReportStatus.Approved,
+                Location = "Dhaka",
+                Latitude = 23.75,
+                Longitude = 90.39,
+                UserId = 1
             });
             db.Crews.Add(new Crew { Id = 1, Name = "Crew 1", UserId = 101 });
             await db.SaveChangesAsync();
@@ -151,11 +160,20 @@ public class CrewTaskNotifierTests
         await WithDb(async db =>
         {
             TestDb.AddUser(db, 1);
+            TestDb.AddUser(db, 101);
+
             db.Reports.Add(new Report
             {
-                Id = 1, Title = "Road", Description = "x", Category = ReportCategory.RoadDamage,
-                Authority = Authority.CityCorporation, Status = ReportStatus.Approved,
-                Location = "Dhaka", Latitude = 23.75, Longitude = 90.39, UserId = 1
+                Id = 1,
+                Title = "Road",
+                Description = "x",
+                Category = ReportCategory.RoadDamage,
+                Authority = Authority.CityCorporation,
+                Status = ReportStatus.Approved,
+                Location = "Dhaka",
+                Latitude = 23.75,
+                Longitude = 90.39,
+                UserId = 1
             });
             db.Crews.Add(new Crew { Id = 1, Name = "Crew 1", UserId = 101 });
             await db.SaveChangesAsync();
@@ -175,6 +193,15 @@ public class CrewTaskNotifierTests
 
             Assert.Equal(AssignOutcome.Assigned, result.Outcome);
             Assert.Equal(ReportStatus.Assigned, (await db.Reports.SingleAsync(r => r.Id == 1)).Status);
+            var history = await db.ReportStatusHistories
+    .SingleAsync(h => h.ReportId == 1);
+
+            Assert.Equal(ReportStatus.Assigned, history.Status);
+
+            var assignment = await db.CrewAssignments
+                .SingleAsync(a => a.ReportId == 1);
+
+            Assert.Equal(assignment.AssignedAtUtc, history.ChangedAtUtc);
         });
     }
 }
