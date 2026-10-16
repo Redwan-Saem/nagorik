@@ -6,6 +6,8 @@
 
 Indexes cover newest-first ordering with an Id tie-breaker, category, area, combined area/category, status ordering, and urgency ordering. SQLite query-plan tests check the combined area/category index against a 10,000-report dataset.
 
+The repeatable HTTP benchmark, environment, timings, and captured EF query plans are documented in [T-008.7 performance results](performance/official-report-list.md). Its isolated temporary database does not require enabling the development flags below.
+
 ## Optional development datasets
 
 Both flags default to false in `appsettings.Development.json`. They are ignored outside the Development environment, even if explicitly enabled. Migrate the database before starting the app.
