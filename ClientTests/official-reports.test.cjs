@@ -8,14 +8,17 @@ const script = readFileSync(join(__dirname, '../wwwroot/js/official-reports.js')
 function node(tag = 'div') {
     const events = new Map();
     return {
-        tag, children: [], attributes: {}, dataset: {}, hidden: false, disabled: false, ownText: '',
+        tag, children: [], attributes: {}, dataset: {}, hidden: false, disabled: false, ownText: '', value: '', checked: false,
         set textContent(value) { this.ownText = String(value); this.children = []; },
         get textContent() { return this.ownText + this.children.map(c => c.textContent).join(''); },
         set innerHTML(value) { assert.fail('Untrusted text must never be inserted as HTML'); },
         appendChild(child) { this.children.push(child); child.parentElement = this; return child; },
+        get options() { return this.children; },
+        querySelector(selector) { return this.children.find(child => selector === '[data-unknown-area]' && 'data-unknown-area' in child.attributes); },
+        remove() { this.parentElement.children = this.parentElement.children.filter(child => child !== this); },
         replaceChildren() { this.children = []; this.ownText = ''; },
         setAttribute(key, value) { this.attributes[key] = value; }, removeAttribute(key) { delete this.attributes[key]; },
-        addEventListener(key, fn) { events.set(key, fn); }, fire(key) { return events.get(key)?.(); }
+        addEventListener(key, fn) { events.set(key, fn); }, fire(key, data = {}) { return events.get(key)?.({ preventDefault() {}, ...data }); }
     };
 }
 const report = title => ({ id: 1, code: 'R-000001', title, category: 'RoadDamage', areaName: null,
@@ -30,7 +33,13 @@ function setup(fetcher = async () => ok(page()), search = '') {
     const sorts = ['date', 'status', 'urgency'].map(sort => {
         const button = node('button'); button.dataset.sort = sort; button.parentElement = node('th'); return button;
     });
-    get('official-reports').querySelectorAll = () => sorts;
+    const categories = ['RoadDamage', 'WaterLogging', 'PowerOutage'].map(value => {
+        const input = node('input'); input.value = value; return input;
+    });
+    for (const value of ['', '1', '2', '3']) {
+        const option = node('option'); option.value = value; get('reports-area').appendChild(option);
+    }
+    get('official-reports').querySelectorAll = selector => selector === '[data-sort]' ? sorts : categories;
     const windowEvents = new Map();
     const requests = [];
     const navigations = [];
@@ -44,7 +53,7 @@ function setup(fetcher = async () => ok(page()), search = '') {
         document: { getElementById: get, createElement: tag => node(tag) }, window, URLSearchParams, AbortController,
         fetch: async (url, options) => { requests.push({ url, options }); return fetcher(url, options); }
     });
-    return { get, sorts, requests, navigations, history, window, event: (name, data) => windowEvents.get(name)?.(data) };
+    return { get, sorts, categories, requests, navigations, history, window, event: (name, data) => windowEvents.get(name)?.(data) };
 }
 
 test('shows loading state then safely renders report values, UTC date, and pagination', async () => {
@@ -94,6 +103,73 @@ test('empty results show an empty state without stale rows or pagination', async
     assert.equal(s.get('reports-table-wrap').hidden, true);
     assert.equal(s.get('reports-pagination').hidden, true);
     assert.equal(s.get('reports-summary').textContent, '0 reports found.');
+    assert.equal(s.get('reports-empty').textContent, 'No reports match your filters.');
+});
+
+test('restores category checkboxes and area from a refreshed URL including case-insensitive names', async () => {
+    const s = setup(undefined, '?Categories=roaddamage&categories=WaterLogging&AreaId=2&page=2'); await flush();
+    assert.deepEqual(s.categories.map(input => input.checked), [true, true, false]);
+    assert.equal(s.get('reports-area').value, '2');
+    const requested = new URL(s.requests[0].url, 'http://local').searchParams;
+    assert.deepEqual(requested.getAll('categories'), ['roaddamage', 'WaterLogging']);
+    assert.equal(requested.get('areaId'), '2');
+    assert.equal(s.history.length, 0);
+});
+
+test('Apply sends two categories and one area, resets paging, and preserves sorting', async () => {
+    const s = setup(undefined, '?page=3&sort=urgency&direction=asc'); await flush();
+    s.categories[0].checked = s.categories[1].checked = true; s.get('reports-area').value = '1';
+    assert.equal(s.requests.length, 1); // Draft edits do not fetch until Apply.
+    s.get('reports-filters').fire('submit'); await flush();
+    const requested = new URL(s.requests.at(-1).url, 'http://local').searchParams;
+    assert.deepEqual(requested.getAll('categories'), ['RoadDamage', 'WaterLogging']);
+    assert.equal(requested.get('areaId'), '1'); assert.equal(requested.get('page'), '1');
+    assert.equal(requested.get('sort'), 'urgency'); assert.equal(requested.get('direction'), 'asc');
+    assert.equal(new URL(s.history.at(-1), 'http://local').search, `?${requested}`);
+});
+
+test('Clear removes category and area parameters and resets controls while retaining sort', async () => {
+    const s = setup(undefined, '?categories=RoadDamage&areaId=1&page=3&sort=status&direction=asc'); await flush();
+    s.get('reports-clear').fire('click'); await flush();
+    const requested = new URL(s.requests.at(-1).url, 'http://local').searchParams;
+    assert.equal(requested.has('categories'), false); assert.equal(requested.has('areaId'), false);
+    assert.equal(requested.get('page'), '1'); assert.equal(requested.get('sort'), 'status'); assert.equal(requested.get('direction'), 'asc');
+    assert.ok(s.categories.every(input => !input.checked)); assert.equal(s.get('reports-area').value, '');
+});
+
+test('Back and Forward restore applied filters and fetch their result count without pushing history', async () => {
+    const s = setup(async url => ok(page({ totalCount: new URL(url, 'http://local').searchParams.has('areaId') ? 1 : 45 })));
+    await flush();
+    s.window.location.search = '?categories=PowerOutage&areaId=2&page=1&sort=status&direction=asc';
+    s.event('popstate'); await flush();
+    assert.deepEqual(s.categories.map(input => input.checked), [false, false, true]);
+    assert.equal(s.get('reports-area').value, '2'); assert.equal(s.get('reports-summary').textContent, '1 report found.');
+    s.window.location.search = ''; s.event('popstate'); await flush();
+    assert.ok(s.categories.every(input => !input.checked)); assert.equal(s.get('reports-area').value, '');
+    assert.equal(s.get('reports-summary').textContent, '45 reports found.'); assert.equal(s.history.length, 0);
+});
+
+test('a failed filter request keeps its URL and selection for refresh or retry', async () => {
+    let fail = false;
+    const s = setup(async () => { if (fail) throw new TypeError('Offline'); return ok(page()); }); await flush();
+    fail = true; s.categories[0].checked = true; s.get('reports-area').value = '3';
+    s.get('reports-filters').fire('submit'); await flush();
+    assert.match(s.history.at(-1), /categories=RoadDamage/); assert.match(s.history.at(-1), /areaId=3/);
+    assert.equal(s.get('reports-apply').disabled, false); assert.equal(s.get('reports-clear').disabled, false);
+    const failedUrl = s.requests.at(-1).url;
+    fail = false; s.get('reports-retry').fire('click'); await flush();
+    assert.equal(s.requests.at(-1).url, failedUrl);
+});
+
+test('unknown areas remain visible and selected until Clear removes the filter', async () => {
+    const s = setup(undefined, '?areaId=999'); await flush();
+    assert.equal(s.get('reports-area').value, '999');
+    assert.equal(s.get('reports-area').options.at(-1).textContent, 'Unknown area (999)');
+    s.categories[0].checked = true; s.get('reports-filters').fire('submit'); await flush();
+    assert.equal(new URL(s.requests.at(-1).url, 'http://local').searchParams.get('areaId'), '999');
+    assert.equal(s.get('reports-area').options.length, 5);
+    s.get('reports-clear').fire('click'); await flush();
+    assert.equal(s.get('reports-area').options.length, 4);
 });
 
 test('401 navigates to login with the report-list return URL', async () => {

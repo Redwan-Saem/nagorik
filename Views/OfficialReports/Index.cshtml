@@ -1,3 +1,4 @@
+@model Nagorik.Api.Models.OfficialReportFiltersViewModel
 @{
     ViewData["Title"] = "City reports";
 }
@@ -6,11 +7,38 @@
 }
 <section id="official-reports" aria-labelledby="reports-heading">
     <h1 id="reports-heading">City reports</h1>
+    <form id="reports-filters" method="get" asp-controller="OfficialReports" asp-action="Index" class="card" aria-label="Filter city reports">
+        <fieldset>
+            <legend>Categories</legend>
+            <p id="reports-category-help">Choose any categories, or leave all unchecked to include every category.</p>
+            <div class="report-category-options">
+                @foreach (var category in Model.Categories)
+                {
+                    <label for="report-category-@category.Category">
+                        <input id="report-category-@category.Category" type="checkbox" name="categories" value="@category.Category" data-report-category aria-describedby="reports-category-help" />
+                        @category.Name
+                    </label>
+                }
+            </div>
+        </fieldset>
+        <label for="reports-area">Area</label>
+        <select id="reports-area" name="areaId">
+            <option value="">All areas</option>
+            @foreach (var area in Model.Areas)
+            {
+                <option value="@area.Id">@area.Name</option>
+            }
+        </select>
+        <div class="report-filter-actions">
+            <button id="reports-apply" type="submit">Apply filters</button>
+            <button id="reports-clear" type="button" class="btn btn-ghost">Clear filters</button>
+        </div>
+    </form>
     <p id="reports-summary" role="status" aria-live="polite">Loading reports…</p>
     <div id="reports-error" class="alert alert-bad" role="alert" hidden></div>
     <button id="reports-retry" type="button" hidden>Retry loading reports</button>
     <a id="reports-reset" asp-controller="OfficialReports" asp-action="Index" hidden>Reset report list</a>
-    <p id="reports-empty" class="card" hidden>No reports match this selection.</p>
+    <p id="reports-empty" class="card" hidden>No reports match your filters.</p>
     <div id="reports-table-wrap" class="table-wrap" role="region" aria-label="City reports" tabindex="0" hidden>
         <table>
             <caption class="sr-only">City reports, up to 20 reports per page</caption>
@@ -28,7 +56,7 @@
         <span id="reports-page-label"></span>
         <button id="reports-next" class="btn btn-ghost" type="button">Next page</button>
     </nav>
-    <noscript><p>Enable JavaScript to load, sort, and page through city reports.</p></noscript>
+    <noscript><p>Enable JavaScript to filter, load, sort, and page through city reports.</p></noscript>
 </section>
 @section Scripts {
     <script src="~/js/official-reports.js" asp-append-version="true"></script>

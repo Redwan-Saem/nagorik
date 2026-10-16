@@ -13,10 +13,34 @@
     const previous = get('reports-previous');
     const next = get('reports-next');
     const sorts = [...root.querySelectorAll('[data-sort]')];
+    const filters = get('reports-filters');
+    const categories = [...root.querySelectorAll('[data-report-category]')];
+    const area = get('reports-area');
+    const apply = get('reports-apply');
+    const clear = get('reports-clear');
     let params;
     let sequence = 0;
     let controller;
     let page;
+    function queryParams(values) {
+        const result = new URLSearchParams();
+        const keys = { categories: 'categories', areaid: 'areaId', page: 'page', sort: 'sort', direction: 'direction' };
+        for (const [key, value] of new URLSearchParams(values)) result.append(keys[key.toLowerCase()] || key, value);
+        return result;
+    }
+    function restoreFilters(values) {
+        const selected = new Set(values.getAll('categories').map(value => value.toLowerCase()));
+        categories.forEach(input => { input.checked = selected.has(input.value.toLowerCase()); });
+        // Retain unknown area IDs visibly so applying a category does not silently remove that filter.
+        area.querySelector('[data-unknown-area]')?.remove();
+        const areaId = values.get('areaId') || '';
+        if (areaId && ![...area.options].some(option => option.value === areaId)) {
+            const option = document.createElement('option');
+            option.value = areaId; option.textContent = `Unknown area (${areaId})`;
+            option.setAttribute('data-unknown-area', ''); area.appendChild(option);
+        }
+        area.value = areaId;
+    }
     function cell(row, text) {
         const td = document.createElement('td');
         td.textContent = text ?? '';
@@ -45,11 +69,13 @@
         }
     }
     async function load(values, push = false) {
-        params = new URLSearchParams(values);
+        params = queryParams(values);
         if (!params.has('page')) params.set('page', '1');
         if (!params.has('sort')) params.set('sort', 'date');
         if (!params.has('direction')) params.set('direction', 'desc');
         const requested = new URLSearchParams(params);
+        restoreFilters(requested);
+        if (push) window.history.pushState({}, '', `/official/reports?${requested}`);
         const current = ++sequence;
         controller?.abort(); controller = new AbortController();
         root.setAttribute('aria-busy', 'true');
@@ -58,6 +84,7 @@
         table.hidden = empty.hidden = pagination.hidden = true;
         previous.disabled = next.disabled = true;
         sorts.forEach(button => { button.disabled = true; });
+        apply.disabled = clear.disabled = true;
         try {
             const response = await fetch(`/api/reports?${requested}`, {
                 credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' }, signal: controller.signal
@@ -81,7 +108,7 @@
             render(data.items);
             table.hidden = data.items.length === 0;
             empty.hidden = data.items.length !== 0;
-            empty.textContent = data.totalCount === 0 ? 'No reports match this selection.' : 'There are no reports on this page. Go to the previous page or reset the report list.';
+            empty.textContent = data.totalCount === 0 ? 'No reports match your filters.' : 'There are no reports on this page. Go to the previous page or reset the report list.';
             summary.textContent = `${data.totalCount} report${data.totalCount === 1 ? '' : 's'} found.`;
             pagination.hidden = data.totalCount === 0;
             get('reports-page-label').textContent = data.page <= data.totalPages ? `Page ${data.page} of ${data.totalPages}` :
@@ -91,7 +118,6 @@
             sorts.forEach(button => {
                 button.parentElement.setAttribute('aria-sort', button.dataset.sort === sort ? direction === 'asc' ? 'ascending' : 'descending' : 'none');
             });
-            if (push) window.history.pushState({}, '', `/official/reports?${requested}`);
         } catch (failure) {
             if (current !== sequence || failure.name === 'AbortError') return;
             summary.textContent = 'Reports are unavailable.';
@@ -100,9 +126,25 @@
         } finally {
             if (current === sequence) {
                 root.removeAttribute('aria-busy'); sorts.forEach(button => { button.disabled = false; });
+                apply.disabled = clear.disabled = false;
             }
         }
     }
+    filters.addEventListener('submit', event => {
+        event.preventDefault();
+        if (apply.disabled) return;
+        const values = new URLSearchParams(params);
+        values.delete('categories'); values.delete('areaId');
+        categories.filter(input => input.checked).forEach(input => values.append('categories', input.value));
+        if (area.value) values.set('areaId', area.value);
+        values.set('page', '1'); load(values, true);
+    });
+    clear.addEventListener('click', () => {
+        if (clear.disabled) return;
+        const values = new URLSearchParams(params);
+        values.delete('categories'); values.delete('areaId'); values.set('page', '1');
+        load(values, true);
+    });
     previous.addEventListener('click', () => {
         if (previous.disabled || !page) return;
         const values = new URLSearchParams(params); values.set('page', String(page.page - 1)); load(values, true);
