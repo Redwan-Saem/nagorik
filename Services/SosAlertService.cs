@@ -8,7 +8,7 @@ namespace Nagorik.Api.Services;
 public sealed record SosAlertDto(int Id, double? Latitude, double? Longitude, string AddressText,
     DateTime CreatedAtUtc, DateTime UpdatedAtUtc, string Status, int? ResponderUserId);
 
-public enum SosOutcome { Created, Success, NotFound, Conflict, Invalid, UserNotFound }
+public enum SosOutcome { Created, Success, NotFound, Conflict, Invalid, UserNotFound, RequestConflict }
 public sealed record SosResult(SosOutcome Outcome, SosAlertDto? Alert = null,
     Dictionary<string, string[]>? Errors = null);
 
@@ -25,19 +25,29 @@ public class SosAlertService(AppDbContext db, SosResponderNotifier responderNoti
         return alert == null ? null : ToDto(alert);
     }
 
+    public async Task<SosAlertDto?> GetByRequestIdAsync(Guid requestId, int userId, CancellationToken ct = default)
+    {
+        var alert = await db.SosAlerts.AsNoTracking()
+            .SingleOrDefaultAsync(a => a.UserId == userId && a.ClientRequestId == requestId, ct);
+        return alert == null ? null : ToDto(alert);
+    }
 
-    public async Task<SosResult> TriggerAsync(int userId, SosLocationRequest request, CancellationToken ct = default)
+    public async Task<SosResult> TriggerAsync(int userId, SosTriggerRequest request, CancellationToken ct = default)
     {
         var invalid = Validate(request);
         if (invalid != null) return invalid;
+        if (request.ClientRequestId == Guid.Empty)
+            return new(SosOutcome.Invalid, Errors: new() { [nameof(request.ClientRequestId)] = ["Use a nonempty submission reference."] });
         if (!await db.Users.AnyAsync(u => u.Id == userId, ct)) return new(SosOutcome.UserNotFound);
+        var replay = await FindReplayAsync(userId, request, ct);
+        if (replay != null) return replay;
         var existing = await GetActiveAsync(userId, ct);
         if (existing != null) return new(SosOutcome.Conflict, existing);
 
         var now = DateTime.UtcNow;
         var alert = new SosAlert
         {
-            UserId = userId,
+            UserId = userId, ClientRequestId = request.ClientRequestId,
             Latitude = request.Latitude, Longitude = request.Longitude,
             AddressText = request.AddressText?.Trim() ?? "", CreatedAtUtc = now, UpdatedAtUtc = now
         };
@@ -50,6 +60,8 @@ public class SosAlertService(AppDbContext db, SosResponderNotifier responderNoti
             // Another trigger may have passed the preflight at the same time.
             db.Entry(history).State = EntityState.Detached;
             db.Entry(alert).State = EntityState.Detached;
+            replay = await FindReplayAsync(userId, request, ct);
+            if (replay != null) return replay;
             existing = await GetActiveAsync(userId, ct);
             if (existing == null) throw;
             return new(SosOutcome.Conflict, existing);
@@ -58,6 +70,19 @@ public class SosAlertService(AppDbContext db, SosResponderNotifier responderNoti
         return new(SosOutcome.Created, ToDto(alert));
     }
 
+    private async Task<SosResult?> FindReplayAsync(int userId, SosTriggerRequest request, CancellationToken ct)
+    {
+        if (!request.ClientRequestId.HasValue) return null;
+        var prior = await db.SosAlerts.AsNoTracking().SingleOrDefaultAsync(a =>
+            a.UserId == userId && a.ClientRequestId == request.ClientRequestId, ct);
+        if (prior == null) return null;
+        var original = await db.SosAlertEvents.AsNoTracking().FirstOrDefaultAsync(e =>
+            e.SosAlertId == prior.Id && e.EventType == SosAlertEventType.Triggered, ct);
+        if (original == null || original.Latitude != request.Latitude || original.Longitude != request.Longitude ||
+            original.AddressText != (request.AddressText?.Trim() ?? ""))
+            return new(SosOutcome.RequestConflict);
+        return new(SosOutcome.Success, ToDto(prior));
+    }
 
     public async Task<SosResult> UpdateLocationAsync(int id, int userId, SosLocationRequest request, CancellationToken ct = default)
     {

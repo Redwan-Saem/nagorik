@@ -4,6 +4,7 @@ const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { runInNewContext, createContext } = require('node:vm');
 const script = readFileSync(join(__dirname, '../wwwroot/js/sos-trigger.js'), 'utf8');
+const submissionScript = readFileSync(join(__dirname, '../wwwroot/js/sos-submission.js'), 'utf8');
 
 function element() {
     const listeners = new Map();
@@ -42,6 +43,9 @@ function setup({ offline = false, noGps = false, responseStatus = 201, fetcher }
             return fetcher ? fetcher(url, options) : { ok: responseStatus === 201, status: responseStatus, json: async () => ({ id: 7, status: 'Active' }) };
         }
     });
+    runInNewContext(submissionScript, context);
+    const Submission = context.SosSubmission;
+    context.SosSubmission = class extends Submission { constructor(options) { super({ ...options, sleep: async () => {} }); } };
     runInNewContext(script, context);
     return {
         get, requests, navigations, navigator,
@@ -76,7 +80,7 @@ test('a deliberate hold requires release, review, and separate confirmation', as
     assert.equal(s.get('sos-review-back').focused, true);
     await s.get('sos-confirm').fire('click');
     assert.equal(s.requests.length, 1);
-    assert.deepEqual(JSON.parse(s.requests[0].options.body), { addressText: 'House 5, Dhaka' });
+    assert.deepEqual(JSON.parse(s.requests[0].options.body), { addressText: 'House 5, Dhaka', clientRequestId: '11111111-1111-4111-8111-111111111111' });
     assert.equal(s.requests[0].options.credentials, 'same-origin');
     assert.deepEqual(s.navigations, ['/sos/7']);
 });

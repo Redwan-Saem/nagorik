@@ -85,8 +85,82 @@ public class SosApiTests : IAsyncLifetime
         _client = new HttpClient { BaseAddress = new Uri(address) };
     }
 
+    [Fact]
+    public async Task SubmissionReference_RecoversOriginalAlertAfterMovementAndCancellationWithoutSendingAgain()
+    {
+        _responderEmails = ["user2@test.com"];
+        Authenticate("1");
+        var reference = Guid.NewGuid();
+        var body = new { addressText = "Original address", clientRequestId = reference };
+        using var created = await _client.PostAsJsonAsync("/api/sos", body);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Contains("no-store", created.Headers.CacheControl!.ToString());
+        var initial = (await created.Content.ReadFromJsonAsync<SosAlertDto>())!;
+        using var moved = await _client.PatchAsJsonAsync($"/api/sos/{initial.Id}/location", new { addressText = "Updated address" });
+        moved.EnsureSuccessStatusCode();
+        using var replay = await _client.PostAsJsonAsync("/api/sos", body);
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        var current = (await replay.Content.ReadFromJsonAsync<SosAlertDto>())!;
+        Assert.Equal(initial.Id, current.Id);
+        Assert.Equal("Updated address", current.AddressText);
+        using var cancelled = await _client.PostAsync($"/api/sos/{initial.Id}/cancel", null);
+        cancelled.EnsureSuccessStatusCode();
+        using var lateRetry = await _client.PostAsJsonAsync("/api/sos", body);
+        Assert.Equal(HttpStatusCode.OK, lateRetry.StatusCode);
+        Assert.Equal("Cancelled", (await lateRetry.Content.ReadFromJsonAsync<SosAlertDto>())!.Status);
+        var recovered = (await _client.GetFromJsonAsync<SosAlertDto>($"/api/sos/requests/{reference}"))!;
+        Assert.Equal(initial.Id, recovered.Id);
+        Assert.Equal("Cancelled", recovered.Status);
+        _notifications.Verify(n => n.SendToUserAsync("2", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        Authenticate("2");
+        using var hidden = await _client.GetAsync($"/api/sos/requests/{reference}");
+        Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        await using var db = CreateDb();
+        Assert.Single(await db.SosAlerts.ToListAsync());
+        Assert.Equal(3, await db.SosAlertEvents.CountAsync());
+    }
 
+    [Fact]
+    public async Task ReusedReferenceWithDifferentLocation_ReturnsConflictWithoutWrites()
+    {
+        Authenticate("1");
+        var reference = Guid.NewGuid();
+        using var first = await _client.PostAsJsonAsync("/api/sos", new { addressText = "Dhaka", clientRequestId = reference });
+        first.EnsureSuccessStatusCode();
+        using var changed = await _client.PostAsJsonAsync("/api/sos", new { addressText = "Different location", clientRequestId = reference });
+        Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
+        await using var db = CreateDb();
+        Assert.Single(await db.SosAlerts.ToListAsync());
+        Assert.Single(await db.SosAlertEvents.ToListAsync());
+    }
 
+    [Fact]
+    public async Task ConcurrentSameReference_ReplaysWinnerWithoutDuplicateHistoryOrNotifications()
+    {
+        _responderEmails = ["user2@test.com"];
+        Authenticate("1");
+        var body = new { addressText = "Dhaka", clientRequestId = Guid.NewGuid() };
+        _gate.Arm();
+        var first = _client.PostAsJsonAsync("/api/sos", body);
+        SosAlertDto winner;
+        try
+        {
+            await _gate.Paused.WaitAsync(TimeSpan.FromSeconds(10));
+            using var second = await _client.PostAsJsonAsync("/api/sos", body);
+            Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+            winner = (await second.Content.ReadFromJsonAsync<SosAlertDto>())!;
+        }
+        finally { _gate.Resume(); }
+        using var replay = await first;
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(winner.Id, (await replay.Content.ReadFromJsonAsync<SosAlertDto>())!.Id);
+        await using var db = CreateDb();
+        Assert.Single(await db.SosAlerts.ToListAsync());
+        Assert.Single(await db.SosAlertEvents.ToListAsync());
+        _notifications.Verify(n => n.SendToUserAsync("2", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+    }
 
     [Fact]
     public async Task SosScreens_RequireAuthenticationAndShowReviewThenOwnerConfirmationAndCancellation()
@@ -281,6 +355,8 @@ public class SosApiTests : IAsyncLifetime
     [InlineData("{\"latitude\":true,\"longitude\":90}")]
     [InlineData("{\"addressText\":[]}")]
     [InlineData("{\"addressText\":\"Dhaka\"")]
+    [InlineData("{\"addressText\":\"Dhaka\",\"clientRequestId\":\"invalid\"}")]
+    [InlineData("{\"addressText\":\"Dhaka\",\"clientRequestId\":\"00000000-0000-0000-0000-000000000000\"}")]
     public async Task InvalidRequests_Return400AndMakeNoWrites(string json)
     {
         Authenticate("1");

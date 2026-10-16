@@ -9,6 +9,7 @@ All endpoints require authentication using the existing `auth_token` cookie (or 
 | POST | `/api/sos` | Create an alert and Triggered event; return 201 and a Location header. |
 | GET | `/api/sos/active` | Return the user's Active/Responding alert, or 204 if none exists. |
 | GET | `/api/sos/{id}` | Read an owned alert, including after cancellation. |
+| GET | `/api/sos/requests/{requestId}` | Recover the owner's exact submission, including a terminal alert. |
 | PATCH | `/api/sos/{id}/location` | Replace the location of an Active/Responding alert and append a location event. |
 | POST | `/api/sos/{id}/cancel` | Cancel an Active/Responding alert and append a cancellation event; no body required. |
 
@@ -25,6 +26,14 @@ Responses contain `id`, `latitude`, `longitude`, `addressText`, `createdAtUtc`, 
 Invalid bodies return 400, missing authentication returns 401, and missing or other users' alerts return 404. A second active alert returns 409 with `activeAlertId` in the problem response. Terminal alerts and concurrent stale writes return 409; read the alert again before retrying.
 
 Repeated cancellation returns 200 without another event. Repeating an identical location update also returns 200 without another event. Triggering again while an alert is active returns 409 and never creates a second alert. Each successful write commits the alert and audit snapshot together.
+
+## Safe trigger retries (T-026.5)
+
+Trigger bodies may include an optional nonempty UUID `clientRequestId`. A database unique index scopes it to the authenticated owner. Repeating the same original request returns 200 with the existing alert's current state, even after location updates or cancellation, without another alert, audit event, or responder notification. Reusing a reference with a different original location returns 409. Older callers without a reference retain the one-active-alert conflict behavior.
+
+The browser creates the reference only for a confirmed submission. It checks the reference lookup before each POST and retries transient connection errors, timeouts, HTTP 408/429, and server errors with at most three attempts and 1- then 2-second backoff. Each request has a 20-second timeout. It stops on validation/auth/ownership conflicts and never posts after an unconfirmed lookup. Exact-request recovery prevents a lost response followed by cancellation from creating a new alert.
+
+Session storage retains only the pending UUID for recovery across reloads. The address and GPS payload remain in memory on the current page. Offline state prevents submission; reconnecting enables an explicit Check and retry control without automatically sending an SOS. Page exit cancels pending browser requests and backoff. SOS API responses and recovery fetches bypass caches.
 
 ## Live location and responder notifications (T-026.3)
 

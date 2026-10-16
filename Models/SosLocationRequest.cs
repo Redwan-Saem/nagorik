@@ -22,3 +22,8 @@ public class SosLocationRequest : IValidatableObject
             yield return new("Provide GPS coordinates or a manual address.", new[] { nameof(AddressText) });
     }
 }
+
+public sealed class SosTriggerRequest : SosLocationRequest
+{
+    public Guid? ClientRequestId { get; set; }
+}

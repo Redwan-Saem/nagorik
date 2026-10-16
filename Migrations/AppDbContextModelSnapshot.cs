@@ -245,6 +245,9 @@ namespace Nagorik.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("ClientRequestId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -279,6 +282,10 @@ namespace Nagorik.Api.Migrations
                         .HasFilter("\"Status\" IN ('Active', 'Responding')");
 
                     b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "ClientRequestId")
+                        .IsUnique()
+                        .HasFilter("\"ClientRequestId\" IS NOT NULL");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 

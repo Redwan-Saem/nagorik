@@ -17,7 +17,7 @@ public class SosApiController(SosAlertService service) : ControllerBase
         int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out id) && id > 0;
 
     [HttpPost]
-    public async Task<IActionResult> Trigger([FromBody] SosLocationRequest request, CancellationToken ct)
+    public async Task<IActionResult> Trigger([FromBody] SosTriggerRequest request, CancellationToken ct)
     {
         if (!TryUserId(out var userId)) return Unauthorized();
         return Respond(await service.TriggerAsync(userId, request, ct));
@@ -31,6 +31,14 @@ public class SosApiController(SosAlertService service) : ControllerBase
         return alert == null ? NoContent() : Ok(alert);
     }
 
+    [HttpGet("requests/{requestId:guid}")]
+    public async Task<IActionResult> GetByRequestId(Guid requestId, CancellationToken ct)
+    {
+        if (!TryUserId(out var userId)) return Unauthorized();
+        if (requestId == Guid.Empty) return Problem(statusCode: 400, title: "Invalid submission reference.");
+        var alert = await service.GetByRequestIdAsync(requestId, userId, ct);
+        return alert == null ? Problem(statusCode: 404, title: "SOS submission not found.") : Ok(alert);
+    }
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById([Range(1, int.MaxValue)] int id, CancellationToken ct)
@@ -63,6 +71,8 @@ public class SosApiController(SosAlertService service) : ControllerBase
         SosOutcome.NotFound => Problem(statusCode: 404, title: "SOS alert not found."),
         SosOutcome.UserNotFound => Problem(statusCode: 401, title: "Your account is no longer available."),
         SosOutcome.Conflict => ConflictProblem(result.Alert),
+        SosOutcome.RequestConflict => Problem(statusCode: 409, title: "Submission reference already used.",
+            detail: "This reference belongs to an earlier request with a different location. Check that alert before submitting again."),
         _ => StatusCode(500)
     };
 

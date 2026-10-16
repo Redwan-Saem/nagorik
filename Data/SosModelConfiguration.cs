@@ -28,6 +28,8 @@ internal static class SosModelConfiguration
             e.HasIndex(a => a.UserId).IsUnique().HasDatabaseName("IX_SosAlerts_OneActivePerUser")
                 .HasFilter("\"Status\" IN ('Active', 'Responding')");
             e.HasIndex(a => new { a.UserId, a.CreatedAtUtc });
+            e.HasIndex(a => new { a.UserId, a.ClientRequestId }).IsUnique()
+                .HasFilter("\"ClientRequestId\" IS NOT NULL");
             e.HasIndex(a => new { a.Status, a.CreatedAtUtc });
         });
 

@@ -12,6 +12,9 @@
     const gps = byId('sos-use-gps');
     const clearGps = byId('sos-clear-gps');
     const retry = byId('sos-retry');
+    const submission = new SosSubmission({ onRetry(attempt, delay) {
+        byId('sos-send-status').textContent = `Checking for a saved alert in ${delay / 1000} seconds (attempt ${attempt} of 3)…`;
+    } });
     let leaving = false;
     let coordinates = null;
     let payload = null;
@@ -99,7 +102,7 @@
     hold.addEventListener('blur', () => { if (held) releaseHold(true); });
     window.addEventListener('blur', () => { if (held) releaseHold(true); });
     window.addEventListener('pagehide', () => {
-        resetHold(); gpsGeneration++; leaving = true;
+        resetHold(); gpsGeneration++; leaving = true; submission.cancel();
         if (sending) {
             retry.hidden = false;
             byId('sos-check-active').hidden = false;
@@ -153,13 +156,7 @@
         byId('sos-send-error').textContent = '';
         byId('sos-send-status').textContent = 'Saving your SOS alert…';
         try {
-            const response = await fetch('/api/sos', {
-                method: 'POST', credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (!response.ok) throw Object.assign(new Error('SOS could not be confirmed. Check your active alert before trying again.'), { status: response.status });
-            const alert = await response.json();
+            const alert = await submission.submit(payload);
             if (leaving) return;
             window.location.assign(`/sos/${encodeURIComponent(alert.id)}`);
         } catch (failure) {
