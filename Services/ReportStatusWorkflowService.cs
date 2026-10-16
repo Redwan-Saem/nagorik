@@ -51,7 +51,8 @@ public class ReportStatusWorkflowService
 
     public async Task<StatusChangeResult> ChangeStatusAsync(
         int reportId,
-        ReportStatus nextStatus)
+        ReportStatus nextStatus,
+        int actorUserId)
     {
         var report = await _db.Reports
             .FirstOrDefaultAsync(r => r.Id == reportId);
@@ -63,12 +64,12 @@ public class ReportStatusWorkflowService
                 "Report not found.");
         }
 
-        return await ApplyChangeAsync(report, nextStatus);
+        return await ApplyChangeAsync(report, nextStatus, actorUserId);
     }
 
 
     private async Task<StatusChangeResult> ApplyChangeAsync(
-        Report report, ReportStatus nextStatus)
+        Report report, ReportStatus nextStatus, int actorUserId, CancellationToken ct = default)
     {
 
         if (!CanTransition(report.Status, nextStatus))
@@ -78,12 +79,15 @@ public class ReportStatusWorkflowService
                 $"Cannot change status from {report.Status} to {nextStatus}.");
         }
 
+        var previousStatus = report.Status;
         report.Status = nextStatus;
 
         var history = new ReportStatusHistory
         {
             ReportId = report.Id,
             Status = nextStatus,
+            PreviousStatus = previousStatus,
+            ChangedByUserId = actorUserId,
             ChangedAtUtc = DateTime.UtcNow
         };
         _db.ReportStatusHistories.Add(history);

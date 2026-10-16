@@ -117,6 +117,8 @@ public class CrewAssignmentService
         {
             ReportId = report.Id,
             Status = ReportStatus.Assigned,
+            PreviousStatus = ReportStatus.Approved,
+            ChangedByUserId = dispatcherId,
             ChangedAtUtc = changedAtUtc
         };
         _db.ReportStatusHistories.Add(history);

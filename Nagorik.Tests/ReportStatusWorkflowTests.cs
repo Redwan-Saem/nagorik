@@ -66,7 +66,7 @@ await using var _db = db;
     var service = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create());
 
     var result = await service.ChangeStatusAsync(
-        1, ReportStatus.Approved);
+        1, ReportStatus.Approved, 1);
 
     Assert.Equal(StatusChangeOutcome.Changed, result.Outcome);
 
@@ -110,7 +110,7 @@ await using var _db = db;
     var service = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create());
 
     var result = await service.ChangeStatusAsync(
-        1, ReportStatus.Completed);
+        1, ReportStatus.Completed, 1);
 
     Assert.Equal(
         StatusChangeOutcome.InvalidTransition,
