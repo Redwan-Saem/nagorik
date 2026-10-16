@@ -151,6 +151,128 @@ public class OfficialReportListApiTests : IAsyncLifetime
     [InlineData("Resident", HttpStatusCode.Forbidden)]
     [InlineData("Crew", HttpStatusCode.Forbidden)]
     [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("official", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.OK)]
+    [InlineData("CityOfficial", HttpStatusCode.OK)]
+    public async Task OfficialDetailPageEnforcesRolesBeforeReadingReports(string? role, HttpStatusCode expected)
+    {
+        if (role != null) Authenticate(role, cookie: true);
+        using var response = await _client.GetAsync("/official/reports/1");
+        Assert.Equal(expected, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        if (expected == HttpStatusCode.OK)
+        {
+            Assert.Contains("Report R-000001", html);
+            Assert.Contains("Private detail 1", html);
+            Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+            Assert.Equal(2, _queries.Sql.Count);
+        }
+        else
+        {
+            Assert.DoesNotContain("Private detail 1", html);
+            Assert.Empty(_queries.Sql);
+            if (expected == HttpStatusCode.Forbidden) Assert.Contains("You do not have permission", html);
+        }
+    }
+
+    [Fact]
+    public async Task OfficialDetailPageRendersEscapedReportPhotoLocationCrewAndOrderedUtcHistory()
+    {
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options))
+        {
+            TestDb.AddUser(db, 3);
+            db.Crews.Add(new Crew { Id = 10, UserId = 3, Name = "Road crew" });
+            var report = await db.Reports.SingleAsync(r => r.Id == 1);
+            report.Title = "Road <script>alert(1)</script>";
+            report.Description = "First line\n<img src=x onerror=alert(2)>";
+            report.Location = "Road 5, Dhaka"; report.Latitude = 23.81; report.Longitude = 90.41;
+            report.Category = ReportCategory.RoadDamage; report.AreaId = 1;
+            report.Authority = Authority.CityCorporation; report.Status = ReportStatus.InProgress;
+            report.Urgency = ReportUrgency.High; report.AssignedCrewId = 10;
+            report.ImageUrl = "/uploads/reports/issue.jpg";
+            db.ReportStatusHistories.AddRange(
+                new ReportStatusHistory { ReportId = 1, Status = ReportStatus.InProgress, PreviousStatus = ReportStatus.Assigned,
+                    ChangedByUserId = 3, ChangedAtUtc = new DateTime(2026, 10, 2, 11, 30, 0, DateTimeKind.Utc) },
+                new ReportStatusHistory { ReportId = 1, Status = ReportStatus.Pending,
+                    ChangedAtUtc = new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc) });
+            await db.SaveChangesAsync();
+        }
+        Authenticate("Official");
+        _queries.Sql.Clear();
+        var html = await _client.GetStringAsync("/official/reports/1");
+        Assert.Contains("Road &lt;script&gt;alert(1)&lt;/script&gt;", html);
+        Assert.Contains("&lt;img src=x onerror=alert(2)&gt;", html);
+        Assert.DoesNotContain("<script>alert(1)</script>", html);
+        Assert.Contains("class=\"official-report-description\"", html);
+        Assert.Contains("Road 5, Dhaka", html); Assert.Contains("23.81000, 90.41000", html);
+        Assert.Contains("Dhanmondi", html); Assert.Contains("Road damage", html);
+        Assert.Contains("Road crew", html); Assert.Contains("In Progress", html); Assert.Contains("High", html);
+        Assert.Contains("src=\"/uploads/reports/issue.jpg\"", html);
+        Assert.Contains("alt=\"Photo of the issue reported in R-000001\"", html);
+        Assert.Contains("Actor not recorded", html); Assert.Contains("by user #3", html);
+        Assert.True(html.IndexOf("2026-10-01T10:00:00Z", StringComparison.Ordinal) <
+                    html.IndexOf("2026-10-02T11:30:00Z", StringComparison.Ordinal));
+        Assert.Contains("2026-10-02 11:30 UTC", html);
+        Assert.Equal(2, _queries.Sql.Count);
+        Assert.DoesNotContain(_queries.Sql, sql => sql.Contains("Email") || sql.Contains("PasswordHash"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("//example.com/uploads/issue.jpg")]
+    [InlineData("https://example.com/issue.jpg")]
+    public async Task OfficialDetailPageHandlesMissingOrUnsupportedPhotoAndOptionalFields(string? photo)
+    {
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options))
+            await db.Reports.Where(r => r.Id == 7).ExecuteUpdateAsync(s => s.SetProperty(r => r.ImageUrl, photo));
+        Authenticate("Official");
+        var html = await _client.GetStringAsync("/official/reports/7");
+        Assert.Contains("Unclassified", html); Assert.Contains("Not assigned", html);
+        Assert.Contains("No report photo is available.", html);
+        Assert.Contains("No status history is available yet.", html);
+        Assert.DoesNotContain("id=\"official-report-photo\"", html);
+    }
+
+    [Theory]
+    [InlineData("/official/reports?categories=RoadDamage&categories=WaterLogging&areaId=1&page=3&sort=urgency&direction=asc", true)]
+    [InlineData("/official/reports", true)]
+    [InlineData("https://example.com", false)]
+    [InlineData("//example.com", false)]
+    [InlineData("/login.html", false)]
+    [InlineData("/official/reports/2", false)]
+    [InlineData("/official/reports.evil", false)]
+    public async Task OfficialDetailBackLinkPreservesOnlyLocalOfficialListUrls(string returnUrl, bool allowed)
+    {
+        Authenticate("Official");
+        var html = await _client.GetStringAsync("/official/reports/1?returnUrl=" + Uri.EscapeDataString(returnUrl));
+        var match = System.Text.RegularExpressions.Regex.Match(html, "id=\"official-detail-back\" href=\"([^\"]+)\"");
+        Assert.True(match.Success);
+        Assert.Equal(allowed ? returnUrl : "/official/reports", WebUtility.HtmlDecode(match.Groups[1].Value));
+    }
+
+    [Theory]
+    [InlineData(999, 1)]
+    [InlineData(0, 0)]
+    [InlineData(-1, 0)]
+    public async Task MissingOfficialDetailPageReturns404WithPreservedBackLink(int id, int queries)
+    {
+        Authenticate("Official");
+        using var response = await _client.GetAsync($"/official/reports/{id}?returnUrl=%2Fofficial%2Freports%3Fpage%3D3");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Report not found", html);
+        Assert.Contains("href=\"/official/reports?page=3\"", html);
+        Assert.DoesNotContain("official-history-heading", html);
+        Assert.Equal(queries, _queries.Sql.Count);
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
     [InlineData("Official", HttpStatusCode.OK)]
     [InlineData("CityOfficial", HttpStatusCode.OK)]
     public async Task OfficialDetailRequiresRoleOrAlias(string? role, HttpStatusCode expected)

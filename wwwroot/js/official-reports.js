@@ -47,11 +47,22 @@
         row.appendChild(td);
         return td;
     }
-    function render(items) {
+    function render(items, requested) {
         rows.replaceChildren();
         for (const report of items) {
             const row = document.createElement('tr');
-            cell(row, report.code); cell(row, report.title);
+            row.className = 'official-report-row';
+            const link = document.createElement('a');
+            const listUrl = `/official/reports?${requested}`;
+            link.href = `/official/reports/${encodeURIComponent(report.id)}?returnUrl=${encodeURIComponent(listUrl)}`;
+            link.textContent = report.code;
+            link.setAttribute('aria-label', `View report ${report.code}: ${report.title}`);
+            cell(row, '').appendChild(link); cell(row, report.title);
+            row.addEventListener('click', event => {
+                if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey ||
+                    event.target.closest('a, button, input, select, textarea') || window.getSelection?.()?.toString()) return;
+                window.location.assign(link.href);
+            });
             cell(row, ({ RoadDamage: 'Road damage', WaterLogging: 'Waterlogging', PowerOutage: 'Power outage' })[report.category] || report.category);
             cell(row, report.areaName ?? 'Unclassified');
             const status = document.createElement('span'); status.className = 'badge';
@@ -105,7 +116,7 @@
                 !Number.isInteger(data.totalCount) || !Number.isInteger(data.totalPages))
                 throw new Error('The report response could not be read. Retry loading reports.');
             page = data;
-            render(data.items);
+            render(data.items, requested);
             table.hidden = data.items.length === 0;
             empty.hidden = data.items.length !== 0;
             empty.textContent = data.totalCount === 0 ? 'No reports match your filters.' : 'There are no reports on this page. Go to the previous page or reset the report list.';
