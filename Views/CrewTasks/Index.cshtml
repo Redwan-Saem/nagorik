@@ -1,0 +1,30 @@
+@model IReadOnlyList<Nagorik.Api.Models.Report>
+@using Nagorik.Api.Models
+@{
+    ViewData["Title"] = "My Tasks";
+}
+<h1>My Tasks</h1>
+<p class="muted">Tasks assigned to your crew. Open a task to view details and update its status.</p>
+@if (Model.Count == 0)
+{
+    <p class="card">You have no assigned tasks yet.</p>
+}
+else
+{
+    <div class="table-wrap" role="region" aria-label="My tasks" tabindex="0">
+        <table>
+            <thead><tr><th scope="col">Task</th><th scope="col">Title</th><th scope="col">Location</th><th scope="col">Status</th></tr></thead>
+            <tbody>
+            @foreach (var report in Model)
+            {
+                <tr>
+                    <td><a asp-controller="CrewTasks" asp-action="Detail" asp-route-id="@report.Id">R-@report.Id.ToString("D6")</a></td>
+                    <td>@report.Title</td>
+                    <td>@report.Location</td>
+                    <td><span class="badge">@(report.Status == ReportStatus.InProgress ? "In Progress" : report.Status.ToString())</span></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

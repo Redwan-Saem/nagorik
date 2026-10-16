@@ -99,13 +99,13 @@ public class ResidentReportStatusNotificationTests
         await using var connectionScope = connection;
         var report = await Seed(db, false);
         var sender = new Mock<INotificationService>(MockBehavior.Strict);
-        var workflow = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create(sender.Object));
+        var workflow = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create(sender.Object), ResidentNotificationTestHelper.Dispatcher(db));
         Assert.Equal(StatusChangeOutcome.ReportNotFound,
-            (await workflow.ChangeStatusAsync(999, ReportStatus.Approved)).Outcome);
+            (await workflow.ChangeStatusAsync(999, ReportStatus.Approved, 1)).Outcome);
         Assert.Equal(StatusChangeOutcome.InvalidTransition,
-            (await workflow.ChangeStatusAsync(report.Id, ReportStatus.Completed)).Outcome);
+            (await workflow.ChangeStatusAsync(report.Id, ReportStatus.Completed, 1)).Outcome);
         Assert.Equal(StatusChangeOutcome.InvalidTransition,
-            (await workflow.ChangeStatusAsync(report.Id, ReportStatus.Pending)).Outcome);
+            (await workflow.ChangeStatusAsync(report.Id, ReportStatus.Pending, 1)).Outcome);
         sender.VerifyNoOtherCalls();
         Assert.Empty(await db.ReportStatusHistories.ToListAsync());
     }
@@ -155,8 +155,8 @@ public class ResidentReportStatusNotificationTests
         }
         else
         {
-            var result = await new ReportStatusWorkflowService(db, notifier)
-                .ChangeStatusAsync(report.Id, ReportStatus.Approved);
+            var result = await new ReportStatusWorkflowService(db, notifier, ResidentNotificationTestHelper.Dispatcher(db))
+                .ChangeStatusAsync(report.Id, ReportStatus.Approved, 1);
             Assert.Contains(result.Outcome, new[] { StatusChangeOutcome.Changed, StatusChangeOutcome.InvalidTransition });
         }
     }

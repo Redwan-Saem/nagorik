@@ -40,6 +40,14 @@
                     </li>
                 }
 
+
+                @if (User.IsInRole("Crew"))
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="CrewTasks" asp-action="Index">My Tasks</a>
+                    </li>
+                }
+
                 @if (User.IsInRole("Crew") || User.IsInRole("Dispatcher"))
                 {
                     <li class="nav-item">

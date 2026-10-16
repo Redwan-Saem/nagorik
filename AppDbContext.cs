@@ -45,6 +45,14 @@ namespace Nagorik.Api
                 entity.Property(x => x.Status)
                     .HasConversion<string>();
 
+                entity.Property(x => x.PreviousStatus)
+                    .HasConversion<string>();
+
+                entity.HasOne(x => x.ChangedByUser)
+                    .WithMany()
+                    .HasForeignKey(x => x.ChangedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
                 entity.HasIndex(x => new
                 {
                     x.ReportId,
@@ -73,7 +81,11 @@ namespace Nagorik.Api
                     .HasConversion<string>();
 
                 e.Property(r => r.Status)
-                    .HasConversion<string>();
+                    .HasConversion<string>()
+                    .IsConcurrencyToken();
+
+                e.Property(r => r.AssignedCrewId)
+                    .IsConcurrencyToken();
 
                 e.HasOne(r => r.User)
                     .WithMany()

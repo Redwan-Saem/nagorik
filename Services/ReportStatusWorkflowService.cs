@@ -7,7 +7,8 @@ public enum StatusChangeOutcome
 {
     Changed,
     ReportNotFound,
-    InvalidTransition
+    InvalidTransition,
+    Conflict
 }
 
 public record StatusChangeResult(
@@ -18,11 +19,14 @@ public class ReportStatusWorkflowService
 {
     private readonly AppDbContext _db;
     private readonly ResidentReportStatusNotifier _residentNotifier;
+    private readonly DispatcherTaskStatusNotifier _dispatcherNotifier;
 
-    public ReportStatusWorkflowService(AppDbContext db, ResidentReportStatusNotifier residentNotifier)
+    public ReportStatusWorkflowService(AppDbContext db, ResidentReportStatusNotifier residentNotifier,
+        DispatcherTaskStatusNotifier dispatcherNotifier)
     {
         _db = db;
         _residentNotifier = residentNotifier;
+        _dispatcherNotifier = dispatcherNotifier;
     }
 
     public static bool CanTransition(
@@ -51,7 +55,8 @@ public class ReportStatusWorkflowService
 
     public async Task<StatusChangeResult> ChangeStatusAsync(
         int reportId,
-        ReportStatus nextStatus)
+        ReportStatus nextStatus,
+        int actorUserId)
     {
         var report = await _db.Reports
             .FirstOrDefaultAsync(r => r.Id == reportId);
@@ -63,12 +68,33 @@ public class ReportStatusWorkflowService
                 "Report not found.");
         }
 
-        return await ApplyChangeAsync(report, nextStatus);
+        return await ApplyChangeAsync(report, nextStatus, actorUserId);
     }
 
+    public async Task<StatusChangeResult> ChangeCrewTaskStatusAsync(
+        int reportId,
+        ReportStatus nextStatus,
+        int crewUserId,
+        CancellationToken ct = default)
+    {
+        var report = await _db.Reports.FirstOrDefaultAsync(r =>
+            r.Id == reportId && r.AssignedCrew != null &&
+            r.AssignedCrew.UserId == crewUserId, ct);
+
+        if (report == null)
+            return new(StatusChangeOutcome.ReportNotFound, "Task not found.");
+
+        if (nextStatus is not (ReportStatus.InProgress or ReportStatus.Completed))
+            return new(StatusChangeOutcome.InvalidTransition, "Crew may only start or complete a task.");
+
+        var result = await ApplyChangeAsync(report, nextStatus, crewUserId, ct);
+        if (result.Outcome == StatusChangeOutcome.Changed)
+            await _dispatcherNotifier.NotifyAsync(report, crewUserId);
+        return result;
+    }
 
     private async Task<StatusChangeResult> ApplyChangeAsync(
-        Report report, ReportStatus nextStatus)
+        Report report, ReportStatus nextStatus, int actorUserId, CancellationToken ct = default)
     {
 
         if (!CanTransition(report.Status, nextStatus))
@@ -78,17 +104,36 @@ public class ReportStatusWorkflowService
                 $"Cannot change status from {report.Status} to {nextStatus}.");
         }
 
+        var previousStatus = report.Status;
         report.Status = nextStatus;
 
         var history = new ReportStatusHistory
         {
             ReportId = report.Id,
             Status = nextStatus,
+            PreviousStatus = previousStatus,
+            ChangedByUserId = actorUserId,
             ChangedAtUtc = DateTime.UtcNow
         };
         _db.ReportStatusHistories.Add(history);
 
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // A concurrent deletion can fail the history FK before EF executes the report update.
+            if (ex is not DbUpdateConcurrencyException &&
+                await _db.Reports.AsNoTracking().AnyAsync(r => r.Id == report.Id, ct))
+                throw;
+
+            // SaveChanges rolls back the history insert along with the losing update.
+            _db.Entry(history).State = EntityState.Detached;
+            await _db.Entry(report).ReloadAsync(ct);
+            return new(StatusChangeOutcome.Conflict,
+                "The task status or assignment changed. Refresh the task before trying again.");
+        }
 
         await _residentNotifier.NotifyAsync(report);
 

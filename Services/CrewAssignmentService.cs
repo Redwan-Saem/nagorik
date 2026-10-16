@@ -11,7 +11,8 @@ public enum AssignOutcome
     NeedsConfirmation,
     ReportNotFound,
     CrewNotFound,
-    NotAssignable
+    NotAssignable,
+    Conflict
 }
 
 public record AssignResult(AssignOutcome Outcome, string Message);
@@ -117,6 +118,8 @@ public class CrewAssignmentService
         {
             ReportId = report.Id,
             Status = ReportStatus.Assigned,
+            PreviousStatus = ReportStatus.Approved,
+            ChangedByUserId = dispatcherId,
             ChangedAtUtc = changedAtUtc
         };
         _db.ReportStatusHistories.Add(history);
@@ -130,7 +133,22 @@ public class CrewAssignmentService
         };
         _db.CrewAssignments.Add(assignment);
 
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            if (ex is not DbUpdateConcurrencyException &&
+                await _db.Reports.AsNoTracking().AnyAsync(r => r.Id == report.Id))
+                throw;
+
+            _db.Entry(history).State = EntityState.Detached;
+            _db.Entry(assignment).State = EntityState.Detached;
+            await _db.Entry(report).ReloadAsync();
+            return new(AssignOutcome.Conflict,
+                "The report status or assignment changed. Refresh the report before trying again.");
+        }
 
         await _residentNotifier.NotifyAsync(report);
 

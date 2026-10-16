@@ -1,0 +1,5 @@
+.crew-task-detail { margin-block: 1rem 2rem; overflow-wrap: anywhere; }
+.crew-task-detail .task-description { white-space: pre-wrap; }
+.crew-task-detail dt { font-weight: 600; }
+.crew-task-detail dd { margin: 0 0 1rem; }
+.task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }

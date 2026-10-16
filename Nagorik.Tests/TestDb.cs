@@ -38,4 +38,8 @@ public static class TestDb
 
         return user;
     }
+
+    // Migration fixtures must use the old table contract rather than the current EF model.
+    public static Task<int> AddLegacyReportAsync(AppDbContext db, int id = 1, int userId = 1, string title = "Legacy report") =>
+        db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO Reports (Id, UserId, Title, Description, Category, Authority, Status, Location, CreatedAt, Latitude, Longitude, IsPossibleDuplicate) VALUES ({id}, {userId}, {title}, 'Legacy description', 'RoadDamage', 'CityCorporation', 'Pending', 'Dhaka', {DateTime.UtcNow}, 23.75, 90.39, 0);");
 }

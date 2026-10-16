@@ -40,8 +40,6 @@ public class CrewTaskNotifier : ICrewTaskNotifier
         }
     }
 
-    // NOTE: no crew task page exists yet, so this link 404s until one is built.
-    // Change ONLY this method when that page exists.
     public static string BuildUrl(Report report) => $"/crew/tasks/{report.Id}";
 
     public static string BuildBody(Report report)
