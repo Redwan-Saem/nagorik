@@ -96,15 +96,33 @@ public class CrewAssignmentService
                 $"{crew.Name} is already working on an active task. Assign anyway?");
         }
 
+        if (!ReportStatusWorkflowService.CanTransition(
+                report.Status,
+                ReportStatus.Assigned))
+        {
+            return new(
+                AssignOutcome.NotAssignable,
+                "Invalid report status transition.");
+        }
+
         report.AssignedCrewId = crewId;
         report.Status = ReportStatus.Assigned;
+
+        var changedAtUtc = DateTime.UtcNow;
+
+        _db.ReportStatusHistories.Add(new ReportStatusHistory
+        {
+            ReportId = report.Id,
+            Status = ReportStatus.Assigned,
+            ChangedAtUtc = changedAtUtc
+        });
 
         _db.CrewAssignments.Add(new CrewAssignment
         {
             ReportId = reportId,
             CrewId = crewId,
             DispatcherId = dispatcherId,
-            AssignedAtUtc = DateTime.UtcNow
+            AssignedAtUtc = changedAtUtc
         });
 
         await _db.SaveChangesAsync();
