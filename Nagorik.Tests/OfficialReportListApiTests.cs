@@ -116,8 +116,34 @@ public class OfficialReportListApiTests : IAsyncLifetime
             Assert.Contains("official-reports.js", html);
             Assert.Contains("Loading reports", html);
             Assert.Contains("href=\"/official/reports\"", html);
+            Assert.Contains("id=\"reports-filters\"", html);
+            Assert.Contains("Apply filters", html);
+            Assert.Contains("Clear filters", html);
+            Assert.Contains("No reports match your filters.", html);
+            foreach (var category in ReportLookups.Categories)
+                Assert.Contains($"value=\"{category.Category}\" data-report-category", html);
+            Assert.Contains("Dhanmondi", html);
+            Assert.Contains("Mirpur", html);
+            Assert.Contains("Gulshan", html);
+            Assert.Contains("ReportAreas", Assert.Single(_queries.Sql));
         }
-        Assert.Empty(_queries.Sql);
+        else Assert.Empty(_queries.Sql);
+    }
+
+    [Fact]
+    public async Task ReportFilterControlsUseCurrentDatabaseAreasAndEncodeTheirNames()
+    {
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options))
+        {
+            db.ReportAreas.Add(new ReportArea { Id = 10, Name = "<Area & zone>" });
+            await db.SaveChangesAsync();
+        }
+        Authenticate("Official");
+        _queries.Sql.Clear();
+        var html = await _client.GetStringAsync("/official/reports?categories=RoadDamage&areaId=10");
+        Assert.Contains("<option value=\"10\">&lt;Area &amp; zone&gt;</option>", html);
+        Assert.DoesNotContain("<Area & zone>", html);
+        Assert.Contains("ReportAreas", Assert.Single(_queries.Sql));
     }
 
     [Theory]
