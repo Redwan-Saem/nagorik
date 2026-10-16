@@ -4,4 +4,4 @@ nagorik.db
 nagorik.db-shm
 nagorik.db-wal
 wwwroot/uploads/
-Nagorik.Web/ClientTests/node_modules/
+Nagorik.Web/ClientTests/node_modules/node_modules/

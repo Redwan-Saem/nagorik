@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nagorik.Api.Services;
@@ -71,5 +73,6 @@ public class DispatchApiController : ControllerBase
 }
 
 public record AssignCrewRequest(
+    [param: Range(1, int.MaxValue, ErrorMessage = "Crew is required.")]
     int CrewId,
     bool ConfirmBusy);

@@ -1,0 +1,104 @@
+@model Nagorik.Api.Models.Report
+@{
+    ViewData["Title"] = "Report R-" + Model.Id.ToString("D6");
+    bool assignable = Model.Authority == Nagorik.Api.Models.Authority.CityCorporation
+                      && Model.Status == Nagorik.Api.Models.ReportStatus.Approved;
+}
+
+<h2>Report R-@Model.Id.ToString("D6")</h2>
+
+<dl>
+    <dt>Category</dt><dd>@Model.Category</dd>
+    <dt>Status</dt><dd>@Model.Status</dd>
+    <dt>Authority</dt><dd>@Model.Authority</dd>
+    <dt>Location</dt><dd>@(string.IsNullOrEmpty(Model.Location) ? "Location not provided" : Model.Location)</dd>
+    <dt>Coordinates</dt><dd>@Model.Latitude, @Model.Longitude</dd>
+    <dt>Title</dt><dd>@Model.Title</dd>
+    <dt>Description</dt><dd>@Model.Description</dd>
+    <dt>Created</dt><dd>@Model.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+</dl>
+
+@if (!string.IsNullOrEmpty(Model.ImageUrl))
+{
+    <img src="@Model.ImageUrl" alt="Report photo" style="max-width:300px;" />
+}
+
+@if (assignable)
+{
+    <h3>Assign a crew</h3>
+
+    <label for="crew-select">Available crews</label>
+    <select id="crew-select" class="form-control"></select>
+
+    <p id="busy-warning" class="text-danger" role="alert" hidden>
+        This crew is already working on an active task. Assigning will require confirmation.
+    </p>
+
+    <button type="button" id="assign-btn" class="btn btn-primary">Assign</button>
+    <p id="assign-message" role="status"></p>
+}
+else
+{
+    <p>This report cannot be assigned (already assigned, finished, or not a City Corporation issue).</p>
+}
+
+@section Scripts {
+    @if (assignable)
+    {
+        <script>
+            const reportId = @Model.Id;
+            const select = document.getElementById("crew-select");
+            const warning = document.getElementById("busy-warning");
+            const message = document.getElementById("assign-message");
+            const button = document.getElementById("assign-btn");
+
+            async function loadCrews() {
+                const res = await fetch("/api/dispatch/crews");
+                if (!res.ok) {
+                    message.textContent = "Could not load crews.";
+                    return;
+                }
+                const crews = await res.json();
+                select.innerHTML = "";
+                crews.forEach(c => {
+                    const opt = document.createElement("option");
+                    opt.value = c.id;
+                    opt.dataset.busy = c.isBusy;
+                    opt.textContent = c.isBusy ? c.name + " (Busy)" : c.name;
+                    select.appendChild(opt);
+                });
+                updateWarning();
+            }
+
+            function updateWarning() {
+                const opt = select.selectedOptions[0];
+                warning.hidden = !(opt && opt.dataset.busy === "true");
+            }
+
+            async function assign(confirmBusy) {
+                const res = await fetch("/api/dispatch/reports/" + reportId + "/assign", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ crewId: parseInt(select.value), confirmBusy: confirmBusy })
+                });
+                const data = await res.json().catch(() => ({}));
+
+                if (res.status === 409 && data.needsConfirmation) {
+                    if (confirm(data.message)) {
+                        return assign(true);
+                    }
+                    return;
+                }
+
+                message.textContent = data.message || "Request failed.";
+                if (res.ok) {
+                    button.disabled = true;
+                }
+            }
+
+            select.addEventListener("change", updateWarning);
+            button.addEventListener("click", () => assign(false));
+            loadCrews();
+        </script>
+    }
+}

@@ -131,6 +131,9 @@ if (typeof document !== 'undefined') {
 
         const res = await fetch('/api/reports', {
           method: 'POST',
+          // credentials: 'include' ensures the auth_token cookie is sent with
+          // this cross-origin-safe same-origin request so [Authorize] works.
+          credentials: 'include',
           body: new FormData($('report-form')),
           headers: {
             'RequestVerificationToken':
