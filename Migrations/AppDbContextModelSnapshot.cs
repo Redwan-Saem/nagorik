@@ -234,6 +234,120 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ReportStatusHistories");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.SosAlert", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AddressText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<int?>("ResponderUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResponderUserId");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_SosAlerts_OneActivePerUser")
+                        .HasFilter("\"Status\" IN ('Active', 'Responding')");
+
+                    b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.ToTable("SosAlerts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SosAlerts_AddressLength", "length(\"AddressText\") <= 500");
+
+                            t.HasCheckConstraint("CK_SosAlerts_Coordinates", "(\"Latitude\" IS NULL AND \"Longitude\" IS NULL) OR (\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL AND \"Latitude\" BETWEEN -90 AND 90 AND \"Longitude\" BETWEEN -180 AND 180)");
+
+                            t.HasCheckConstraint("CK_SosAlerts_Location", "(\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL) OR length(trim(\"AddressText\", char(9) || char(10) || char(13) || ' ')) > 0");
+
+                            t.HasCheckConstraint("CK_SosAlerts_Status", "\"Status\" IN ('Active', 'Responding', 'Completed', 'Cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.SosAlertEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActorUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AddressText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SosAlertId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("SosAlertId", "OccurredAtUtc");
+
+                    b.ToTable("SosAlertEvents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SosAlertEvents_AddressLength", "length(\"AddressText\") <= 500");
+
+                            t.HasCheckConstraint("CK_SosAlertEvents_Coordinates", "(\"Latitude\" IS NULL AND \"Longitude\" IS NULL) OR (\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL AND \"Latitude\" BETWEEN -90 AND 90 AND \"Longitude\" BETWEEN -180 AND 180)");
+
+                            t.HasCheckConstraint("CK_SosAlertEvents_EventType", "\"EventType\" IN ('Triggered', 'LocationUpdated', 'ResponderAssigned', 'Completed', 'Cancelled')");
+
+                            t.HasCheckConstraint("CK_SosAlertEvents_Location", "(\"Latitude\" IS NOT NULL AND \"Longitude\" IS NOT NULL) OR length(trim(\"AddressText\", char(9) || char(10) || char(13) || ' ')) > 0");
+
+                            t.HasCheckConstraint("CK_SosAlertEvents_Status", "\"Status\" IN ('Active', 'Responding', 'Completed', 'Cancelled')");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -431,6 +545,43 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.SosAlert", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", "ResponderUser")
+                        .WithMany()
+                        .HasForeignKey("ResponderUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nagorik.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ResponderUser");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.SosAlertEvent", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.SosAlert", "SosAlert")
+                        .WithMany()
+                        .HasForeignKey("SosAlertId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ActorUser");
+
+                    b.Navigation("SosAlert");
                 });
 #pragma warning restore 612, 618
         }

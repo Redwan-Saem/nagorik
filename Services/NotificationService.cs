@@ -55,7 +55,7 @@ namespace Nagorik.Api.Services
                     subscription.Endpoint,
                     subscription.P256dh,
                     subscription.Auth,
-                    payload);
+                    payload).WaitAsync(ct);
 
                 if (result.Success)
                 {

@@ -1,0 +1,12 @@
+@model Nagorik.Api.Models.SosAlert
+@{
+    ViewData["Title"] = $"SOS-{Model.Id:D6}";
+}
+<h1>SOS-@Model.Id.ToString("D6")</h1>
+<p>Current status: <strong>@Model.Status</strong></p>
+<dl>
+    <dt>Address or landmark</dt><dd style="overflow-wrap:anywhere">@(string.IsNullOrWhiteSpace(Model.AddressText) ? "Address not provided" : Model.AddressText)</dd>
+    <dt>GPS coordinates</dt><dd>@(Model.Latitude.HasValue ? FormattableString.Invariant($"{Model.Latitude:F5}, {Model.Longitude:F5}") : "GPS not available; use the manual address.")</dd>
+    <dt>Last updated (UTC)</dt><dd>@Model.UpdatedAtUtc.ToString("yyyy-MM-dd HH:mm:ss") UTC</dd>
+</dl>
+<a class="btn" asp-controller="Sos" asp-action="Respond" asp-route-id="@Model.Id">Refresh location and status</a>

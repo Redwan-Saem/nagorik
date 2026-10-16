@@ -1,0 +1,9 @@
+#sos-trigger-form { max-width: 44rem; }
+#sos-trigger-form [hidden], #sos-review-dialog [hidden] { display: none !important; }
+#sos-hold { touch-action: none; user-select: none; -webkit-user-select: none; }
+#sos-hold-progress { display: block; width: 100%; margin-block: 1rem; accent-color: var(--bad); }
+.sos-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-block: 1rem; }
+.sos-location-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+dialog { max-width: min(36rem, calc(100% - 2rem)); color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 1.5rem; }
+dialog::backdrop { background: rgb(0 0 0 / .55); }
+#sos-active form { margin-block: 1.5rem; }

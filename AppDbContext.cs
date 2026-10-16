@@ -17,6 +17,8 @@ namespace Nagorik.Api
         public DbSet<ZoneMapData> ZoneMapData { get; set; }
 
         public DbSet<Report> Reports => Set<Report>();
+        public DbSet<SosAlert> SosAlerts => Set<SosAlert>();
+        public DbSet<SosAlertEvent> SosAlertEvents => Set<SosAlertEvent>();
 
 
         // T-002.1 Notification schema
@@ -39,6 +41,7 @@ namespace Nagorik.Api
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            Data.SosModelConfiguration.Configure(builder);
 
             builder.Entity<ReportStatusHistory>(entity =>
             {
