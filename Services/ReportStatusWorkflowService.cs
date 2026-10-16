@@ -67,6 +67,25 @@ public class ReportStatusWorkflowService
         return await ApplyChangeAsync(report, nextStatus, actorUserId);
     }
 
+    public async Task<StatusChangeResult> ChangeCrewTaskStatusAsync(
+        int reportId,
+        ReportStatus nextStatus,
+        int crewUserId,
+        CancellationToken ct = default)
+    {
+        var report = await _db.Reports.FirstOrDefaultAsync(r =>
+            r.Id == reportId && r.AssignedCrew != null &&
+            r.AssignedCrew.UserId == crewUserId, ct);
+
+        if (report == null)
+            return new(StatusChangeOutcome.ReportNotFound, "Task not found.");
+
+        if (nextStatus is not (ReportStatus.InProgress or ReportStatus.Completed))
+            return new(StatusChangeOutcome.InvalidTransition, "Crew may only start or complete a task.");
+
+        var result = await ApplyChangeAsync(report, nextStatus, crewUserId, ct);
+        return result;
+    }
 
     private async Task<StatusChangeResult> ApplyChangeAsync(
         Report report, ReportStatus nextStatus, int actorUserId, CancellationToken ct = default)
@@ -92,7 +111,7 @@ public class ReportStatusWorkflowService
         };
         _db.ReportStatusHistories.Add(history);
 
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
 
         await _residentNotifier.NotifyAsync(report);
 
