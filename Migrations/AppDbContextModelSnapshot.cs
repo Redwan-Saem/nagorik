@@ -145,6 +145,7 @@ namespace Nagorik.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int?>("AssignedCrewId")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Authority")
@@ -182,6 +183,7 @@ namespace Nagorik.Api.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<string>("Status")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasColumnType("TEXT");
 

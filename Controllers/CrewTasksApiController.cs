@@ -14,7 +14,7 @@ public class CrewTasksApiController(ReportStatusWorkflowService workflow) : Cont
 {
     [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateStatus(
-        int id, [FromBody] UpdateCrewTaskStatusRequest request, CancellationToken ct)
+        [Range(1, int.MaxValue)] int id, [FromBody] UpdateCrewTaskStatusRequest request, CancellationToken ct)
     {
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
             return Problem(statusCode: 401, title: "Invalid crew identity.");
@@ -34,7 +34,7 @@ public class CrewTasksApiController(ReportStatusWorkflowService workflow) : Cont
         {
             StatusChangeOutcome.Changed => Ok(new { id, status = next.Value.ToString(), message = result.Message }),
             StatusChangeOutcome.ReportNotFound => Problem(statusCode: 404, title: "Task not found.", detail: result.Message),
-            StatusChangeOutcome.InvalidTransition =>
+            StatusChangeOutcome.InvalidTransition or StatusChangeOutcome.Conflict =>
                 Problem(statusCode: 409, title: "Task update conflict.", detail: result.Message),
             _ => StatusCode(500)
         };
@@ -43,5 +43,7 @@ public class CrewTasksApiController(ReportStatusWorkflowService workflow) : Cont
 
 public sealed class UpdateCrewTaskStatusRequest
 {
+    [Required]
+    [RegularExpression("^(InProgress|Completed)$", ErrorMessage = "Status must be InProgress or Completed.")]
     public string Status { get; set; } = "";
 }

@@ -7,7 +7,8 @@ public enum StatusChangeOutcome
 {
     Changed,
     ReportNotFound,
-    InvalidTransition
+    InvalidTransition,
+    Conflict
 }
 
 public record StatusChangeResult(
@@ -116,7 +117,23 @@ public class ReportStatusWorkflowService
         };
         _db.ReportStatusHistories.Add(history);
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+        {
+            // A concurrent deletion can fail the history FK before EF executes the report update.
+            if (ex is not DbUpdateConcurrencyException &&
+                await _db.Reports.AsNoTracking().AnyAsync(r => r.Id == report.Id, ct))
+                throw;
+
+            // SaveChanges rolls back the history insert along with the losing update.
+            _db.Entry(history).State = EntityState.Detached;
+            await _db.Entry(report).ReloadAsync(ct);
+            return new(StatusChangeOutcome.Conflict,
+                "The task status or assignment changed. Refresh the task before trying again.");
+        }
 
         await _residentNotifier.NotifyAsync(report);
 

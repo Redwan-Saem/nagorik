@@ -81,7 +81,11 @@ namespace Nagorik.Api
                     .HasConversion<string>();
 
                 e.Property(r => r.Status)
-                    .HasConversion<string>();
+                    .HasConversion<string>()
+                    .IsConcurrencyToken();
+
+                e.Property(r => r.AssignedCrewId)
+                    .IsConcurrencyToken();
 
                 e.HasOne(r => r.User)
                     .WithMany()

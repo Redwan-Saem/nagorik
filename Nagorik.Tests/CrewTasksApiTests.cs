@@ -29,6 +29,7 @@ public class CrewTasksApiTests : IAsyncLifetime
     private HttpClient _client = null!;
     private readonly Mock<INotificationService> _notifications = new();
     private readonly Mock<ICrewTaskNotifier> _crewNotifications = new();
+    private readonly PauseReportSaveInterceptor _saveGate = new();
 
     public async Task InitializeAsync()
     {
@@ -40,7 +41,7 @@ public class CrewTasksApiTests : IAsyncLifetime
         });
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection));
+        builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite(_connection).AddInterceptors(_saveGate));
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(CrewTasksApiController).Assembly);
         builder.Services.AddScoped<ReportStatusWorkflowService>();
         builder.Services.AddScoped<ResidentReportStatusNotifier>();
@@ -85,8 +86,85 @@ public class CrewTasksApiTests : IAsyncLifetime
         _client = new HttpClient { BaseAddress = new Uri(address) };
     }
 
+    [Fact]
+    public async Task SimultaneousAssignments_CreateOneAssignmentAndHistoryAndNotifyOnce()
+    {
+        Authenticate("1", "Dispatcher");
+        _saveGate.Arm();
+        var firstRequest = _client.PostAsJsonAsync("/api/dispatch/reports/2/assign", new { crewId = 10, confirmBusy = true });
+        try
+        {
+            await _saveGate.Paused.WaitAsync(TimeSpan.FromSeconds(10));
+            using var winner = await _client.PostAsJsonAsync("/api/dispatch/reports/2/assign", new { crewId = 20, confirmBusy = true });
+            Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+        }
+        finally { _saveGate.Resume(); }
+        using var loser = await firstRequest;
+        Assert.Equal(HttpStatusCode.Conflict, loser.StatusCode);
+        await using var db = CreateDb();
+        Assert.Equal(20, (await db.Reports.SingleAsync(r => r.Id == 2)).AssignedCrewId);
+        Assert.Equal(20, (await db.CrewAssignments.SingleAsync()).CrewId);
+        Assert.Equal(ReportStatus.Assigned, (await db.ReportStatusHistories.SingleAsync()).Status);
+        _notifications.Verify(n => n.SendToUserAsync("1", It.IsAny<string>(), It.IsAny<string>(),
+            "/Reports/Detail/2", null, default), Times.Once);
+        _crewNotifications.Verify(n => n.NotifyAssignedAsync(It.IsAny<Report>(), It.IsAny<Crew>()), Times.Once);
+    }
 
+    [Fact]
+    public async Task SimultaneousUpdates_CommitAndNotifyOnceAndReturn409ForLosingRequest()
+    {
+        await SeedDispatcherAssignments();
+        Authenticate("2", "Crew");
+        _saveGate.Arm();
+        var firstRequest = _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        try
+        {
+            await _saveGate.Paused.WaitAsync(TimeSpan.FromSeconds(10));
+            using var winner = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+            Assert.Equal(HttpStatusCode.OK, winner.StatusCode);
+        }
+        finally { _saveGate.Resume(); }
+        using var loser = await firstRequest;
+        Assert.Equal(HttpStatusCode.Conflict, loser.StatusCode);
+        Assert.Equal("application/problem+json", loser.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("assignment changed", await loser.Content.ReadAsStringAsync());
+        await AssertState(ReportStatus.InProgress, 1);
+        foreach (var user in new[] { "1", "5" })
+            _notifications.Verify(n => n.SendToUserAsync(user, It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), null, default), Times.Once);
+    }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AssignmentChangeOrDeletionDuringUpdate_Returns409WithoutHistoryOrNotifications(bool delete)
+    {
+        await SeedDispatcherAssignments();
+        Authenticate("2", "Crew");
+        _saveGate.Arm();
+        var request = _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        try
+        {
+            await _saveGate.Paused.WaitAsync(TimeSpan.FromSeconds(10));
+            await using var db = CreateDb();
+            if (delete)
+                await db.Reports.Where(r => r.Id == 1).ExecuteDeleteAsync();
+            else
+                await db.Reports.Where(r => r.Id == 1).ExecuteUpdateAsync(set => set.SetProperty(r => r.AssignedCrewId, 20));
+        }
+        finally { _saveGate.Resume(); }
+        using var response = await request;
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        await using var persisted = CreateDb();
+        Assert.Empty(await persisted.ReportStatusHistories.ToListAsync());
+        if (!delete)
+        {
+            var report = await persisted.Reports.SingleAsync(r => r.Id == 1);
+            Assert.Equal(20, report.AssignedCrewId);
+            Assert.Equal(ReportStatus.Assigned, report.Status);
+        }
+        _notifications.VerifyNoOtherCalls();
+    }
 
     [Fact]
     public async Task CrewUpdates_NotifyLatestAssigningDispatcherOnceAndLinkToWorkingDetail()
@@ -263,6 +341,17 @@ public class CrewTasksApiTests : IAsyncLifetime
         await AssertUnchanged();
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task UpdateStatus_InvalidTaskIdReturnsValidationProblem(int id)
+    {
+        Authenticate("2", "Crew");
+        using var response = await _client.PatchAsJsonAsync($"/api/crew/tasks/{id}/status", new { status = "InProgress" });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        await AssertUnchanged();
+    }
 
     [Theory]
     [InlineData(ReportStatus.Completed)]

@@ -66,6 +66,9 @@ public class DispatchApiController : ControllerBase
             AssignOutcome.NotAssignable =>
                 BadRequest(new { message = result.Message }),
 
+            AssignOutcome.Conflict =>
+                Conflict(new { message = result.Message }),
+
             _ =>
                 BadRequest(new { message = result.Message })
         };
