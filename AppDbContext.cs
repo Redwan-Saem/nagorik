@@ -17,6 +17,7 @@ namespace Nagorik.Api
         public DbSet<ZoneMapData> ZoneMapData { get; set; }
 
         public DbSet<Report> Reports => Set<Report>();
+        public DbSet<ReportArea> ReportAreas => Set<ReportArea>();
         public DbSet<SosAlert> SosAlerts => Set<SosAlert>();
         public DbSet<SosAlertEvent> SosAlertEvents => Set<SosAlertEvent>();
 
@@ -42,6 +43,7 @@ namespace Nagorik.Api
         {
             base.OnModelCreating(builder);
             Data.SosModelConfiguration.Configure(builder);
+            Data.ReportFilterModelConfiguration.Configure(builder);
 
             builder.Entity<ReportStatusHistory>(entity =>
             {

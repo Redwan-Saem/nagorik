@@ -14,6 +14,10 @@ public class Report
 
     public ReportStatus Status { get; set; } = ReportStatus.Pending;
 
+    public int? AreaId { get; set; }
+    public ReportArea? Area { get; set; }
+    public ReportUrgency Urgency { get; set; } = ReportUrgency.Normal;
+
     public string Location { get; set; } = "";
 
     public string? ImageUrl { get; set; }
