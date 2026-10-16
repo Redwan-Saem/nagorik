@@ -35,7 +35,7 @@ public class CrewAssignmentServiceTests
         return new CrewAssignmentService(
             db,
             notifier,
-            logger);
+            logger, ResidentNotificationTestHelper.Create());
     }
 
     private static Report AddAssignableReport(
