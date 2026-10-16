@@ -144,6 +144,9 @@ namespace Nagorik.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("AreaId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("AssignedCrewId")
                         .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
@@ -191,6 +194,11 @@ namespace Nagorik.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Urgency")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1);
+
                     b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
 
@@ -200,7 +208,64 @@ namespace Nagorik.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Reports");
+                    b.HasIndex("CreatedAt", "Id")
+                        .IsDescending();
+
+                    b.HasIndex("AreaId", "CreatedAt", "Id")
+                        .IsDescending(false, true, true);
+
+                    b.HasIndex("Category", "CreatedAt", "Id")
+                        .IsDescending(false, true, true);
+
+                    b.HasIndex("Status", "CreatedAt", "Id")
+                        .IsDescending(false, true, true);
+
+                    b.HasIndex("Urgency", "CreatedAt", "Id")
+                        .IsDescending();
+
+                    b.HasIndex("AreaId", "Category", "CreatedAt", "Id")
+                        .IsDescending(false, false, true, true);
+
+                    b.ToTable("Reports", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Reports_Urgency", "\"Urgency\" IN (0, 1, 2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ReportArea", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ReportAreas");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Dhanmondi"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "Mirpur"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "Gulshan"
+                        });
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.ReportStatusHistory", b =>
@@ -245,6 +310,9 @@ namespace Nagorik.Api.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<Guid?>("ClientRequestId")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -279,6 +347,10 @@ namespace Nagorik.Api.Migrations
                         .HasFilter("\"Status\" IN ('Active', 'Responding')");
 
                     b.HasIndex("Status", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "ClientRequestId")
+                        .IsUnique()
+                        .HasFilter("\"ClientRequestId\" IS NOT NULL");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 
@@ -513,6 +585,11 @@ namespace Nagorik.Api.Migrations
 
             modelBuilder.Entity("Nagorik.Api.Models.Report", b =>
                 {
+                    b.HasOne("Nagorik.Api.Models.ReportArea", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nagorik.Api.Models.Crew", "AssignedCrew")
                         .WithMany()
                         .HasForeignKey("AssignedCrewId")
@@ -523,6 +600,8 @@ namespace Nagorik.Api.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Area");
 
                     b.Navigation("AssignedCrew");
 

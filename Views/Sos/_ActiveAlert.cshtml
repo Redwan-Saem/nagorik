@@ -1,0 +1,34 @@
+@model Nagorik.Api.Services.SosAlertDto
+<section class="card" id="sos-active" data-alert-id="@Model.Id">
+    <h2>SOS-@Model.Id.ToString("D6")</h2>
+    <p>Status: <strong id="sos-status">@Model.Status</strong></p>
+    <p id="sos-location" class="sos-location-text">@(Model.Latitude.HasValue ? FormattableString.Invariant($"GPS {Model.Latitude:F5}, {Model.Longitude:F5}") : Model.AddressText)</p>
+    <p>Location is shared only while this page is open and live tracking is enabled.</p>
+    <div class="sos-actions">
+        <button type="button" id="start-sos-tracking">Start live location sharing</button>
+        <button type="button" id="stop-sos-tracking" class="btn btn-ghost" disabled>Stop live location sharing</button>
+    </div>
+    <p id="sos-tracking-message" role="status" aria-live="polite"></p>
+    <p id="sos-tracking-error" class="error" role="alert"></p>
+    <form id="sos-manual-location">
+        <label for="sos-address">Manual address or landmark</label>
+        <textarea id="sos-address" maxlength="500" required>@Model.AddressText</textarea>
+        <button type="submit">Update address</button>
+    </form>
+    <div class="sos-actions">
+        <button type="button" id="sos-cancel" class="btn-danger">Cancel SOS alert</button>
+        <a asp-controller="Sos" asp-action="Confirmation" asp-route-id="@Model.Id">Refresh alert status</a>
+    </div>
+    <noscript><p>Enable JavaScript to share GPS, update your address, or cancel this alert.</p></noscript>
+</section>
+<dialog id="sos-cancel-dialog" aria-labelledby="sos-cancel-heading">
+    <h2 id="sos-cancel-heading">Cancel this SOS alert?</h2>
+    <p>This will mark SOS-@Model.Id.ToString("D6") as cancelled and stop live location sharing.</p>
+    <p id="sos-cancel-message" role="status" aria-live="polite"></p>
+    <p id="sos-cancel-error" class="error" role="alert"></p>
+    <div class="sos-actions">
+        <button type="button" id="sos-cancel-confirm" class="btn-danger">Yes, cancel SOS</button>
+        <button type="button" id="sos-cancel-back" class="btn btn-ghost">Keep alert active</button>
+    </div>
+    <a asp-controller="Sos" asp-action="Confirmation" asp-route-id="@Model.Id">Check latest alert status</a>
+</dialog>

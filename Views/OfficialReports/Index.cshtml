@@ -1,0 +1,35 @@
+@{
+    ViewData["Title"] = "City reports";
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/official-reports.css" asp-append-version="true" />
+}
+<section id="official-reports" aria-labelledby="reports-heading">
+    <h1 id="reports-heading">City reports</h1>
+    <p id="reports-summary" role="status" aria-live="polite">Loading reports…</p>
+    <div id="reports-error" class="alert alert-bad" role="alert" hidden></div>
+    <button id="reports-retry" type="button" hidden>Retry loading reports</button>
+    <a id="reports-reset" asp-controller="OfficialReports" asp-action="Index" hidden>Reset report list</a>
+    <p id="reports-empty" class="card" hidden>No reports match this selection.</p>
+    <div id="reports-table-wrap" class="table-wrap" role="region" aria-label="City reports" tabindex="0" hidden>
+        <table>
+            <caption class="sr-only">City reports, up to 20 reports per page</caption>
+            <thead><tr>
+                <th scope="col">Code</th><th scope="col">Title</th><th scope="col">Category</th><th scope="col">Area</th>
+                <th scope="col" aria-sort="none"><button type="button" class="report-sort" data-sort="status">Status</button></th>
+                <th scope="col" aria-sort="none"><button type="button" class="report-sort" data-sort="urgency">Urgency</button></th>
+                <th scope="col" aria-sort="descending"><button type="button" class="report-sort" data-sort="date">Created (UTC)</button></th>
+            </tr></thead>
+            <tbody id="reports-rows"></tbody>
+        </table>
+    </div>
+    <nav id="reports-pagination" aria-label="Report pages" hidden>
+        <button id="reports-previous" class="btn btn-ghost" type="button">Previous page</button>
+        <span id="reports-page-label"></span>
+        <button id="reports-next" class="btn btn-ghost" type="button">Next page</button>
+    </nav>
+    <noscript><p>Enable JavaScript to load, sort, and page through city reports.</p></noscript>
+</section>
+@section Scripts {
+    <script src="~/js/official-reports.js" asp-append-version="true"></script>
+}

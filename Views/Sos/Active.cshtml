@@ -9,28 +9,11 @@
 @if (Model == null)
 {
     <p>You have no active SOS alert.</p>
+    <a class="btn" asp-controller="Sos" asp-action="Index">Request SOS assistance</a>
 }
 else
 {
-<section class="card" id="sos-active" data-alert-id="@Model.Id">
-    <h2>SOS-@Model.Id.ToString("D6")</h2>
-    <p>Status: <strong id="sos-status">@Model.Status</strong></p>
-    <p id="sos-location" class="sos-location-text">@(Model.Latitude.HasValue ? FormattableString.Invariant($"GPS {Model.Latitude:F5}, {Model.Longitude:F5}") : Model.AddressText)</p>
-    <p>Location is shared only while this page is open and live tracking is enabled.</p>
-    <div class="sos-actions">
-        <button type="button" id="start-sos-tracking">Start live location sharing</button>
-        <button type="button" id="stop-sos-tracking" class="btn btn-ghost" disabled>Stop live location sharing</button>
-    </div>
-    <p id="sos-tracking-message" role="status" aria-live="polite"></p>
-    <p id="sos-tracking-error" class="error" role="alert"></p>
-    <form id="sos-manual-location">
-        <label for="sos-address">Manual address or landmark</label>
-        <textarea id="sos-address" maxlength="500" required>@Model.AddressText</textarea>
-        <button type="submit">Update address</button>
-    </form>
-    <noscript><p>Enable JavaScript to share GPS, update your address, .</p></noscript>
-</section>
-
+    @await Html.PartialAsync("_ActiveAlert", Model)
 }
 @section Scripts {
     <script src="~/js/sos-live-location.js" asp-append-version="true"></script>

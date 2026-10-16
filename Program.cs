@@ -37,6 +37,7 @@ builder.Services.AddOptions<SosOptions>().Bind(builder.Configuration.GetSection(
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddScoped<SosResponderDirectory>();
 builder.Services.AddScoped<SosResponderNotifier>();
+builder.Services.AddScoped<OfficialReportQueryService>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
@@ -90,6 +91,8 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     await DevDataSeeder.SeedAsync(scope.ServiceProvider);
+    await Nagorik.Api.Data.DevelopmentReportSeeder.SeedAsync(
+        scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
 }
 
 using (var scope = app.Services.CreateScope())

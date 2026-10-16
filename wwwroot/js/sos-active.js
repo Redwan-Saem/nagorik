@@ -5,6 +5,10 @@
     const stop = document.getElementById('stop-sos-tracking');
     const message = document.getElementById('sos-tracking-message');
     const error = document.getElementById('sos-tracking-error');
+    const cancel = document.getElementById('sos-cancel');
+    const cancelDialog = document.getElementById('sos-cancel-dialog');
+    const cancelConfirm = document.getElementById('sos-cancel-confirm');
+    const cancelBack = document.getElementById('sos-cancel-back');
     const manualForm = document.getElementById('sos-manual-location');
     let terminal = false;
     let cancelling = false;
@@ -12,6 +16,7 @@
     const buttons = () => {
         start.disabled = terminal || cancelling || updatingAddress || tracker.running;
         stop.disabled = !tracker.running;
+        cancel.disabled = terminal || cancelling || updatingAddress;
         manualForm.querySelector('button').disabled = terminal || cancelling || updatingAddress;
     };
     const tracker = new SosLiveLocation({
@@ -60,5 +65,35 @@
             message.textContent = 'Manual address saved. Live GPS sharing is stopped.';
         } catch (failure) { error.textContent = failure.message; }
         finally { updatingAddress = false; buttons(); }
+    });
+    cancel.addEventListener('click', () => {
+        if (terminal || cancelling || updatingAddress) return;
+        document.getElementById('sos-cancel-error').textContent = '';
+        cancelConfirm.disabled = false;
+        cancelDialog.showModal(); cancelBack.focus();
+    });
+    cancelBack.addEventListener('click', () => { if (!cancelling) cancelDialog.close(); });
+    cancelDialog.addEventListener('cancel', event => { if (cancelling) event.preventDefault(); });
+    cancelConfirm.addEventListener('click', async () => {
+        if (cancelling || terminal || !cancelDialog.open || cancelConfirm.disabled) return;
+        cancelling = true; cancelConfirm.disabled = true; cancelBack.disabled = true;
+        tracker.stop(); buttons();
+        cancelDialog.setAttribute('aria-busy', 'true');
+        document.getElementById('sos-cancel-message').textContent = 'Cancelling your SOS alert…';
+        try {
+            const response = await fetch(`/api/sos/${encodeURIComponent(page.dataset.alertId)}/cancel`, {
+                method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' }
+            });
+            if (!response.ok) throw new Error('Cancellation could not be confirmed. Check the latest alert status or log in again.');
+            const alert = await response.json();
+            if (alert.status !== 'Cancelled') throw new Error('Check the latest alert status to confirm cancellation.');
+            terminal = true;
+            window.location.assign(`/sos/${encodeURIComponent(page.dataset.alertId)}`);
+        } catch (failure) {
+            document.getElementById('sos-cancel-message').textContent = '';
+            document.getElementById('sos-cancel-error').textContent = failure.message;
+        } finally {
+            cancelling = false; cancelBack.disabled = false; cancelDialog.removeAttribute('aria-busy'); buttons();
+        }
     });
 })();

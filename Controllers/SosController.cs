@@ -11,7 +11,22 @@ namespace Nagorik.Api.Controllers;
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public class SosController(SosAlertService service, SosResponderDirectory responders, AppDbContext db) : Controller
 {
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken ct)
+    {
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
+            return Unauthorized();
+        return await service.GetActiveAsync(userId, ct) == null ? View() : RedirectToAction(nameof(Active));
+    }
 
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> Confirmation(int id, CancellationToken ct)
+    {
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
+            return Unauthorized();
+        var alert = await service.GetByIdAsync(id, userId, ct);
+        return alert == null ? NotFound() : View(alert);
+    }
 
     [HttpGet("active")]
     public async Task<IActionResult> Active(CancellationToken ct)

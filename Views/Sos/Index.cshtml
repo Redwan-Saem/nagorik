@@ -1,0 +1,43 @@
+@{
+    ViewData["Title"] = "Request SOS assistance";
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/sos.css" asp-append-version="true" />
+}
+<h1>Request SOS assistance</h1>
+<p>Provide your location, then review and confirm your SOS alert.</p>
+<form id="sos-trigger-form" class="card" novalidate>
+    <h2>Your location</h2>
+    <button type="button" id="sos-use-gps" class="btn btn-ghost">Use my location</button>
+    <p id="sos-gps-message" role="status" aria-live="polite">You can use GPS or enter an address below.</p>
+    <button type="button" id="sos-clear-gps" class="btn btn-ghost" hidden>Use manual address only</button>
+    <label for="sos-trigger-address">Address or landmark</label>
+    <textarea id="sos-trigger-address" maxlength="500" rows="3" aria-describedby="sos-location-hint"></textarea>
+    <p id="sos-location-hint" class="hint">Required when GPS is unavailable. Include a nearby landmark to help responders locate you.</p>
+    <h2>Prepare your SOS</h2>
+    <p id="sos-hold-hint">Hold for 2 seconds and release to review. You will confirm before the alert is sent.</p>
+    <button type="button" id="sos-hold" class="btn-danger" aria-describedby="sos-hold-hint">Hold to prepare SOS</button>
+    <progress id="sos-hold-progress" max="100" value="0" aria-label="SOS hold progress"></progress>
+    <p id="sos-hold-status" role="status" aria-live="polite"></p>
+    <button type="button" id="sos-review" class="btn btn-ghost">Review SOS without holding</button>
+    <p id="sos-trigger-error" class="error" role="alert" tabindex="-1"></p>
+    <noscript><p>Enable JavaScript to review and send an SOS alert.</p></noscript>
+</form>
+<dialog id="sos-review-dialog" aria-labelledby="sos-review-heading">
+    <h2 id="sos-review-heading">Review SOS alert</h2>
+    <p id="sos-review-location" class="sos-location-text"></p>
+    <p>Send this location as an SOS assistance request?</p>
+    <p id="sos-send-status" role="status" aria-live="polite"></p>
+    <p id="sos-send-error" class="error" role="alert"></p>
+    <div class="sos-actions">
+        <button type="button" id="sos-confirm" class="btn-danger">Confirm and send SOS</button>
+        <button type="button" id="sos-review-back" class="btn btn-ghost">Go back</button>
+        <button type="button" id="sos-retry" class="btn btn-ghost" hidden>Check and retry</button>
+    </div>
+    <a id="sos-check-active" asp-controller="Sos" asp-action="Active" hidden>Check my active alert</a>
+    <a id="sos-login" href="/login.html?returnUrl=%2Fsos" hidden>Log in again</a>
+</dialog>
+@section Scripts {
+    <script src="~/js/sos-submission.js" asp-append-version="true"></script>
+    <script src="~/js/sos-trigger.js" asp-append-version="true"></script>
+}
