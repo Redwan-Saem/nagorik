@@ -91,8 +91,60 @@ public class CrewTasksApiTests : IAsyncLifetime
 
 
 
+    [Theory]
+    [InlineData(null, null, HttpStatusCode.Unauthorized)]
+    [InlineData("1", "Resident", HttpStatusCode.Forbidden)]
+    [InlineData("1", "Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("invalid", "Crew", HttpStatusCode.Unauthorized)]
+    [InlineData("3", "Crew", HttpStatusCode.NotFound)]
+    public async Task TaskPage_EnforcesRoleAndOwnership(string? userId, string? role, HttpStatusCode expected)
+    {
+        Authenticate(userId, role);
+        using var response = await _client.GetAsync("/crew/tasks/1");
+        Assert.Equal(expected, response.StatusCode);
+    }
 
+    [Fact]
+    public async Task TaskPages_ShowOnlyOwnTasksAndEscapeReportContent()
+    {
+        Authenticate("2", "Crew");
+        var list = await _client.GetStringAsync("/crew/tasks");
+        Assert.Contains("/crew/tasks/1", list);
+        Assert.Contains("Crew task &lt;script&gt;", list);
+        Assert.DoesNotContain("Unassigned private report", list);
+        var detail = await _client.GetStringAsync("/crew/tasks/1");
+        Assert.Contains("Repair the road", detail);
+        Assert.Contains("Dhaka", detail);
+        Assert.Contains("No status history is available yet.", detail);
+        Assert.Contains("data-next-status=\"InProgress\"", detail);
+        Assert.Contains("Crew task &lt;script&gt;", detail);
+        Assert.DoesNotContain("<script>alert(1)</script>", detail);
 
+        Authenticate("3", "Crew");
+        var empty = await _client.GetStringAsync("/crew/tasks");
+        Assert.Contains("You have no assigned tasks yet.", empty);
+        Assert.DoesNotContain("/crew/tasks/1", empty);
+        using var unassigned = await _client.GetAsync("/crew/tasks/2");
+        Assert.Equal(HttpStatusCode.NotFound, unassigned.StatusCode);
+    }
+
+    [Fact]
+    public async Task TaskPage_RefreshesNextActionAndHistoryThroughCompletion()
+    {
+        Authenticate("2", "Crew");
+        using var started = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        started.EnsureSuccessStatusCode();
+        var progress = await _client.GetStringAsync("/crew/tasks/1");
+        Assert.Contains("data-next-status=\"Completed\"", progress);
+        Assert.Contains("In Progress", progress);
+        Assert.Contains("by user #2", progress);
+        using var completed = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "Completed" });
+        completed.EnsureSuccessStatusCode();
+        var finished = await _client.GetStringAsync("/crew/tasks/1");
+        Assert.Contains("No further status updates are available.", finished);
+        Assert.DoesNotContain("id=\"update-task-status\"", finished);
+        Assert.Contains("Completed", finished);
+    }
 
     [Theory]
     [InlineData(null, null, HttpStatusCode.Unauthorized)]

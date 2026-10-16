@@ -1,0 +1,69 @@
+@model Nagorik.Api.Models.ReportDetailViewModel
+@using Nagorik.Api.Models
+@{
+    ViewData["Title"] = $"Task R-{Model.Report.Id:D6}";
+    var nextStatus = Model.Report.Status switch
+    {
+        ReportStatus.Assigned => "InProgress",
+        ReportStatus.InProgress => "Completed",
+        _ => null
+    };
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/crew-tasks.css" asp-append-version="true" />
+}
+<a asp-controller="CrewTasks" asp-action="Index">Back to My Tasks</a>
+<h1>Task R-@Model.Report.Id.ToString("D6")</h1>
+<article class="card crew-task-detail" data-task-id="@Model.Report.Id">
+    <h2>@Model.Report.Title</h2>
+    <p class="task-description">@Model.Report.Description</p>
+    <dl>
+        <dt>Category</dt><dd>@Model.Report.Category</dd>
+        <dt>Location</dt><dd>@Model.Report.Location</dd>
+        <dt>Current status</dt><dd><span class="badge" id="task-status">@(Model.Report.Status == ReportStatus.InProgress ? "In Progress" : Model.Report.Status.ToString())</span></dd>
+    </dl>
+    @if (!string.IsNullOrEmpty(Model.Report.ImageUrl))
+    {
+        <img class="preview" src="@Model.Report.ImageUrl" alt="Photo of the reported issue" />
+    }
+    <p id="task-feedback" role="status" aria-live="polite" tabindex="-1"></p>
+    <p id="task-error" class="alert alert-bad" role="alert" tabindex="-1" hidden></p>
+    <div class="task-actions">
+        @if (nextStatus != null)
+        {
+            <button type="button" id="update-task-status" data-next-status="@nextStatus">
+                @(nextStatus == "InProgress" ? "Start task" : "Complete task")
+            </button>
+            <noscript><p>Enable JavaScript to update this task's status.</p></noscript>
+        }
+        else
+        {
+            <p>No further status updates are available.</p>
+        }
+        <a asp-controller="CrewTasks" asp-action="Detail" asp-route-id="@Model.Report.Id" class="btn btn-ghost">Refresh task</a>
+        <a id="task-login" href="/login.html" hidden>Log in again</a>
+    </div>
+</article>
+<section aria-labelledby="task-history-heading">
+    <h2 id="task-history-heading">Status history</h2>
+    @if (Model.StatusHistory.Count == 0)
+    {
+        <p>No status history is available yet.</p>
+    }
+    else
+    {
+        <ol>
+        @foreach (var entry in Model.StatusHistory)
+        {
+            <li>
+                <strong>@(entry.Status == ReportStatus.InProgress ? "In Progress" : entry.Status.ToString())</strong>
+                <time datetime="@entry.ChangedAtUtc.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@entry.ChangedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</time>
+                <span class="muted">@(entry.ChangedByUserId.HasValue ? $"by user #{entry.ChangedByUserId}" : "Actor not recorded")</span>
+            </li>
+        }
+        </ol>
+    }
+</section>
+@section Scripts {
+    <script src="~/js/crew-task-detail.js" asp-append-version="true"></script>
+}
