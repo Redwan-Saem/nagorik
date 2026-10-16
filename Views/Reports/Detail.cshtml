@@ -1,0 +1,36 @@
+@model Nagorik.Api.Models.ReportDetailViewModel
+@{
+    ViewData["Title"] = $"Report R-{Model.Report.Id:D6}";
+}
+
+<a asp-controller="Reports" asp-action="Mine">Back to My Reports</a>
+<h1>Report R-@Model.Report.Id.ToString("D6")</h1>
+<h2>@Model.Report.Title</h2>
+<p style="white-space: pre-wrap; overflow-wrap: anywhere">@Model.Report.Description</p>
+<dl>
+    <dt>Category</dt><dd>@Model.Report.Category</dd>
+    <dt>Location</dt><dd style="overflow-wrap: anywhere">@Model.Report.Location</dd>
+    <dt>Current status</dt><dd>@Model.Report.Status</dd>
+    <dt>Submitted (UTC)</dt>
+    <dd><time datetime="@Model.Report.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@Model.Report.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</time></dd>
+</dl>
+
+<section aria-labelledby="history-heading">
+    <h2 id="history-heading">Status history</h2>
+    @if (Model.StatusHistory.Count == 0)
+    {
+        <p>No status history is available yet.</p>
+    }
+    else
+    {
+        <ol>
+            @foreach (var entry in Model.StatusHistory)
+            {
+                <li>
+                    <strong>@entry.Status</strong>
+                    <time datetime="@entry.ChangedAtUtc.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@entry.ChangedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</time>
+                </li>
+            }
+        </ol>
+    }
+</section>

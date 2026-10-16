@@ -17,10 +17,12 @@ public record StatusChangeResult(
 public class ReportStatusWorkflowService
 {
     private readonly AppDbContext _db;
+    private readonly ResidentReportStatusNotifier _residentNotifier;
 
-    public ReportStatusWorkflowService(AppDbContext db)
+    public ReportStatusWorkflowService(AppDbContext db, ResidentReportStatusNotifier residentNotifier)
     {
         _db = db;
+        _residentNotifier = residentNotifier;
     }
 
     public static bool CanTransition(
@@ -61,6 +63,14 @@ public class ReportStatusWorkflowService
                 "Report not found.");
         }
 
+        return await ApplyChangeAsync(report, nextStatus);
+    }
+
+
+    private async Task<StatusChangeResult> ApplyChangeAsync(
+        Report report, ReportStatus nextStatus)
+    {
+
         if (!CanTransition(report.Status, nextStatus))
         {
             return new(
@@ -70,14 +80,17 @@ public class ReportStatusWorkflowService
 
         report.Status = nextStatus;
 
-        _db.ReportStatusHistories.Add(new ReportStatusHistory
+        var history = new ReportStatusHistory
         {
             ReportId = report.Id,
             Status = nextStatus,
             ChangedAtUtc = DateTime.UtcNow
-        });
+        };
+        _db.ReportStatusHistories.Add(history);
 
         await _db.SaveChangesAsync();
+
+        await _residentNotifier.NotifyAsync(report);
 
         return new(
             StatusChangeOutcome.Changed,

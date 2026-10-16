@@ -30,6 +30,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 // T-002.5 Alert processing
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<ReportStatusWorkflowService>();
+builder.Services.AddScoped<ResidentReportStatusNotifier>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]

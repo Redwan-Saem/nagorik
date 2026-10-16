@@ -143,7 +143,7 @@ public class CrewTaskNotifierTests
             var service = new CrewAssignmentService(
                 db,
                 CreateNotifier(sender.Object),
-                NullLogger<CrewAssignmentService>.Instance);
+                NullLogger<CrewAssignmentService>.Instance, ResidentNotificationTestHelper.Create());
 
             var result = await service.AssignAsync(1, 1, 1, false);
 
@@ -187,7 +187,7 @@ public class CrewTaskNotifierTests
             var service = new CrewAssignmentService(
                 db,
                 CreateNotifier(sender.Object),
-                NullLogger<CrewAssignmentService>.Instance);
+                NullLogger<CrewAssignmentService>.Instance, ResidentNotificationTestHelper.Create());
 
             var result = await service.AssignAsync(1, 1, 1, false);
 

@@ -27,15 +27,18 @@ public class CrewAssignmentService
     private readonly AppDbContext _db;
     private readonly ICrewTaskNotifier _notifier;
     private readonly ILogger<CrewAssignmentService> _log;
+    private readonly ResidentReportStatusNotifier _residentNotifier;
 
     public CrewAssignmentService(
         AppDbContext db,
         ICrewTaskNotifier notifier,
-        ILogger<CrewAssignmentService> log)
+        ILogger<CrewAssignmentService> log,
+        ResidentReportStatusNotifier residentNotifier)
     {
         _db = db;
         _notifier = notifier;
         _log = log;
+        _residentNotifier = residentNotifier;
     }
 
     public async Task<List<CrewDto>> GetCrewsAsync()
@@ -110,22 +113,26 @@ public class CrewAssignmentService
 
         var changedAtUtc = DateTime.UtcNow;
 
-        _db.ReportStatusHistories.Add(new ReportStatusHistory
+        var history = new ReportStatusHistory
         {
             ReportId = report.Id,
             Status = ReportStatus.Assigned,
             ChangedAtUtc = changedAtUtc
-        });
+        };
+        _db.ReportStatusHistories.Add(history);
 
-        _db.CrewAssignments.Add(new CrewAssignment
+        var assignment = new CrewAssignment
         {
             ReportId = reportId,
             CrewId = crewId,
             DispatcherId = dispatcherId,
             AssignedAtUtc = changedAtUtc
-        });
+        };
+        _db.CrewAssignments.Add(assignment);
 
         await _db.SaveChangesAsync();
+
+        await _residentNotifier.NotifyAsync(report);
 
         try
         {

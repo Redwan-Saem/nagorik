@@ -50,6 +50,24 @@ namespace Nagorik.Api.Controllers
             return View(report);
         }
 
+        public async Task<IActionResult> Detail(int id, CancellationToken ct)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return NotFound();
+
+            var report = await _db.Reports.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId, ct);
+            if (report == null)
+                return NotFound();
+
+            var history = await _db.ReportStatusHistories.AsNoTracking()
+                .Where(h => h.ReportId == id)
+                .OrderBy(h => h.ChangedAtUtc).ThenBy(h => h.Id)
+                .ToListAsync(ct);
+
+            return View(new ReportDetailViewModel(report, history));
+        }
+
         public async Task<IActionResult> Mine()
         {
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
