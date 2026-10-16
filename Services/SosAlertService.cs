@@ -12,7 +12,7 @@ public enum SosOutcome { Created, Success, NotFound, Conflict, Invalid, UserNotF
 public sealed record SosResult(SosOutcome Outcome, SosAlertDto? Alert = null,
     Dictionary<string, string[]>? Errors = null);
 
-public class SosAlertService(AppDbContext db)
+public class SosAlertService(AppDbContext db, SosResponderNotifier responderNotifier)
 {
     public async Task<SosAlertDto?> GetActiveAsync(int userId, CancellationToken ct = default) =>
         await db.SosAlerts.AsNoTracking()
@@ -54,6 +54,7 @@ public class SosAlertService(AppDbContext db)
             if (existing == null) throw;
             return new(SosOutcome.Conflict, existing);
         }
+        await responderNotifier.NotifyCreatedAsync(alert);
         return new(SosOutcome.Created, ToDto(alert));
     }
 

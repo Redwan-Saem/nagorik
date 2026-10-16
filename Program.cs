@@ -33,6 +33,10 @@ builder.Services.AddScoped<ReportStatusWorkflowService>();
 builder.Services.AddScoped<ResidentReportStatusNotifier>();
 builder.Services.AddScoped<DispatcherTaskStatusNotifier>();
 builder.Services.AddScoped<SosAlertService>();
+builder.Services.AddOptions<SosOptions>().Bind(builder.Configuration.GetSection("Sos"))
+    .ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddScoped<SosResponderDirectory>();
+builder.Services.AddScoped<SosResponderNotifier>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]

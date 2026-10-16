@@ -28,7 +28,9 @@ public class SosApiTests : IAsyncLifetime
     private WebApplication _app = null!;
     private HttpClient _client = null!;
     private readonly PauseSosSave _gate = new();
+    private string[] _responderEmails = [];
     private readonly Mock<INotificationService> _notifications = new();
+    private readonly SosNotificationLog _notificationLog = new();
     private static readonly object Gps = new { latitude = 23.81, longitude = 90.41 };
 
     public async Task InitializeAsync()
@@ -44,7 +46,12 @@ public class SosApiTests : IAsyncLifetime
         builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(_connection).AddInterceptors(_gate));
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(SosApiController).Assembly);
         builder.Services.AddScoped<SosAlertService>();
+        builder.Services.AddOptions<SosOptions>();
+        builder.Services.Configure<SosOptions>(o => { o.ResponderEmails = _responderEmails; o.NotificationTimeoutSeconds = 1; });
+        builder.Services.AddScoped<SosResponderDirectory>();
+        builder.Services.AddScoped<SosResponderNotifier>();
         builder.Services.AddSingleton(_notifications.Object);
+        builder.Services.AddSingleton<ILogger<SosResponderNotifier>>(_notificationLog);
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
         {
             o.TokenValidationParameters = new TokenValidationParameters
@@ -82,10 +89,100 @@ public class SosApiTests : IAsyncLifetime
 
 
 
+    [Fact]
+    public async Task Trigger_NotifiesOnlyConfiguredResponderAfterCommitWithinTargetAndLinkIsProtected()
+    {
+        _responderEmails = [" USER2@TEST.COM ", "user2@test.com"];
+        var verified = 0;
+        _notifications.Setup(n => n.SendToUserAsync("2", "SOS assistance requested", It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .Returns(async (string user, string title, string body, string url, DateTime? timestamp, CancellationToken ct) =>
+            {
+                await using var db = CreateDb();
+                var saved = await db.SosAlerts.SingleAsync();
+                Assert.Single(await db.SosAlertEvents.ToListAsync());
+                Assert.InRange((DateTime.UtcNow - saved.CreatedAtUtc).TotalSeconds, 0, 60);
+                Assert.Equal($"/sos/respond/{saved.Id}", url);
+                Assert.Contains($"SOS-{saved.Id:D6}", body);
+                Assert.True(ct.CanBeCanceled);
+                verified++;
+                return 1;
+            });
+        var alert = await Trigger();
+        Assert.Equal(1, verified);
+        using var repeat = await _client.PostAsJsonAsync("/api/sos", Gps);
+        Assert.Equal(HttpStatusCode.Conflict, repeat.StatusCode);
+        _notifications.Verify(n => n.SendToUserAsync("2", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        _notifications.Verify(n => n.SendToUserAsync("1", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains(_notificationLog.Messages, m => m.Contains("dispatch started after"));
+        using var ownerDenied = await _client.GetAsync($"/sos/respond/{alert.Id}");
+        Assert.Equal(HttpStatusCode.Forbidden, ownerDenied.StatusCode);
+        Authenticate("2");
+        var page = await _client.GetStringAsync($"/sos/respond/{alert.Id}");
+        Assert.Contains($"SOS-{alert.Id:D6}", page);
+        Assert.Contains("23.81000", page);
+        using var missing = await _client.GetAsync("/sos/respond/999");
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
 
+    [Fact]
+    public async Task SlowResponder_IsBoundedAndDoesNotBlockOtherRecipientAttempts()
+    {
+        _responderEmails = ["user1@test.com", "user2@test.com"];
+        _notifications.Setup(n => n.SendToUserAsync("1", It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .Returns(async (string user, string title, string body, string url, DateTime? timestamp, CancellationToken ct) =>
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+                return 0;
+            });
+        _notifications.Setup(n => n.SendToUserAsync("2", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ReturnsAsync(1);
+        var started = DateTime.UtcNow;
+        await Trigger();
+        Assert.InRange((DateTime.UtcNow - started).TotalSeconds, 0, 60);
+        _notifications.Verify(n => n.SendToUserAsync("2", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Contains(_notificationLog.Messages, m => m.Contains("notification attempt failed"));
+    }
 
+    [Fact]
+    public async Task NotificationFailure_IsLoggedAndAlertRemainsStored()
+    {
+        _responderEmails = ["user2@test.com"];
+        _notifications.Setup(n => n.SendToUserAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("Push down"));
+        await Trigger();
+        await using var db = CreateDb();
+        Assert.Single(await db.SosAlerts.ToListAsync());
+        Assert.Single(await db.SosAlertEvents.ToListAsync());
+        Assert.Contains(_notificationLog.Messages, m => m.Contains("notification attempt failed"));
+    }
 
+    [Fact]
+    public async Task MissingResponderConfiguration_LogsFailureAndDoesNotChooseArbitraryUsers()
+    {
+        _responderEmails = ["missing@example.test"];
+        await Trigger();
+        _notifications.VerifyNoOtherCalls();
+        Assert.Contains(_notificationLog.Messages, m => m.Contains("no configured responder accounts"));
+    }
 
+    [Fact]
+    public async Task ActivePage_ExposesOnlyOwnedAlertAndManualAddressFallback()
+    {
+        var alert = await Trigger();
+        var own = await _client.GetStringAsync("/sos/active");
+        Assert.Contains($"data-alert-id=\"{alert.Id}\"", own);
+        Assert.Contains("Start live location sharing", own);
+        Assert.Contains("Manual address or landmark", own);
+        Authenticate("2");
+        var other = await _client.GetStringAsync("/sos/active");
+        Assert.Contains("You have no active SOS alert.", other);
+        Assert.DoesNotContain("id=\"sos-active\"", other);
+    }
 
     [Fact]
     public async Task Lifecycle_UsesCookieIdentityAndAtomicallyAuditsTriggerLocationAndCancellation()
@@ -359,4 +456,15 @@ public class SosApiTests : IAsyncLifetime
         }
     }
 
+    private sealed class SosNotificationLog : ILogger<SosResponderNotifier>
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel level) => true;
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            lock (Messages) Messages.Add(formatter(state, exception));
+        }
+    }
 }
