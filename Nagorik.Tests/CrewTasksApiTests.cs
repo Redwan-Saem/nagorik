@@ -44,6 +44,7 @@ public class CrewTasksApiTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(CrewTasksApiController).Assembly);
         builder.Services.AddScoped<ReportStatusWorkflowService>();
         builder.Services.AddScoped<ResidentReportStatusNotifier>();
+        builder.Services.AddScoped<DispatcherTaskStatusNotifier>();
         builder.Services.AddScoped<CrewAssignmentService>();
         builder.Services.AddSingleton(_crewNotifications.Object);
         builder.Services.AddSingleton(_notifications.Object);
@@ -87,9 +88,85 @@ public class CrewTasksApiTests : IAsyncLifetime
 
 
 
+    [Fact]
+    public async Task CrewUpdates_NotifyLatestAssigningDispatcherOnceAndLinkToWorkingDetail()
+    {
+        await SeedDispatcherAssignments();
+        var verifiedCommittedNotifications = 0;
+        _notifications.Setup(n => n.SendToUserAsync("5", "Crew task status updated",
+                It.IsAny<string>(), "/Dispatch/Report/1", null, default))
+            .Returns(async (string user, string title, string body, string url, DateTime? timestamp, CancellationToken ct) =>
+            {
+                await using var db = CreateDb();
+                var status = (await db.Reports.SingleAsync(r => r.Id == 1)).Status;
+                Assert.Contains(status.ToString(), body);
+                Assert.Contains("Assigned crew (crew #10)", body);
+                Assert.Contains("R-000001", body);
+                Assert.True(await db.ReportStatusHistories.AnyAsync(h => h.ReportId == 1 && h.Status == status));
+                verifiedCommittedNotifications++;
+                return 1;
+            });
+        Authenticate("2", "Crew");
+        using var invalid = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "Completed" });
+        Assert.Equal(HttpStatusCode.Conflict, invalid.StatusCode);
+        using var start = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        start.EnsureSuccessStatusCode();
+        using var repeat = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        Assert.Equal(HttpStatusCode.Conflict, repeat.StatusCode);
+        using var finish = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "Completed" });
+        finish.EnsureSuccessStatusCode();
+        Assert.Equal(2, verifiedCommittedNotifications);
+        _notifications.Verify(n => n.SendToUserAsync("5", "Crew task status updated", It.IsAny<string>(),
+            "/Dispatch/Report/1", null, default), Times.Exactly(2));
+        _notifications.Verify(n => n.SendToUserAsync("4", It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, default), Times.Never);
+        Authenticate("5", "Dispatcher");
+        var detail = await _client.GetStringAsync("/Dispatch/Report/1");
+        Assert.Contains("Completed", detail);
+    }
 
+    [Theory]
+    [InlineData("1")]
+    [InlineData("5")]
+    public async Task CrewUpdate_DeliveryFailuresPreserveTaskAndOtherRecipients(string failingUser)
+    {
+        await SeedDispatcherAssignments();
+        _notifications.Setup(n => n.SendToUserAsync(failingUser, It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), null, default)).ThrowsAsync(new InvalidOperationException("Push down"));
+        Authenticate("2", "Crew");
+        using var response = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        response.EnsureSuccessStatusCode();
+        await AssertState(ReportStatus.InProgress, 1);
+        foreach (var user in new[] { "1", "5" })
+            _notifications.Verify(n => n.SendToUserAsync(user, It.IsAny<string>(), It.IsAny<string>(),
+                It.IsAny<string>(), null, default), Times.Once);
+    }
 
+    [Fact]
+    public async Task CrewUpdate_WrongCrewAndSaveFailuresDoNotNotifyDispatcher()
+    {
+        await SeedDispatcherAssignments();
+        Authenticate("3", "Crew");
+        using var wrongCrew = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        Assert.Equal(HttpStatusCode.NotFound, wrongCrew.StatusCode);
+        Authenticate("2", "Crew");
+        await using (var db = CreateDb())
+            await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_report_update BEFORE UPDATE ON Reports BEGIN SELECT RAISE(ABORT, 'test save failure'); END;");
+        using var failure = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress" });
+        Assert.Equal(HttpStatusCode.InternalServerError, failure.StatusCode);
+        await AssertUnchanged();
+    }
 
+    private async Task SeedDispatcherAssignments()
+    {
+        await using var db = CreateDb();
+        TestDb.AddUser(db, 4);
+        TestDb.AddUser(db, 5);
+        db.CrewAssignments.AddRange(
+            new CrewAssignment { ReportId = 1, CrewId = 20, DispatcherId = 4, AssignedAtUtc = DateTime.UtcNow.AddHours(-2) },
+            new CrewAssignment { ReportId = 1, CrewId = 10, DispatcherId = 5, AssignedAtUtc = DateTime.UtcNow.AddHours(-1) });
+        await db.SaveChangesAsync();
+    }
 
     [Theory]
     [InlineData(null, null, HttpStatusCode.Unauthorized)]

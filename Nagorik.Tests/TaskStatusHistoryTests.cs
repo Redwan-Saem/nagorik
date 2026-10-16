@@ -28,7 +28,7 @@ public class TaskStatusHistoryTests
         var notifier = ResidentNotificationTestHelper.Create();
         var assignments = new CrewAssignmentService(db, Mock.Of<ICrewTaskNotifier>(),
             NullLogger<CrewAssignmentService>.Instance, notifier);
-        var workflow = new ReportStatusWorkflowService(db, notifier);
+        var workflow = new ReportStatusWorkflowService(db, notifier, ResidentNotificationTestHelper.Dispatcher(db));
 
         Assert.False((await assignments.GetCrewsAsync()).Single().IsBusy);
         Assert.Equal(AssignOutcome.Assigned, (await assignments.AssignAsync(report.Id, 1, 2, false)).Outcome);
@@ -73,7 +73,7 @@ public class TaskStatusHistoryTests
         db.Reports.Add(report);
         await db.SaveChangesAsync();
         var sender = new Mock<INotificationService>(MockBehavior.Strict);
-        var workflow = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create(sender.Object));
+        var workflow = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create(sender.Object), ResidentNotificationTestHelper.Dispatcher(db));
         await Assert.ThrowsAsync<DbUpdateException>(() => workflow.ChangeStatusAsync(report.Id, ReportStatus.InProgress, 999));
         db.ChangeTracker.Clear();
         Assert.Equal(ReportStatus.Assigned, (await db.Reports.SingleAsync()).Status);

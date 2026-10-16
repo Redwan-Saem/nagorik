@@ -18,11 +18,14 @@ public class ReportStatusWorkflowService
 {
     private readonly AppDbContext _db;
     private readonly ResidentReportStatusNotifier _residentNotifier;
+    private readonly DispatcherTaskStatusNotifier _dispatcherNotifier;
 
-    public ReportStatusWorkflowService(AppDbContext db, ResidentReportStatusNotifier residentNotifier)
+    public ReportStatusWorkflowService(AppDbContext db, ResidentReportStatusNotifier residentNotifier,
+        DispatcherTaskStatusNotifier dispatcherNotifier)
     {
         _db = db;
         _residentNotifier = residentNotifier;
+        _dispatcherNotifier = dispatcherNotifier;
     }
 
     public static bool CanTransition(
@@ -84,6 +87,8 @@ public class ReportStatusWorkflowService
             return new(StatusChangeOutcome.InvalidTransition, "Crew may only start or complete a task.");
 
         var result = await ApplyChangeAsync(report, nextStatus, crewUserId, ct);
+        if (result.Outcome == StatusChangeOutcome.Changed)
+            await _dispatcherNotifier.NotifyAsync(report, crewUserId);
         return result;
     }
 

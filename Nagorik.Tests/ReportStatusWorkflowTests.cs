@@ -63,7 +63,7 @@ await using var _db = db;
 
     await db.SaveChangesAsync();
 
-    var service = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create());
+    var service = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create(), ResidentNotificationTestHelper.Dispatcher(db));
 
     var result = await service.ChangeStatusAsync(
         1, ReportStatus.Approved, 1);
@@ -107,7 +107,7 @@ await using var _db = db;
 
     await db.SaveChangesAsync();
 
-    var service = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create());
+    var service = new ReportStatusWorkflowService(db, ResidentNotificationTestHelper.Create(), ResidentNotificationTestHelper.Dispatcher(db));
 
     var result = await service.ChangeStatusAsync(
         1, ReportStatus.Completed, 1);
