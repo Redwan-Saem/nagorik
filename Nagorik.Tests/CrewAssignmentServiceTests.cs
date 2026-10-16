@@ -1,7 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Nagorik.Api;
 using Nagorik.Api.Models;
 using Nagorik.Api.Services;
-
 public class CrewAssignmentServiceTests
 {
     private class TestNotifier : ICrewTaskNotifier
@@ -60,23 +61,24 @@ public class CrewAssignmentServiceTests
 
         return report;
     }
+private static Crew AddCrew(
+    AppDbContext db,
+    int id = 1)
+{
+    TestDb.AddUser(db, id + 100);   // Crew.UserId has a foreign key to Users
 
-    private static Crew AddCrew(
-        AppDbContext db,
-        int id = 1)
+    var crew = new Crew
     {
-        var crew = new Crew
-        {
-            Id = id,
-            Name = $"Crew {id}",
-            UserId = id + 100
-        };
+        Id = id,
+        Name = $"Crew {id}",
+        UserId = id + 100
+    };
 
-        db.Crews.Add(crew);
-        db.SaveChanges();
+    db.Crews.Add(crew);
+    db.SaveChanges();
 
-        return crew;
-    }
+    return crew;
+}
 
     [Fact]
     public async Task AssignAsync_AssignsCrewAndCreatesAssignmentLog()

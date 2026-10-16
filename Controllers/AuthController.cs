@@ -12,7 +12,13 @@ namespace Nagorik.Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly AppDbContext _db;
-        public AuthController(AppDbContext db) { _db = db; }
+        private readonly IConfiguration _config;
+
+        public AuthController(AppDbContext db, IConfiguration config)
+        {
+            _db = db;
+            _config = config;
+        }
 
         [HttpPost("register")]
         public IActionResult Register(RegisterDto dto)
@@ -40,7 +46,10 @@ namespace Nagorik.Api.Controllers
             if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
                 return Unauthorized(new { message = "Invalid email or password" });
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("ThisIsMySecretKeyForNagorikPleaseChangeLater123!"));
+            var jwtKey = _config["Jwt:Key"]
+                ?? throw new InvalidOperationException("Jwt:Key is not configured.");
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var token = new JwtSecurityToken(
               claims: new[] {
@@ -50,7 +59,26 @@ namespace Nagorik.Api.Controllers
                 expires: DateTime.Now.AddDays(7),
                 signingCredentials: creds
             );
-            return Ok(new { token = new JwtSecurityTokenHandler().WriteToken(token) });
+            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+            // Set the token as an HTTP cookie so Razor/CSHTML pages can be
+            // authenticated. The JWT middleware reads it via OnMessageReceived.
+            Response.Cookies.Append("auth_token", tokenString, new CookieOptions
+            {
+                HttpOnly = true,       // not readable by JS (XSS protection)
+                Secure = false,        // set to true in production (HTTPS only)
+                SameSite = SameSiteMode.Lax,
+                Expires = DateTimeOffset.Now.AddDays(7)
+            });
+
+            return Ok(new { token = tokenString, role = user.Role });
+        }
+
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("auth_token");
+            return Ok(new { message = "Logged out." });
         }
     }
 }

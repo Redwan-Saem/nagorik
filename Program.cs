@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=nagorik.db"));
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
 
 // Existing services
 builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
@@ -19,7 +19,8 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 
 // T-004.2 Crew assignment services
-builder.Services.AddScoped<ICrewTaskNotifier, NullCrewTaskNotifier>();
+// T-004.3: real notifier replaces NullCrewTaskNotifier
+builder.Services.AddScoped<ICrewTaskNotifier, CrewTaskNotifier>();
 builder.Services.AddScoped<CrewAssignmentService>();
 
 // Notification services
@@ -30,11 +31,37 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<AlertService>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
-var jwtKey = "ThisIsMySecretKeyForNagorikPleaseChangeLater123!";
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.Events = new JwtBearerEvents
+        {
+            // Read token from the auth_token cookie (set by login.html)
+            OnMessageReceived = ctx =>
+            {
+                ctx.Token ??= ctx.Request.Cookies["auth_token"];
+                return Task.CompletedTask;
+            },
+            // For browser (non-API) requests: redirect to login page instead of
+            // returning a raw 401, which browsers show as a blank error page.
+            OnChallenge = ctx =>
+            {
+                var accept = ctx.Request.Headers["Accept"].ToString();
+                bool isBrowserRequest = accept.Contains("text/html");
+
+                if (isBrowserRequest)
+                {
+                    ctx.HandleResponse(); // suppress default 401 response
+                    var returnUrl = Uri.EscapeDataString(ctx.Request.Path + ctx.Request.QueryString);
+                    ctx.Response.Redirect($"/login.html?returnUrl={returnUrl}");
+                }
+
+                return Task.CompletedTask;
+            }
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = false,
@@ -129,6 +156,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// HTTPS redirect must come first, before auth middleware
+app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseAuthentication();
@@ -138,8 +167,6 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-app.UseHttpsRedirection();
 
 var summaries = new[]
 {
@@ -169,6 +196,9 @@ app.MapGet("/weatherforecast", () =>
     return forecast;
 })
 .WithName("GetWeatherForecast");
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.MapControllers();
 
