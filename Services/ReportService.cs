@@ -39,6 +39,8 @@ public class ReportService : IReportService
         CreateReportRequest request)
     {
         var errors = new Dictionary<string, string>();
+        if (request.Category == ReportCategory.UtilityAnomaly)
+            return ReportResult.Fail(new() { [nameof(request.Category)] = "Use the utility anomaly submission endpoint for this category." });
 
         if (!ReportValidator.IsInDhaka(
                 request.Latitude!.Value,

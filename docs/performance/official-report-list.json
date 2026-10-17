@@ -1,0 +1,796 @@
+{
+  "MeasuredAtUtc": "2026-10-16T22:09:20.832091Z",
+  "Environment": {
+    "OS": "Microsoft Windows 10.0.26200",
+    "Runtime": ".NET 10.0.13",
+    "Architecture": "X64",
+    "Cpu": "Intel64 Family 6 Model 142 Stepping 12, GenuineIntel",
+    "LogicalProcessors": 4,
+    "GcAvailableMemoryBytes": 4124585984,
+    "EfCore": "10.0.12.0",
+    "Sqlite": "3.53.3",
+    "Configuration": "Release"
+  },
+  "Database": "Isolated temporary file-backed SQLite; migrations applied; pooling disabled",
+  "ReportCount": 10000,
+  "PageSize": 20,
+  "WarmupsPerScenario": 2,
+  "TrialsPerScenario": 5,
+  "BudgetMilliseconds": 2000,
+  "Measurement": "Sequential authenticated GET /official/reports?query (HTML body read), then GET /api/reports?query (JSON parsed); includes localhost HTTP, routing, auth, SQL and Razor; excludes browser scripts, paint and asset downloads",
+  "Results": [
+    {
+      "Name": "Newest first",
+      "Query": "sort=date\u0026direction=desc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 1192.9647,
+          "ApiMilliseconds": 240.63059999999996,
+          "TotalMilliseconds": 1433.5953
+        },
+        {
+          "HtmlMilliseconds": 21.3504,
+          "ApiMilliseconds": 20.3761,
+          "TotalMilliseconds": 41.7265
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 10.5621,
+          "ApiMilliseconds": 14.371800000000002,
+          "TotalMilliseconds": 24.9339
+        },
+        {
+          "HtmlMilliseconds": 6.605,
+          "ApiMilliseconds": 13.270900000000001,
+          "TotalMilliseconds": 19.8759
+        },
+        {
+          "HtmlMilliseconds": 10.2277,
+          "ApiMilliseconds": 11.763399999999999,
+          "TotalMilliseconds": 21.9911
+        },
+        {
+          "HtmlMilliseconds": 8.0859,
+          "ApiMilliseconds": 12.099199999999998,
+          "TotalMilliseconds": 20.1851
+        },
+        {
+          "HtmlMilliseconds": 6.9735,
+          "ApiMilliseconds": 11.2443,
+          "TotalMilliseconds": 18.2178
+        }
+      ],
+      "MedianMilliseconds": 20.1851,
+      "MaximumMilliseconds": 24.9339,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r USING INDEX IX_Reports_CreatedAt_Id",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Oldest first",
+      "Query": "sort=date\u0026direction=asc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 7.0661,
+          "ApiMilliseconds": 20.6814,
+          "TotalMilliseconds": 27.7475
+        },
+        {
+          "HtmlMilliseconds": 21.0493,
+          "ApiMilliseconds": 14.195400000000003,
+          "TotalMilliseconds": 35.2447
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 6.3727,
+          "ApiMilliseconds": 13.163400000000001,
+          "TotalMilliseconds": 19.5361
+        },
+        {
+          "HtmlMilliseconds": 8.1029,
+          "ApiMilliseconds": 12.2127,
+          "TotalMilliseconds": 20.3156
+        },
+        {
+          "HtmlMilliseconds": 7.1375,
+          "ApiMilliseconds": 12.6894,
+          "TotalMilliseconds": 19.8269
+        },
+        {
+          "HtmlMilliseconds": 10.7737,
+          "ApiMilliseconds": 11.366999999999999,
+          "TotalMilliseconds": 22.1407
+        },
+        {
+          "HtmlMilliseconds": 7.0081,
+          "ApiMilliseconds": 18.2775,
+          "TotalMilliseconds": 25.2856
+        }
+      ],
+      "MedianMilliseconds": 20.3156,
+      "MaximumMilliseconds": 25.2856,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Id\u0022\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022CreatedAt\u0022, \u0022r1\u0022.\u0022Id\u0022",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r USING INDEX IX_Reports_CreatedAt_Id",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Status ascending",
+      "Query": "sort=status\u0026direction=asc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 8.7205,
+          "ApiMilliseconds": 19.177799999999998,
+          "TotalMilliseconds": 27.8983
+        },
+        {
+          "HtmlMilliseconds": 5.9287,
+          "ApiMilliseconds": 12.366800000000001,
+          "TotalMilliseconds": 18.2955
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 6.2579,
+          "ApiMilliseconds": 10.9637,
+          "TotalMilliseconds": 17.2216
+        },
+        {
+          "HtmlMilliseconds": 6.4432,
+          "ApiMilliseconds": 10.1614,
+          "TotalMilliseconds": 16.6046
+        },
+        {
+          "HtmlMilliseconds": 7.153,
+          "ApiMilliseconds": 11.0886,
+          "TotalMilliseconds": 18.2416
+        },
+        {
+          "HtmlMilliseconds": 7.3182,
+          "ApiMilliseconds": 9.997499999999999,
+          "TotalMilliseconds": 17.3157
+        },
+        {
+          "HtmlMilliseconds": 7.3998,
+          "ApiMilliseconds": 13.7105,
+          "TotalMilliseconds": 21.1103
+        }
+      ],
+      "MedianMilliseconds": 17.3157,
+      "MaximumMilliseconds": 21.1103,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022Status\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r USING INDEX IX_Reports_Status_CreatedAt_Id",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Status descending",
+      "Query": "sort=status\u0026direction=desc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 6.587,
+          "ApiMilliseconds": 28.4139,
+          "TotalMilliseconds": 35.0009
+        },
+        {
+          "HtmlMilliseconds": 6.7742,
+          "ApiMilliseconds": 18.533,
+          "TotalMilliseconds": 25.3072
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 6.4413,
+          "ApiMilliseconds": 21.6682,
+          "TotalMilliseconds": 28.1095
+        },
+        {
+          "HtmlMilliseconds": 7.0293,
+          "ApiMilliseconds": 21.5837,
+          "TotalMilliseconds": 28.613
+        },
+        {
+          "HtmlMilliseconds": 12.9808,
+          "ApiMilliseconds": 28.3142,
+          "TotalMilliseconds": 41.295
+        },
+        {
+          "HtmlMilliseconds": 8.9152,
+          "ApiMilliseconds": 26.466300000000004,
+          "TotalMilliseconds": 35.3815
+        },
+        {
+          "HtmlMilliseconds": 7.2325,
+          "ApiMilliseconds": 21.720399999999998,
+          "TotalMilliseconds": 28.9529
+        }
+      ],
+      "MedianMilliseconds": 28.9529,
+      "MaximumMilliseconds": 41.295,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022Status\u0022 DESC, \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022Status\u0022 DESC, \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r",
+        "USE TEMP B-TREE FOR ORDER BY",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Urgency ascending",
+      "Query": "sort=urgency\u0026direction=asc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 29.4052,
+          "ApiMilliseconds": 36.576600000000006,
+          "TotalMilliseconds": 65.9818
+        },
+        {
+          "HtmlMilliseconds": 7.8299,
+          "ApiMilliseconds": 21.574399999999997,
+          "TotalMilliseconds": 29.4043
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 16.4296,
+          "ApiMilliseconds": 24.650399999999998,
+          "TotalMilliseconds": 41.08
+        },
+        {
+          "HtmlMilliseconds": 6.5616,
+          "ApiMilliseconds": 33.972100000000005,
+          "TotalMilliseconds": 40.5337
+        },
+        {
+          "HtmlMilliseconds": 18.8351,
+          "ApiMilliseconds": 31.297700000000003,
+          "TotalMilliseconds": 50.1328
+        },
+        {
+          "HtmlMilliseconds": 15.6793,
+          "ApiMilliseconds": 41.5792,
+          "TotalMilliseconds": 57.2585
+        },
+        {
+          "HtmlMilliseconds": 25.3153,
+          "ApiMilliseconds": 31.112899999999996,
+          "TotalMilliseconds": 56.4282
+        }
+      ],
+      "MedianMilliseconds": 50.1328,
+      "MaximumMilliseconds": 57.2585,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022Urgency\u0022, \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022Urgency\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r",
+        "USE TEMP B-TREE FOR ORDER BY",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Urgency descending",
+      "Query": "sort=urgency\u0026direction=desc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 6.5557,
+          "ApiMilliseconds": 26.3504,
+          "TotalMilliseconds": 32.9061
+        },
+        {
+          "HtmlMilliseconds": 6.3735,
+          "ApiMilliseconds": 14.1463,
+          "TotalMilliseconds": 20.5198
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 15.1122,
+          "ApiMilliseconds": 13.0905,
+          "TotalMilliseconds": 28.2027
+        },
+        {
+          "HtmlMilliseconds": 7.9928,
+          "ApiMilliseconds": 19.5817,
+          "TotalMilliseconds": 27.5745
+        },
+        {
+          "HtmlMilliseconds": 9.2453,
+          "ApiMilliseconds": 18.8345,
+          "TotalMilliseconds": 28.0798
+        },
+        {
+          "HtmlMilliseconds": 8.9757,
+          "ApiMilliseconds": 11.3372,
+          "TotalMilliseconds": 20.3129
+        },
+        {
+          "HtmlMilliseconds": 12.3112,
+          "ApiMilliseconds": 21.777700000000003,
+          "TotalMilliseconds": 34.0889
+        }
+      ],
+      "MedianMilliseconds": 28.0798,
+      "MaximumMilliseconds": 34.0889,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022Urgency\u0022 DESC, \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022Urgency\u0022 DESC, \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r USING INDEX IX_Reports_Urgency_CreatedAt_Id",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Area and single category",
+      "Query": "areaId=1\u0026categories=RoadDamage",
+      "MatchingReports": 476,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 15.4804,
+          "ApiMilliseconds": 296.1034,
+          "TotalMilliseconds": 311.5838
+        },
+        {
+          "HtmlMilliseconds": 21.5958,
+          "ApiMilliseconds": 32.8237,
+          "TotalMilliseconds": 54.4195
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 14.3288,
+          "ApiMilliseconds": 16.2932,
+          "TotalMilliseconds": 30.622
+        },
+        {
+          "HtmlMilliseconds": 6.874,
+          "ApiMilliseconds": 14.478000000000002,
+          "TotalMilliseconds": 21.352
+        },
+        {
+          "HtmlMilliseconds": 10.0273,
+          "ApiMilliseconds": 12.869299999999999,
+          "TotalMilliseconds": 22.8966
+        },
+        {
+          "HtmlMilliseconds": 10.1575,
+          "ApiMilliseconds": 13.300099999999999,
+          "TotalMilliseconds": 23.4576
+        },
+        {
+          "HtmlMilliseconds": 9.699,
+          "ApiMilliseconds": 13.610999999999999,
+          "TotalMilliseconds": 23.31
+        }
+      ],
+      "MedianMilliseconds": 23.31,
+      "MaximumMilliseconds": 30.622,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022\r\nWHERE \u0022r\u0022.\u0022Category\u0022 = @categories1 AND \u0022r\u0022.\u0022AreaId\u0022 = @request_AreaId",
+        "Parameters": [
+          {
+            "Name": "@categories1",
+            "Value": "RoadDamage"
+          },
+          {
+            "Name": "@request_AreaId",
+            "Value": 1
+          }
+        ]
+      },
+      "CountPlan": [
+        "SEARCH r USING COVERING INDEX IX_Reports_AreaId_Category_CreatedAt_Id (AreaId=? AND Category=?)"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    WHERE \u0022r\u0022.\u0022Category\u0022 = @categories1 AND \u0022r\u0022.\u0022AreaId\u0022 = @request_AreaId\r\n    ORDER BY \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p3 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@categories1",
+            "Value": "RoadDamage"
+          },
+          {
+            "Name": "@request_AreaId",
+            "Value": 1
+          },
+          {
+            "Name": "@p3",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SEARCH r USING INDEX IX_Reports_AreaId_Category_CreatedAt_Id (AreaId=? AND Category=?)",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Area and multiple categories",
+      "Query": "areaId=1\u0026categories=RoadDamage\u0026categories=WaterLogging",
+      "MatchingReports": 953,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 8.5515,
+          "ApiMilliseconds": 21.451999999999998,
+          "TotalMilliseconds": 30.0035
+        },
+        {
+          "HtmlMilliseconds": 7.7516,
+          "ApiMilliseconds": 17.5822,
+          "TotalMilliseconds": 25.3338
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 9.2382,
+          "ApiMilliseconds": 14.9523,
+          "TotalMilliseconds": 24.1905
+        },
+        {
+          "HtmlMilliseconds": 8.6605,
+          "ApiMilliseconds": 13.542899999999998,
+          "TotalMilliseconds": 22.2034
+        },
+        {
+          "HtmlMilliseconds": 14.6804,
+          "ApiMilliseconds": 14.592999999999998,
+          "TotalMilliseconds": 29.2734
+        },
+        {
+          "HtmlMilliseconds": 7.5089,
+          "ApiMilliseconds": 17.3208,
+          "TotalMilliseconds": 24.8297
+        },
+        {
+          "HtmlMilliseconds": 7.2063,
+          "ApiMilliseconds": 14.138300000000001,
+          "TotalMilliseconds": 21.3446
+        }
+      ],
+      "MedianMilliseconds": 24.1905,
+      "MaximumMilliseconds": 29.2734,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022\r\nWHERE \u0022r\u0022.\u0022Category\u0022 IN (@categories1, @categories2) AND \u0022r\u0022.\u0022AreaId\u0022 = @request_AreaId",
+        "Parameters": [
+          {
+            "Name": "@categories1",
+            "Value": "RoadDamage"
+          },
+          {
+            "Name": "@categories2",
+            "Value": "WaterLogging"
+          },
+          {
+            "Name": "@request_AreaId",
+            "Value": 1
+          }
+        ]
+      },
+      "CountPlan": [
+        "SEARCH r USING COVERING INDEX IX_Reports_AreaId_Category_CreatedAt_Id (AreaId=? AND Category=?)"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    WHERE \u0022r\u0022.\u0022Category\u0022 IN (@categories1, @categories2) AND \u0022r\u0022.\u0022AreaId\u0022 = @request_AreaId\r\n    ORDER BY \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p3 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@categories1",
+            "Value": "RoadDamage"
+          },
+          {
+            "Name": "@categories2",
+            "Value": "WaterLogging"
+          },
+          {
+            "Name": "@request_AreaId",
+            "Value": 1
+          },
+          {
+            "Name": "@p3",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SEARCH r USING INDEX IX_Reports_AreaId_CreatedAt_Id (AreaId=?)",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Area only",
+      "Query": "areaId=2",
+      "MatchingReports": 3332,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 7.2792,
+          "ApiMilliseconds": 60.7167,
+          "TotalMilliseconds": 67.9959
+        },
+        {
+          "HtmlMilliseconds": 14.5903,
+          "ApiMilliseconds": 39.9122,
+          "TotalMilliseconds": 54.5025
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 7.563,
+          "ApiMilliseconds": 35.489,
+          "TotalMilliseconds": 43.052
+        },
+        {
+          "HtmlMilliseconds": 10.3906,
+          "ApiMilliseconds": 19.3354,
+          "TotalMilliseconds": 29.726
+        },
+        {
+          "HtmlMilliseconds": 18.1422,
+          "ApiMilliseconds": 42.2171,
+          "TotalMilliseconds": 60.3593
+        },
+        {
+          "HtmlMilliseconds": 6.7003,
+          "ApiMilliseconds": 29.0522,
+          "TotalMilliseconds": 35.7525
+        },
+        {
+          "HtmlMilliseconds": 24.7532,
+          "ApiMilliseconds": 38.1468,
+          "TotalMilliseconds": 62.9
+        }
+      ],
+      "MedianMilliseconds": 43.052,
+      "MaximumMilliseconds": 62.9,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022\r\nWHERE \u0022r\u0022.\u0022AreaId\u0022 = @request_AreaId",
+        "Parameters": [
+          {
+            "Name": "@request_AreaId",
+            "Value": 2
+          }
+        ]
+      },
+      "CountPlan": [
+        "SEARCH r USING COVERING INDEX IX_Reports_AreaId_CreatedAt_Id (AreaId=?)"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    WHERE \u0022r\u0022.\u0022AreaId\u0022 = @request_AreaId\r\n    ORDER BY \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p2 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@request_AreaId",
+            "Value": 2
+          },
+          {
+            "Name": "@p2",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 0
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SEARCH r USING INDEX IX_Reports_AreaId_CreatedAt_Id (AreaId=?)",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    },
+    {
+      "Name": "Last page",
+      "Query": "page=500\u0026sort=date\u0026direction=desc",
+      "MatchingReports": 10000,
+      "Warmups": [
+        {
+          "HtmlMilliseconds": 9.8102,
+          "ApiMilliseconds": 73.37960000000001,
+          "TotalMilliseconds": 83.1898
+        },
+        {
+          "HtmlMilliseconds": 6.7753,
+          "ApiMilliseconds": 24.4621,
+          "TotalMilliseconds": 31.2374
+        }
+      ],
+      "Trials": [
+        {
+          "HtmlMilliseconds": 6.869,
+          "ApiMilliseconds": 38.1832,
+          "TotalMilliseconds": 45.0522
+        },
+        {
+          "HtmlMilliseconds": 9.5657,
+          "ApiMilliseconds": 18.5346,
+          "TotalMilliseconds": 28.1003
+        },
+        {
+          "HtmlMilliseconds": 6.9229,
+          "ApiMilliseconds": 20.245600000000003,
+          "TotalMilliseconds": 27.1685
+        },
+        {
+          "HtmlMilliseconds": 8.4811,
+          "ApiMilliseconds": 37.441900000000004,
+          "TotalMilliseconds": 45.923
+        },
+        {
+          "HtmlMilliseconds": 7.0555,
+          "ApiMilliseconds": 24.0935,
+          "TotalMilliseconds": 31.149
+        }
+      ],
+      "MedianMilliseconds": 31.149,
+      "MaximumMilliseconds": 45.923,
+      "CountSql": {
+        "Text": "SELECT COUNT(*)\r\nFROM \u0022Reports\u0022 AS \u0022r\u0022",
+        "Parameters": []
+      },
+      "CountPlan": [
+        "SCAN Reports USING COVERING INDEX IX_Reports_UserId"
+      ],
+      "PageSql": {
+        "Text": "SELECT \u0022r1\u0022.\u0022Id\u0022, \u0022r1\u0022.\u0022Title\u0022, CAST(\u0022r1\u0022.\u0022Category\u0022 AS TEXT), \u0022r1\u0022.\u0022AreaId\u0022, \u0022r0\u0022.\u0022Name\u0022, CAST(\u0022r1\u0022.\u0022Status\u0022 AS TEXT), CASE \u0022r1\u0022.\u0022Urgency\u0022\r\n    WHEN 0 THEN \u0027Low\u0027\r\n    WHEN 1 THEN \u0027Normal\u0027\r\n    WHEN 2 THEN \u0027High\u0027\r\n    WHEN 3 THEN \u0027Critical\u0027\r\n    ELSE CAST(\u0022r1\u0022.\u0022Urgency\u0022 AS TEXT)\r\nEND, \u0022r1\u0022.\u0022Location\u0022, \u0022r1\u0022.\u0022CreatedAt\u0022\r\nFROM (\r\n    SELECT \u0022r\u0022.\u0022Id\u0022, \u0022r\u0022.\u0022AreaId\u0022, \u0022r\u0022.\u0022Category\u0022, \u0022r\u0022.\u0022CreatedAt\u0022, \u0022r\u0022.\u0022Location\u0022, \u0022r\u0022.\u0022Status\u0022, \u0022r\u0022.\u0022Title\u0022, \u0022r\u0022.\u0022Urgency\u0022\r\n    FROM \u0022Reports\u0022 AS \u0022r\u0022\r\n    ORDER BY \u0022r\u0022.\u0022CreatedAt\u0022 DESC, \u0022r\u0022.\u0022Id\u0022 DESC\r\n    LIMIT @p1 OFFSET @p\r\n) AS \u0022r1\u0022\r\nLEFT JOIN \u0022ReportAreas\u0022 AS \u0022r0\u0022 ON \u0022r1\u0022.\u0022AreaId\u0022 = \u0022r0\u0022.\u0022Id\u0022\r\nORDER BY \u0022r1\u0022.\u0022CreatedAt\u0022 DESC, \u0022r1\u0022.\u0022Id\u0022 DESC",
+        "Parameters": [
+          {
+            "Name": "@p1",
+            "Value": 20
+          },
+          {
+            "Name": "@p",
+            "Value": 9980
+          }
+        ]
+      },
+      "PagePlan": [
+        "CO-ROUTINE r1",
+        "SCAN r USING INDEX IX_Reports_CreatedAt_Id",
+        "SCAN r1",
+        "SEARCH r0 USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN"
+      ]
+    }
+  ]
+}

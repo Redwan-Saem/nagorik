@@ -18,6 +18,7 @@ namespace Nagorik.Api
 
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<ReportArea> ReportAreas => Set<ReportArea>();
+        public DbSet<UtilityRoutingRule> UtilityRoutingRules => Set<UtilityRoutingRule>();
         public DbSet<SosAlert> SosAlerts => Set<SosAlert>();
         public DbSet<SosAlertEvent> SosAlertEvents => Set<SosAlertEvent>();
 
@@ -44,6 +45,8 @@ namespace Nagorik.Api
             base.OnModelCreating(builder);
             Data.SosModelConfiguration.Configure(builder);
             Data.ReportFilterModelConfiguration.Configure(builder);
+            Data.UtilityAnomalyModelConfiguration.Configure(builder);
+            Data.UtilityRoutingModelConfiguration.Configure(builder);
 
             builder.Entity<ReportStatusHistory>(entity =>
             {

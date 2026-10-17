@@ -23,6 +23,7 @@ namespace Nagorik.Api.Controllers
             var vm = new ReportFormViewModel
             {
                 Categories = Enum.GetValues<ReportCategory>()
+                    .Where(c => c != ReportCategory.UtilityAnomaly)
                     .Select(c => new SelectListItem(
                         c.ToString(),
                         c.ToString()

@@ -8,7 +8,8 @@ public enum ReportCategory
     WaterLogging,
     RoadDamage,
     PowerOutage,
-    Other
+    Other,
+    UtilityAnomaly
 }
 
 public enum Authority

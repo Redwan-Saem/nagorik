@@ -7,7 +7,7 @@ public sealed class OfficialReportListQuery : IValidatableObject
     public const int PageSize = 20;
     [Range(1, int.MaxValue / PageSize)]
     public int Page { get; set; } = 1;
-    [MaxLength(7)]
+    [MaxLength(8)]
     public string[] Categories { get; set; } = [];
     [Range(1, int.MaxValue)]
     public int? AreaId { get; set; }

@@ -15,6 +15,7 @@ builder.Services.AddControllersWithViews();
 
 // Existing services
 builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
+builder.Services.AddScoped<UtilityPhotoUploadService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 
@@ -38,6 +39,8 @@ builder.Services.AddOptions<SosOptions>().Bind(builder.Configuration.GetSection(
 builder.Services.AddScoped<SosResponderDirectory>();
 builder.Services.AddScoped<SosResponderNotifier>();
 builder.Services.AddScoped<OfficialReportQueryService>();
+builder.Services.AddScoped<UtilityRoutingService>();
+builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]

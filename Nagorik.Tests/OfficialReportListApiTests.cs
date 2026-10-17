@@ -448,6 +448,83 @@ public class OfficialReportListApiTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData("date", "asc", false)]
+    [InlineData("date", "desc", false)]
+    [InlineData("status", "asc", false)]
+    [InlineData("status", "desc", false)]
+    [InlineData("urgency", "asc", false)]
+    [InlineData("urgency", "desc", false)]
+    [InlineData("date", "desc", true)]
+    [InlineData("status", "asc", true)]
+    [InlineData("urgency", "desc", true)]
+    public async Task TraversingEveryPageKeepsExactOrderCountsAndMembershipAcrossTies(string sort, string direction, bool filtered)
+    {
+        // Collapse dates to force ties spanning page boundaries for each sort key.
+        await using (var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options))
+        {
+            var tiedDate = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+            await db.Reports.ExecuteUpdateAsync(s => s.SetProperty(r => r.CreatedAt, tiedDate)
+                .SetProperty(r => r.AreaId, r => r.Id % 4 == 0 ? 2 : 1));
+            foreach (var report in _reports)
+            {
+                report.CreatedAt = tiedDate;
+                report.AreaId = report.Id % 4 == 0 ? 2 : 1;
+            }
+        }
+        Authenticate("Official", cookie: true);
+        var source = _reports.Where(r => !filtered || r.AreaId == 1 &&
+            r.Category is ReportCategory.RoadDamage or ReportCategory.WaterLogging).ToList();
+        var ascending = direction == "asc";
+        // Expected ordering is calculated independently of the SQL query service.
+        var expected = source.Select(r => new
+        {
+            Report = r,
+            Key = sort == "status" ? r.Status.ToString() : sort == "urgency" ? ((int)r.Urgency).ToString() : "same-date"
+        }).OrderBy(r => r.Key, ascending ? StringComparer.Ordinal : Comparer<string>.Create((a, b) => StringComparer.Ordinal.Compare(b, a)));
+        var orderedIds = sort == "date" && ascending
+            ? expected.ThenBy(r => r.Report.Id).Select(r => r.Report.Id).ToArray()
+            : expected.ThenByDescending(r => r.Report.Id).Select(r => r.Report.Id).ToArray();
+        var filter = filtered ? "&categories=RoadDamage&categories=WaterLogging&areaId=1" : "";
+        var totalPages = (source.Count + 19) / 20;
+        var actual = new List<int>();
+        for (var pageNumber = 1; pageNumber <= totalPages; pageNumber++)
+        {
+            _queries.Sql.Clear();
+            var url = $"/api/reports?page={pageNumber}&sort={sort}&direction={direction}{filter}";
+            using var response = await _client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+            var page = (await response.Content.ReadFromJsonAsync<OfficialReportPage>())!;
+            Assert.Equal(pageNumber, page.Page); Assert.Equal(20, page.PageSize);
+            Assert.Equal(source.Count, page.TotalCount); Assert.Equal(totalPages, page.TotalPages);
+            Assert.Equal(orderedIds.Skip((pageNumber - 1) * 20).Take(20), page.Items.Select(r => r.Id));
+            actual.AddRange(page.Items.Select(r => r.Id));
+            Assert.Equal(2, _queries.Sql.Count);
+            Assert.Contains(_queries.Sql, sql => sql.Contains("LIMIT") && sql.Contains("OFFSET"));
+        }
+        Assert.Equal(orderedIds, actual);
+        Assert.Equal(source.Count, actual.Distinct().Count());
+        var lastUrl = $"/api/reports?page={totalPages}&sort={sort}&direction={direction}{filter}";
+        var repeated = (await _client.GetFromJsonAsync<OfficialReportPage>(lastUrl))!;
+        Assert.Equal(orderedIds.Skip((totalPages - 1) * 20), repeated.Items.Select(r => r.Id));
+        var beyond = (await _client.GetFromJsonAsync<OfficialReportPage>(
+            $"/api/reports?page={totalPages + 1}&sort={sort}&direction={direction}{filter}"))!;
+        Assert.Empty(beyond.Items); Assert.Equal(source.Count, beyond.TotalCount); Assert.Equal(totalPages, beyond.TotalPages);
+    }
+
+    [Fact]
+    public async Task HighestValidPageDoesNotOverflowAndDoesNotAlterData()
+    {
+        Authenticate("Official");
+        var page = (await _client.GetFromJsonAsync<OfficialReportPage>("/api/reports?page=107374182"))!;
+        Assert.Empty(page.Items); Assert.Equal(65, page.TotalCount); Assert.Equal(4, page.TotalPages);
+        await using var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options);
+        Assert.Equal(65, await db.Reports.CountAsync());
+        Assert.Empty(await db.ReportStatusHistories.ToListAsync());
+        Assert.Empty(await db.NotificationLogs.ToListAsync());
+    }
+
+    [Theory]
     [InlineData("page=0")]
     [InlineData("page=-1")]
     [InlineData("page=2147483647")]
@@ -458,8 +535,12 @@ public class OfficialReportListApiTests : IAsyncLifetime
     [InlineData("categories=unknown")]
     [InlineData("categories=999")]
     [InlineData("categories=4")]
+    [InlineData("categories=RoadDamage&categories=WaterLogging&categories=PowerOutage&categories=Complaint&categories=Request&categories=Emergency&categories=Other&categories=UtilityAnomaly&categories=RoadDamage")]
     [InlineData("areaId=-1")]
     [InlineData("areaId=0")]
+    [InlineData("areaId=abc")]
+    [InlineData("areaId=2147483648")]
+    [InlineData("page=107374183")]
     public async Task InvalidQueryReturns400BeforeQuerying(string query)
     {
         Authenticate("Official");

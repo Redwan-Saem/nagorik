@@ -63,7 +63,7 @@
                     event.target.closest('a, button, input, select, textarea') || window.getSelection?.()?.toString()) return;
                 window.location.assign(link.href);
             });
-            cell(row, ({ RoadDamage: 'Road damage', WaterLogging: 'Waterlogging', PowerOutage: 'Power outage' })[report.category] || report.category);
+            cell(row, ({ RoadDamage: 'Road damage', WaterLogging: 'Waterlogging', PowerOutage: 'Power outage', UtilityAnomaly: 'Utility Anomaly' })[report.category] || report.category);
             cell(row, report.areaName ?? 'Unclassified');
             const status = document.createElement('span'); status.className = 'badge';
             status.textContent = report.status === 'InProgress' ? 'In Progress' : report.status;
