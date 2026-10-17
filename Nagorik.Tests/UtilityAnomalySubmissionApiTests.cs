@@ -506,6 +506,35 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         using var beyond = await Send(HttpMethod.Get, "/Reports/Mine?page=3"); Assert.Contains("no reports on this page", await beyond.Content.ReadAsStringAsync());
         using var invalid = await Send(HttpMethod.Get, "/Reports/Mine?page=0"); Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
+    [Theory]
+    [InlineData(5242880, 201)]
+    [InlineData(5242881, 400)]
+    public async Task ThreePhotosRespectExactPerFileLimitAtHttpBoundary(int size, int expected)
+    {
+        var bytes = new byte[size]; bytes[0] = 255; bytes[1] = 216; bytes[2] = 255;
+        using var response = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form(count: 3, bytes: bytes));
+        Assert.Equal(expected, (int)response.StatusCode);
+        if (expected == 400) await AssertNoWrites();
+        else { Assert.Equal(3, Photos().Length); Assert.All(Photos(), file => Assert.Equal(size, new FileInfo(file).Length)); }
+    }
+    [Theory]
+    [InlineData("  Dhaka\tstreet\r\n", "DHAKA STREET")]
+    [InlineData("Ｄｈａｋａ street", "DHAKA STREET")]
+    [InlineData("ঢাকা\u00a0রাস্তা", "ঢাকা রাস্তা")]
+    public void DuplicateLocationNormalizationHandlesUnicodeAndWhitespace(string input, string expected) =>
+        Assert.Equal(expected, UtilityAnomalySubmissionService.NormalizeLocation(input));
+    [Fact]
+    public async Task RetryAfterExpiresEnoughReportsWhenHistoricalQuotaAlreadyExceedsTen()
+    {
+        await SeedReports(2, clock.GetUtcNow().UtcDateTime.AddMinutes(-59));
+        await SeedReports(9, clock.GetUtcNow().UtcDateTime.AddMinutes(-30));
+        using var blocked = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.TooManyRequests, blocked.StatusCode);
+        Assert.Equal("60", blocked.Headers.GetValues("Retry-After").Single());
+        clock.Advance(TimeSpan.FromSeconds(60));
+        using var accepted = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.Created, accepted.StatusCode); Assert.Single(Photos());
+    }
     private sealed class SubmissionTestClock : TimeProvider
     {
         private long ticks = DateTime.UtcNow.Ticks;
