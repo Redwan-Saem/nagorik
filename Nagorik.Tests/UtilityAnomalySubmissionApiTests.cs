@@ -304,6 +304,90 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         Assert.Equal(10, await db.Reports.CountAsync()); Assert.Equal(10, await db.ReportStatusHistories.CountAsync());
         Assert.Equal(9, await db.Reports.CountAsync(r => r.IsPossibleDuplicate));
     }
+    [Theory]
+    [InlineData(ReportStatus.Pending, "Submitted")]
+    [InlineData(ReportStatus.Approved, "Acknowledged")]
+    [InlineData(ReportStatus.Assigned, "Acknowledged")]
+    [InlineData(ReportStatus.InProgress, "In Progress")]
+    [InlineData(ReportStatus.Completed, "Resolved")]
+    [InlineData(ReportStatus.Rejected, "Rejected")]
+    public async Task MineMapsEveryStatusAndKeepsOtherResidentsPrivate(ReportStatus status, string label)
+    {
+        await SeedReports(1, clock.GetUtcNow().UtcDateTime);
+        await SeedReports(1, clock.GetUtcNow().UtcDateTime, userId: 2);
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var own = await db.Reports.SingleAsync(r => r.UserId == 1); own.Status = status;
+            own.ReferenceNo = $"UA-{own.Id:D6}"; await db.SaveChangesAsync();
+        }
+        using var response = await Send(HttpMethod.Get, "/api/reports/mine?userId=2");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl!.NoStore);
+        var page = (await response.Content.ReadFromJsonAsync<ResidentReportPage>())!;
+        var item = Assert.Single(page.Items); Assert.Equal(1, item.Id); Assert.Equal(label, item.Status);
+        Assert.Equal("UA-000001", item.Code); Assert.Equal(item.ReferenceNo, item.Code);
+        Assert.Equal("GasLeak", item.AnomalyType); Assert.Equal("Unassigned", item.Utility);
+        Assert.Equal("UtilityAnomaly", item.Category); Assert.Equal(1, page.TotalCount);
+        using var detail = await Send(HttpMethod.Get, "/api/reports/1");
+        var json = System.Text.Json.JsonDocument.Parse(await detail.Content.ReadAsStringAsync());
+        Assert.Equal(label, json.RootElement.GetProperty("displayStatus").GetString());
+        Assert.Equal(status.ToString(), json.RootElement.GetProperty("status").GetString());
+        using var other = await Send(HttpMethod.Get, "/api/reports/mine", id: "2");
+        Assert.Equal(2, Assert.Single((await other.Content.ReadFromJsonAsync<ResidentReportPage>())!.Items).Id);
+    }
+    [Theory]
+    [InlineData(null, "1", 401)] [InlineData("Official", "3", 403)]
+    [InlineData("CityOfficial", "3", 403)] [InlineData("Dispatcher", "1", 403)]
+    [InlineData("Crew", "1", 403)] [InlineData("Resident", "bad", 401)]
+    [InlineData("Resident", "0", 401)] [InlineData("Resident", "999", 401)] [InlineData("Resident", "3", 401)]
+    public async Task MineEnforcesAuthenticatedResidentIdentity(string? role, string id, int expected)
+    {
+        using var response = await Send(HttpMethod.Get, "/api/reports/mine", role: role, id: id);
+        Assert.Equal(expected, (int)response.StatusCode); await AssertNoWrites();
+    }
+    [Fact]
+    public async Task MineHandlesEmptyPagesAndStablePaginationIncludingLegacyReports()
+    {
+        using var empty = await Send(HttpMethod.Get, "/api/reports/mine");
+        var emptyPage = (await empty.Content.ReadFromJsonAsync<ResidentReportPage>())!;
+        Assert.Empty(emptyPage.Items); Assert.Equal(0, emptyPage.TotalCount); Assert.Equal(0, emptyPage.TotalPages);
+        await SeedReports(21, clock.GetUtcNow().UtcDateTime, category: ReportCategory.Other);
+        await SeedReports(1, clock.GetUtcNow().UtcDateTime.AddSeconds(1), userId: 2);
+        await using (var legacyScope = app.Services.CreateAsyncScope())
+            await legacyScope.ServiceProvider.GetRequiredService<AppDbContext>().Reports.Where(r => r.UserId == 1)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AnomalyType, (AnomalyType?)null).SetProperty(r => r.Utility, (UtilityProvider?)null));
+        using var first = await Send(HttpMethod.Get, "/api/reports/mine");
+        var page = (await first.Content.ReadFromJsonAsync<ResidentReportPage>())!;
+        Assert.Equal(21, page.TotalCount); Assert.Equal(2, page.TotalPages); Assert.Equal(20, page.PageSize);
+        Assert.Equal(Enumerable.Range(2, 20).Reverse(), page.Items.Select(r => r.Id));
+        Assert.All(page.Items, item => { Assert.Null(item.ReferenceNo); Assert.Null(item.AnomalyType); Assert.Null(item.Utility); Assert.Equal($"R-{item.Id:D6}", item.Code); });
+        using var second = await Send(HttpMethod.Get, "/api/reports/mine?page=2");
+        Assert.Equal(1, Assert.Single((await second.Content.ReadFromJsonAsync<ResidentReportPage>())!.Items).Id);
+        using var beyond = await Send(HttpMethod.Get, "/api/reports/mine?page=3");
+        var beyondPage = (await beyond.Content.ReadFromJsonAsync<ResidentReportPage>())!;
+        Assert.Empty(beyondPage.Items); Assert.Equal(21, beyondPage.TotalCount);
+        await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(22, await db.Reports.CountAsync()); Assert.Empty(await db.ReportStatusHistories.ToListAsync());
+    }
+    [Theory]
+    [InlineData("0")] [InlineData("-1")] [InlineData("107374183")] [InlineData("2147483648")] [InlineData("invalid")]
+    public async Task MineRejectsInvalidPagination(string page)
+    {
+        using var response = await Send(HttpMethod.Get, "/api/reports/mine?page=" + page);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode); await AssertNoWrites();
+    }
+    [Fact]
+    public async Task NewSubmissionAppearsAsSubmittedWithItsReference()
+    {
+        using var createdResponse = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        var created = (await createdResponse.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!;
+        using var response = await Send(HttpMethod.Get, "/api/reports/mine");
+        var item = Assert.Single((await response.Content.ReadFromJsonAsync<ResidentReportPage>())!.Items);
+        Assert.Equal(created.Id, item.Id); Assert.Equal(created.ReferenceNo, item.ReferenceNo); Assert.Equal("Submitted", item.Status);
+        using var other = await Send(HttpMethod.Get, "/api/reports/mine", id: "2");
+        Assert.Empty((await other.Content.ReadFromJsonAsync<ResidentReportPage>())!.Items);
+    }
     private sealed class SubmissionTestClock : TimeProvider
     {
         private long ticks = DateTime.UtcNow.Ticks;
