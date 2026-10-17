@@ -1,16 +1,17 @@
 @model Nagorik.Api.Models.ReportDetailViewModel
 @{
-    ViewData["Title"] = $"Report R-{Model.Report.Id:D6}";
+    var reference = Model.Report.ReferenceNo ?? $"R-{Model.Report.Id:D6}";
+    ViewData["Title"] = $"Report {reference}";
 }
 
 <a asp-controller="Reports" asp-action="Mine">Back to My Reports</a>
-<h1>Report R-@Model.Report.Id.ToString("D6")</h1>
+<h1>Report @reference</h1>
 <h2>@Model.Report.Title</h2>
 <p style="white-space: pre-wrap; overflow-wrap: anywhere">@Model.Report.Description</p>
 <dl>
-    <dt>Category</dt><dd>@Model.Report.Category</dd>
+    <dt>Category</dt><dd>@(Model.Report.Category == Nagorik.Api.Models.ReportCategory.UtilityAnomaly ? "Utility Anomaly" : Model.Report.Category.ToString())</dd>
     <dt>Location</dt><dd style="overflow-wrap: anywhere">@Model.Report.Location</dd>
-    <dt>Current status</dt><dd>@Model.Report.Status</dd>
+    <dt>Current status</dt><dd>@Nagorik.Api.Models.ResidentReportStatus.GetLabel(Model.Report.Status)</dd>
     <dt>Submitted (UTC)</dt>
     <dd><time datetime="@Model.Report.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@Model.Report.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</time></dd>
 </dl>
@@ -27,7 +28,7 @@
             @foreach (var entry in Model.StatusHistory)
             {
                 <li>
-                    <strong>@entry.Status</strong>
+                    <strong>@Nagorik.Api.Models.ResidentReportStatus.GetLabel(entry.Status)</strong>
                     <time datetime="@entry.ChangedAtUtc.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@entry.ChangedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</time>
                 </li>
             }

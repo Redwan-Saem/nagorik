@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Nagorik.Api.Models;
+using Nagorik.Api.Services;
 
 namespace Nagorik.Api.Controllers
 {
     [Authorize(Roles = "Resident")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public class ReportsController : Controller
     {
         private readonly AppDbContext _db;
@@ -80,20 +82,25 @@ namespace Nagorik.Api.Controllers
             return View(new ReportDetailViewModel(report, history));
         }
 
-        public async Task<IActionResult> Mine()
+        [HttpGet("/reports/reference/{reference}")]
+        public async Task<IActionResult> Reference(string reference, CancellationToken ct)
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
+                return NotFound();
+            if (reference.Length > UtilityAnomalyRules.MaxReferenceLength ||
+                !System.Text.RegularExpressions.Regex.IsMatch(reference, "^UA-[0-9]{6,}$")) return NotFound();
+            var id = await _db.Reports.AsNoTracking().Where(r => r.UserId == userId && r.ReferenceNo == reference)
+                .Select(r => (int?)r.Id).SingleOrDefaultAsync(ct);
+            return id == null ? NotFound() : RedirectToAction(nameof(Detail), new { id });
+        }
 
-            if (!int.TryParse(userIdClaim, out var userId))
-                return View(new List<Report>());
-
-            var list = await _db.Reports
-                .AsNoTracking()
-                .Where(r => r.UserId == userId)
-                .OrderByDescending(r => r.CreatedAt)
-                .ToListAsync();
-
-            return View(list);
+        public async Task<IActionResult> Mine([FromQuery] ResidentReportListQuery request, CancellationToken ct)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0 ||
+                !await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.Role == "Resident", ct))
+                return Unauthorized();
+            if (!ModelState.IsValid) return BadRequest("Provide a valid page number.");
+            return View(await ResidentReportQueries.ListAsync(_db, userId, request.Page, ct));
         }
     }
 }

@@ -1,19 +1,32 @@
 @model Nagorik.Api.Models.Report
+@{
+    ViewData["Title"] = "Report submitted";
+    var utility = Model.Category == Nagorik.Api.Models.ReportCategory.UtilityAnomaly;
+}
+@section Styles {
+    <link rel="stylesheet" href="~/css/resident-reports.css" asp-append-version="true" />
+}
 
-<h2>Report Submitted Successfully</h2>
+<h1>Report submitted successfully</h1>
 
 <p>Your report has been submitted successfully.</p>
 
 <p>
-    Your report code is:
+    Your report reference is:
     <strong id="report-code">@(Model.ReferenceNo ?? $"R-{Model.Id:D6}")</strong>
 </p>
+<p>Keep this reference to track your report in My Reports.</p>
+<p>Current status: <strong>@Nagorik.Api.Models.ResidentReportStatus.GetLabel(Model.Status)</strong></p>
+@if (Model.ReferenceNo != null)
+{
+    <p><a asp-action="Reference" asp-route-reference="@Model.ReferenceNo">Open report @Model.ReferenceNo</a></p>
+}
 @if (Model.Category == Nagorik.Api.Models.ReportCategory.UtilityAnomaly && Model.IsPossibleDuplicate)
 {
     <p class="alert alert-warn" role="status">A similar report was submitted at this location in the past 24 hours. Your report has still been submitted.</p>
 }
 
-<div class="mt-3">
+<div class="resident-actions">
     <a class="btn btn-primary" asp-controller="Reports" asp-action="Detail" asp-route-id="@Model.Id">
         View report and status history
     </a>
@@ -22,7 +35,7 @@
         My Reports
     </a>
 
-    <a class="btn btn-secondary" asp-controller="Reports" asp-action="Create">
-        Report another issue
+    <a class="btn btn-secondary" asp-controller="Reports" asp-action="@(utility ? "UtilityCreate" : "Create")">
+        @(utility ? "Report another utility anomaly" : "Report another issue")
     </a>
 </div>

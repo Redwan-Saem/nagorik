@@ -1,0 +1,8 @@
+.resident-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-block: 1rem; }
+#report-code { display: inline-block; font-family: var(--mono); font-size: var(--step-1); overflow-wrap: anywhere; }
+.resident-table { overflow-x: auto; max-width: 100%; margin-block: 1rem; border: 1px solid var(--line); border-radius: var(--radius-s); }
+.resident-table table { width: 100%; margin: 0; }
+.resident-table td { vertical-align: top; }
+.resident-table td:first-child { min-width: 12rem; max-width: 24rem; overflow-wrap: anywhere; }
+.resident-table time { white-space: nowrap; }
+.resident-table img { width: 60px; height: 60px; object-fit: cover; border-radius: var(--radius-s); }
