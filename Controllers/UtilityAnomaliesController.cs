@@ -21,6 +21,15 @@ public sealed class UtilityAnomaliesController(UtilityAnomalySubmissionService s
             return Unauthorized();
         var result = await submissions.CreateAsync(userId, request, ct);
         if (result.InvalidIdentity) return Unauthorized();
+        if (result.RetryAfterSeconds is int retryAfter)
+        {
+            Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                message = "You can submit up to 10 utility anomaly reports per rolling hour. Try again after the indicated delay.",
+                retryAfterSeconds = retryAfter
+            });
+        }
         if (result.Report == null)
         {
             foreach (var error in result.Errors)

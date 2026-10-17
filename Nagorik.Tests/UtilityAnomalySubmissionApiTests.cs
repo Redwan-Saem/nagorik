@@ -24,6 +24,7 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
     private readonly string root = Path.Combine(Path.GetTempPath(), "nagorik-submission-tests-" + Guid.NewGuid().ToString("N"));
     private WebApplication app = null!;
     private HttpClient client = null!;
+    private readonly SubmissionTestClock clock = new();
     public async Task InitializeAsync()
     {
         Directory.CreateDirectory(Path.Combine(root, "wwwroot"));
@@ -34,6 +35,7 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
         builder.Services.AddScoped<UtilityPhotoUploadService>(); builder.Services.AddScoped<UtilityRoutingService>();
         builder.Services.AddScoped<UtilityAnomalySubmissionService>(); builder.Services.AddScoped<OfficialReportQueryService>();
+        builder.Services.AddSingleton<TimeProvider>(clock);
         builder.Services.AddScoped<IReportService, ReportService>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
         { ValidateIssuer = false, ValidateAudience = false, ValidateLifetime = true, ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Key)) });
@@ -198,6 +200,115 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         }
         using var response = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form(count: 3));
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode); await AssertNoWrites();
+    }
+    private async Task SeedReports(int count, DateTime createdAt, int userId = 1, AnomalyType type = AnomalyType.GasLeak,
+        int area = 1, string location = "Dhaka street", ReportCategory category = ReportCategory.UtilityAnomaly)
+    {
+        await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        for (var i = 0; i < count; i++)
+            db.Reports.Add(new Report { UserId = userId, Title = "Prior report", Description = "Prior anomaly report", Category = category,
+                AnomalyType = type, Utility = UtilityProvider.Unassigned, Urgency = UtilityAnomalyRules.GetUrgency(type),
+                CreatedAt = createdAt, AreaId = area, Location = location });
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task FirstTenAcceptedThenEleventhReturnsRetryGuidanceWithoutOrphans()
+    {
+        for (var i = 0; i < 10; i++)
+        {
+            using var accepted = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+            Assert.Equal(HttpStatusCode.Created, accepted.StatusCode);
+        }
+        using var rejected = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+        Assert.Equal("3600", rejected.Headers.GetValues("Retry-After").Single());
+        Assert.Equal(10, Photos().Length);
+        await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(10, await db.Reports.CountAsync()); Assert.Equal(10, await db.ReportStatusHistories.CountAsync());
+    }
+    [Fact]
+    public async Task RollingHourExpiresExactlyAtBoundary()
+    {
+        await SeedReports(10, clock.GetUtcNow().UtcDateTime.AddHours(-1).AddSeconds(1));
+        using var blocked = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.TooManyRequests, blocked.StatusCode);
+        Assert.Equal("1", blocked.Headers.GetValues("Retry-After").Single()); Assert.Empty(Photos());
+        clock.Advance(TimeSpan.FromSeconds(1));
+        using var accepted = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.Created, accepted.StatusCode); Assert.Single(Photos());
+    }
+    [Theory]
+    [InlineData(1, "GasLeak", 1, "  DHAKA\t street  ", -23, true)]
+    [InlineData(1, "GasLeak", 1, "Ｄｈａｋａ street", -23, true)]
+    [InlineData(2, "GasLeak", 1, "Dhaka street", -23, false)]
+    [InlineData(1, "WaterLeak", 1, "Dhaka street", -23, false)]
+    [InlineData(1, "GasLeak", 2, "Dhaka street", -23, false)]
+    [InlineData(1, "GasLeak", 1, "Another street", -23, false)]
+    [InlineData(1, "GasLeak", 1, "Dhaka street", -24, false)]
+    [InlineData(1, "GasLeak", 1, "Dhaka street", 1, false)]
+    public async Task DuplicateWarningRespectsIdentityTypeLocationAndWindow(int userId, string type, int area, string location, int hours, bool duplicate)
+    {
+        await SeedReports(1, clock.GetUtcNow().UtcDateTime.AddHours(hours), userId, Enum.Parse<AnomalyType>(type), area, location);
+        using var response = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = (await response.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!;
+        Assert.Equal(duplicate, created.IsPossibleDuplicate);
+        if (duplicate) { Assert.Equal(1, created.DuplicateOfReportId); Assert.NotNull(created.Warning); }
+        else { Assert.Null(created.DuplicateOfReportId); Assert.Null(created.Warning); }
+        await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var report = await db.Reports.SingleAsync(r => r.Id == created.Id);
+        Assert.Equal(duplicate, report.IsPossibleDuplicate); Assert.Equal(created.DuplicateOfReportId, report.DuplicateOfReportId);
+        Assert.Equal(2, await db.Reports.CountAsync());
+    }
+    [Fact]
+    public async Task JustInside24HoursWarnsAndSelectsMostRecentMatch()
+    {
+        await SeedReports(1, clock.GetUtcNow().UtcDateTime.AddHours(-24).AddTicks(1));
+        using var response = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        var first = (await response.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!;
+        Assert.True(first.IsPossibleDuplicate); Assert.Equal(1, first.DuplicateOfReportId);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        using var next = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        var second = (await next.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!;
+        Assert.True(second.IsPossibleDuplicate); Assert.Equal(first.Id, second.DuplicateOfReportId);
+    }
+    [Fact]
+    public async Task OtherUsersAndGenericReportsDoNotConsumeQuotaOrProduceUtilityWarnings()
+    {
+        await SeedReports(10, clock.GetUtcNow().UtcDateTime, userId: 2);
+        await SeedReports(10, clock.GetUtcNow().UtcDateTime, category: ReportCategory.Other);
+        using var response = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.False((await response.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!.IsPossibleDuplicate);
+    }
+    [Fact]
+    public async Task FailedRequestsDoNotConsumeRemainingQuota()
+    {
+        await SeedReports(9, clock.GetUtcNow().UtcDateTime);
+        using var invalid = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form(bytes: [77, 90]));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using var accepted = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        Assert.Equal(HttpStatusCode.Created, accepted.StatusCode); Assert.Single(Photos());
+    }
+    [Fact]
+    public async Task ConcurrentSubmissionsCannotExceedTenAcceptedReports()
+    {
+        var statuses = await Task.WhenAll(Enumerable.Range(0, 12).Select(async _ =>
+        {
+            using var response = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form()); return response.StatusCode;
+        }));
+        Assert.Equal(10, statuses.Count(s => s == HttpStatusCode.Created));
+        Assert.Equal(2, statuses.Count(s => s == HttpStatusCode.TooManyRequests)); Assert.Equal(10, Photos().Length);
+        await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(10, await db.Reports.CountAsync()); Assert.Equal(10, await db.ReportStatusHistories.CountAsync());
+        Assert.Equal(9, await db.Reports.CountAsync(r => r.IsPossibleDuplicate));
+    }
+    private sealed class SubmissionTestClock : TimeProvider
+    {
+        private long ticks = DateTime.UtcNow.Ticks;
+        public override DateTimeOffset GetUtcNow() => new(Interlocked.Read(ref ticks), TimeSpan.Zero);
+        public void Advance(TimeSpan duration) => Interlocked.Add(ref ticks, duration.Ticks);
     }
     public async Task DisposeAsync()
     {
