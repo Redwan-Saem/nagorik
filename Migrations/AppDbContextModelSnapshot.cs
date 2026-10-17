@@ -520,6 +520,273 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("UserPushSubscriptions");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.UtilityRoutingRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AnomalyType")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("AreaId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
+                    b.Property<double?>("MaxLatitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("MaxLongitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("MinLatitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("MinLongitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Utility")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AreaId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive", "AnomalyType", "AreaId", "Priority")
+                        .IsDescending(false, false, false, true);
+
+                    b.ToTable("UtilityRoutingRules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_UtilityRoutingRules_AnomalyType", "\"AnomalyType\" IS NULL OR \"AnomalyType\" IN ('ExposedWire', 'GasLeak', 'FallenPole', 'PowerOutage', 'WaterLeak', 'Other')");
+
+                            t.HasCheckConstraint("CK_UtilityRoutingRules_Bounds", "(\"MinLatitude\" IS NULL AND \"MaxLatitude\" IS NULL AND \"MinLongitude\" IS NULL AND \"MaxLongitude\" IS NULL)\nOR (\"MinLatitude\" IS NOT NULL AND \"MaxLatitude\" IS NOT NULL AND \"MinLongitude\" IS NOT NULL AND \"MaxLongitude\" IS NOT NULL\n    AND \"MinLatitude\" BETWEEN -90 AND 90 AND \"MaxLatitude\" BETWEEN -90 AND 90\n    AND \"MinLongitude\" BETWEEN -180 AND 180 AND \"MaxLongitude\" BETWEEN -180 AND 180\n    AND \"MinLatitude\" <= \"MaxLatitude\" AND \"MinLongitude\" <= \"MaxLongitude\")");
+
+                            t.HasCheckConstraint("CK_UtilityRoutingRules_IsActive", "\"IsActive\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_UtilityRoutingRules_Name", "length(\"Name\") <= 160 AND length(trim(\"Name\", char(9) || char(10) || char(13) || ' ')) > 0");
+
+                            t.HasCheckConstraint("CK_UtilityRoutingRules_Priority", "\"Priority\" BETWEEN 0 AND 10000");
+
+                            t.HasCheckConstraint("CK_UtilityRoutingRules_Utility", "\"Utility\" IN ('Desco', 'Dpdc', 'WaterAuthority', 'GasAuthority')");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            AnomalyType = "WaterLeak",
+                            IsActive = true,
+                            Name = "Water leak / generic water authority",
+                            Priority = 0,
+                            Utility = "WaterAuthority"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            AnomalyType = "GasLeak",
+                            IsActive = true,
+                            Name = "Gas leak / generic gas authority",
+                            Priority = 0,
+                            Utility = "GasAuthority"
+                        },
+                        new
+                        {
+                            Id = 10,
+                            AnomalyType = "ExposedWire",
+                            AreaId = 1,
+                            IsActive = false,
+                            Name = "DESCO / Dhanmondi / ExposedWire (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 11,
+                            AnomalyType = "FallenPole",
+                            AreaId = 1,
+                            IsActive = false,
+                            Name = "DESCO / Dhanmondi / FallenPole (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 12,
+                            AnomalyType = "PowerOutage",
+                            AreaId = 1,
+                            IsActive = false,
+                            Name = "DESCO / Dhanmondi / PowerOutage (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            AnomalyType = "ExposedWire",
+                            AreaId = 2,
+                            IsActive = false,
+                            Name = "DESCO / Mirpur / ExposedWire (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            AnomalyType = "FallenPole",
+                            AreaId = 2,
+                            IsActive = false,
+                            Name = "DESCO / Mirpur / FallenPole (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 15,
+                            AnomalyType = "PowerOutage",
+                            AreaId = 2,
+                            IsActive = false,
+                            Name = "DESCO / Mirpur / PowerOutage (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 16,
+                            AnomalyType = "ExposedWire",
+                            AreaId = 3,
+                            IsActive = false,
+                            Name = "DESCO / Gulshan / ExposedWire (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 17,
+                            AnomalyType = "FallenPole",
+                            AreaId = 3,
+                            IsActive = false,
+                            Name = "DESCO / Gulshan / FallenPole (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 18,
+                            AnomalyType = "PowerOutage",
+                            AreaId = 3,
+                            IsActive = false,
+                            Name = "DESCO / Gulshan / PowerOutage (unverified template)",
+                            Priority = 100,
+                            Utility = "Desco"
+                        },
+                        new
+                        {
+                            Id = 19,
+                            AnomalyType = "ExposedWire",
+                            AreaId = 1,
+                            IsActive = false,
+                            Name = "DPDC / Dhanmondi / ExposedWire (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 20,
+                            AnomalyType = "FallenPole",
+                            AreaId = 1,
+                            IsActive = false,
+                            Name = "DPDC / Dhanmondi / FallenPole (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 21,
+                            AnomalyType = "PowerOutage",
+                            AreaId = 1,
+                            IsActive = false,
+                            Name = "DPDC / Dhanmondi / PowerOutage (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 22,
+                            AnomalyType = "ExposedWire",
+                            AreaId = 2,
+                            IsActive = false,
+                            Name = "DPDC / Mirpur / ExposedWire (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 23,
+                            AnomalyType = "FallenPole",
+                            AreaId = 2,
+                            IsActive = false,
+                            Name = "DPDC / Mirpur / FallenPole (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 24,
+                            AnomalyType = "PowerOutage",
+                            AreaId = 2,
+                            IsActive = false,
+                            Name = "DPDC / Mirpur / PowerOutage (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 25,
+                            AnomalyType = "ExposedWire",
+                            AreaId = 3,
+                            IsActive = false,
+                            Name = "DPDC / Gulshan / ExposedWire (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 26,
+                            AnomalyType = "FallenPole",
+                            AreaId = 3,
+                            IsActive = false,
+                            Name = "DPDC / Gulshan / FallenPole (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        },
+                        new
+                        {
+                            Id = 27,
+                            AnomalyType = "PowerOutage",
+                            AreaId = 3,
+                            IsActive = false,
+                            Name = "DPDC / Gulshan / PowerOutage (unverified template)",
+                            Priority = 100,
+                            Utility = "Dpdc"
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.WaterloggingRisk", b =>
                 {
                     b.Property<int>("Id")
@@ -696,6 +963,16 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ActorUser");
 
                     b.Navigation("SosAlert");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.UtilityRoutingRule", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.ReportArea", "Area")
+                        .WithMany()
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Area");
                 });
 #pragma warning restore 612, 618
         }
