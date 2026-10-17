@@ -34,6 +34,17 @@ namespace Nagorik.Api.Controllers
             return View(vm);
         }
 
+        [HttpGet("/reports/utility-anomalies/create")]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<IActionResult> UtilityCreate(CancellationToken ct)
+        {
+            if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0 ||
+                !await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.Role == "Resident", ct))
+                return Unauthorized();
+            return View(new UtilityAnomalyFormViewModel(await _db.ReportAreas.AsNoTracking()
+                .OrderBy(a => a.Name).ThenBy(a => a.Id).ToListAsync(ct)));
+        }
+
         public async Task<IActionResult> Confirmation(int id)
         {
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
