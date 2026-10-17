@@ -41,6 +41,7 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         { ValidateIssuer = false, ValidateAudience = false, ValidateLifetime = true, ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Key)) });
         builder.Services.AddAuthorization(); app = builder.Build();
         app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+        app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
         await using (var scope = app.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); await db.Database.EnsureCreatedAsync();
@@ -387,6 +388,50 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         Assert.Equal(created.Id, item.Id); Assert.Equal(created.ReferenceNo, item.ReferenceNo); Assert.Equal("Submitted", item.Status);
         using var other = await Send(HttpMethod.Get, "/api/reports/mine", id: "2");
         Assert.Empty((await other.Content.ReadFromJsonAsync<ResidentReportPage>())!.Items);
+    }
+    [Theory]
+    [InlineData(null, "1", 401)] [InlineData("Crew", "1", 403)] [InlineData("Official", "3", 403)]
+    [InlineData("Resident", "999", 401)] [InlineData("Resident", "bad", 401)]
+    public async Task UtilityFormRequiresResidentIdentity(string? role, string id, int status)
+    {
+        using var response = await Send(HttpMethod.Get, "/reports/utility-anomalies/create", role: role, id: id);
+        Assert.Equal(status, (int)response.StatusCode); await AssertNoWrites();
+    }
+    [Fact]
+    public async Task UtilityFormRendersCurrentAreasEncodedAndAccessibleControls()
+    {
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.ReportAreas.Add(new ReportArea { Id = 10, Name = "<Area & landmark>" }); await db.SaveChangesAsync();
+        }
+        using var response = await Send(HttpMethod.Get, "/reports/utility-anomalies/create");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode); Assert.True(response.Headers.CacheControl!.NoStore);
+        var html = await response.Content.ReadAsStringAsync();
+        Assert.Contains("&lt;Area &amp; landmark&gt;", html); Assert.DoesNotContain("<Area & landmark>", html);
+        Assert.Contains("data-high-risk-types=\"ExposedWire,GasLeak,FallenPole\"", html);
+        foreach (var type in Enum.GetNames<AnomalyType>()) Assert.Contains($"value=\"{type}\"", html);
+        foreach (var name in new[] { "AnomalyType", "AreaId", "AddressText", "Description", "Photos" })
+        {
+            Assert.Contains($"for=\"utility-{name}\"", html); Assert.Contains($"id=\"utility-{name}-error\"", html);
+        }
+        Assert.Contains("utility-anomaly-form.js", html); Assert.Contains("utility-anomaly-form.css", html);
+        Assert.Contains("GPS is optional", html); Assert.Contains("method=\"post\"", html);
+        Assert.Contains("Do not approach the hazard", html); Assert.Contains("href=\"/reports/utility-anomalies/create\"", html);
+        await AssertNoWrites();
+    }
+    [Fact]
+    public async Task UtilitySuccessUsesReferenceAndShowsPersistedDuplicateWarningOnlyToOwner()
+    {
+        using var first = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        using var second = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        var created = (await second.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!;
+        using var confirmation = await Send(HttpMethod.Get, $"/Reports/Confirmation/{created.Id}");
+        Assert.Equal(HttpStatusCode.OK, confirmation.StatusCode);
+        var html = await confirmation.Content.ReadAsStringAsync(); Assert.Contains(created.ReferenceNo, html);
+        Assert.Contains("Your report has still been submitted", html);
+        using var other = await Send(HttpMethod.Get, $"/Reports/Confirmation/{created.Id}", id: "2");
+        Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
     }
     private sealed class SubmissionTestClock : TimeProvider
     {

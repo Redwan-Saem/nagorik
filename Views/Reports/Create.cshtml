@@ -1,6 +1,7 @@
 @model Nagorik.Api.Models.ReportFormViewModel
 
 <h2>Report an Issue</h2>
+<p>For gas, water or electrical problems, <a asp-controller="Reports" asp-action="UtilityCreate">report a utility anomaly</a>.</p>
 
 <form id="report-form" novalidate>
     @Html.AntiForgeryToken()
