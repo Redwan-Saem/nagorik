@@ -19,5 +19,9 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\Nagorik.Api.csproj" />
+  </ItemGroup>
 
 </Project>
