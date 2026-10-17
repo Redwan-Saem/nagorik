@@ -57,17 +57,7 @@ public class ReportsApiController : ControllerBase
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0 ||
             !await _db.Users.AsNoTracking().AnyAsync(u => u.Id == userId && u.Role == "Resident", ct))
             return Unauthorized();
-        var query = _db.Reports.AsNoTracking().Where(r => r.UserId == userId);
-        var count = await query.CountAsync(ct);
-        var items = await query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
-            .Skip((request.Page - 1) * ResidentReportListQuery.PageSize).Take(ResidentReportListQuery.PageSize)
-            .Select(r => new ResidentReportListItem(r.Id, r.ReferenceNo ?? $"R-{r.Id:D6}", r.ReferenceNo,
-                r.Title, r.Category.ToString(), r.AnomalyType.HasValue ? r.AnomalyType.Value.ToString() : null,
-                r.Utility.HasValue ? r.Utility.Value.ToString() : null, ResidentReportStatus.GetLabel(r.Status),
-                r.Urgency.ToString(), r.AreaId, r.Area == null ? null : r.Area.Name, r.Location, r.CreatedAt))
-            .ToListAsync(ct);
-        return Ok(new ResidentReportPage(items, request.Page, ResidentReportListQuery.PageSize, count,
-            (int)Math.Ceiling(count / (double)ResidentReportListQuery.PageSize)));
+        return Ok(await ResidentReportQueries.ListAsync(_db, userId, request.Page, ct));
     }
 
         [HttpGet("{id:int}")]

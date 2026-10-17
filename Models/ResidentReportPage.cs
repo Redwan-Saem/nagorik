@@ -11,7 +11,7 @@ public sealed class ResidentReportListQuery
 
 public sealed record ResidentReportListItem(int Id, string Code, string? ReferenceNo, string Title,
     string Category, string? AnomalyType, string? Utility, string Status, string Urgency,
-    int? AreaId, string? AreaName, string Location, DateTime CreatedAt);
+    int? AreaId, string? AreaName, string Location, DateTime CreatedAt, string? ImageUrl = null);
 
 public sealed record ResidentReportPage(IReadOnlyList<ResidentReportListItem> Items,
     int Page, int PageSize, int TotalCount, int TotalPages);

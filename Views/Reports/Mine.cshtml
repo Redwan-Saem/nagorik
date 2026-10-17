@@ -1,50 +1,48 @@
-@model IEnumerable<Nagorik.Api.Models.Report>
-
-<h2>My Reports</h2>
-
-@if (!Model.Any())
+@model Nagorik.Api.Models.ResidentReportPage
+@{ ViewData["Title"] = "My Reports"; }
+@section Styles {
+    <link rel="stylesheet" href="~/css/resident-reports.css" asp-append-version="true" />
+}
+<h1>My Reports</h1>
+<p>Track your reports using their reference and current status.</p>
+<div class="resident-actions">
+    <a class="btn" asp-action="UtilityCreate">Report a utility anomaly</a>
+    <a class="btn btn-ghost" asp-action="Create">Report another issue</a>
+</div>
+@if (Model.Items.Count == 0)
 {
-    <p>You haven't submitted any reports yet.</p>
+    <p class="card">@(Model.TotalCount == 0 ? "You haven't submitted any reports yet." : "There are no reports on this page.")</p>
+    @if (Model.Page > 1) { <a asp-action="Mine">Back to the first page</a> }
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Code</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Photo</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            @foreach (var r in Model)
+    <p>@Model.TotalCount report(s). Page @Model.Page of @Model.TotalPages.</p>
+    <div class="resident-table" role="region" aria-label="My Reports" tabindex="0">
+        <table>
+            <caption class="sr-only">Your submitted reports and current status</caption>
+            <thead><tr><th scope="col">Reference</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">Submitted (UTC)</th><th scope="col">Photo</th></tr></thead>
+            <tbody>
+            @foreach (var report in Model.Items)
             {
-                <tr class="report-row" data-report-id="@r.Id">
-                    <td><a asp-controller="Reports" asp-action="Detail" asp-route-id="@r.Id">R-@r.Id.ToString("D6")</a></td>
-
-                    <td>@r.Category</td>
-
+                <tr class="report-row" data-report-id="@report.Id">
+                    <td><a asp-action="Detail" asp-route-id="@report.Id">@report.Code</a><div class="muted">@report.Title</div></td>
+                    <td>@(report.Category == "UtilityAnomaly" ? "Utility Anomaly" : report.Category)</td>
+                    <td><span class="report-status badge">@report.Status</span></td>
+                    <td><time datetime="@report.CreatedAt.ToString("yyyy-MM-ddTHH:mm:ss'Z'")">@report.CreatedAt.ToString("yyyy-MM-dd HH:mm")</time></td>
                     <td>
-                        <span class="report-status badge bg-secondary">
-                            @r.Status
-                        </span>
-                    </td>
-
-                    <td>@r.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-
-                    <td>
-                        @if (!string.IsNullOrEmpty(r.ImageUrl))
-                        {
-                            <img src="@r.ImageUrl"
-                                 alt="Report photo"
-                                 style="width:60px;height:60px;object-fit:cover;" />
-                        }
+                    @if (report.ImageUrl != null && Url.IsLocalUrl(report.ImageUrl) &&
+                        (report.ImageUrl.StartsWith("/uploads/", StringComparison.Ordinal) || Nagorik.Api.Services.LocalPhotoStorage.IsPrivateUrl(report.ImageUrl)))
+                    {
+                        <img src="@report.ImageUrl" alt="Photo for @report.Code" loading="lazy" width="60" height="60" />
+                    }
                     </td>
                 </tr>
             }
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
+    <nav class="resident-actions" aria-label="My Reports pages">
+        @if (Model.Page > 1) { <a class="btn btn-ghost" asp-action="Mine" asp-route-page="@(Model.Page - 1)" rel="prev">Previous page</a> }
+        @if (Model.Page < Model.TotalPages) { <a class="btn btn-ghost" asp-action="Mine" asp-route-page="@(Model.Page + 1)" rel="next">Next page</a> }
+    </nav>
 }

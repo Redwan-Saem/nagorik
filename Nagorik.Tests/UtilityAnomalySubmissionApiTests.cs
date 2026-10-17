@@ -49,7 +49,7 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
             var staff = TestDb.AddUser(db, 3); staff.Role = "Official"; await db.SaveChangesAsync();
         }
         await app.StartAsync();
-        client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+        client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
     }
     private static MultipartFormDataContent Form(string type = "GasLeak", string? description = null, string? area = "1", string? address = "Dhaka street",
         int count = 1, byte[]? bytes = null, string? latitude = null, string? longitude = null)
@@ -432,6 +432,79 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         Assert.Contains("Your report has still been submitted", html);
         using var other = await Send(HttpMethod.Get, $"/Reports/Confirmation/{created.Id}", id: "2");
         Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
+    }
+    [Theory]
+    [InlineData(ReportStatus.Pending, "Submitted")]
+    [InlineData(ReportStatus.Approved, "Acknowledged")]
+    [InlineData(ReportStatus.Assigned, "Acknowledged")]
+    [InlineData(ReportStatus.InProgress, "In Progress")]
+    [InlineData(ReportStatus.Completed, "Resolved")]
+    [InlineData(ReportStatus.Rejected, "Rejected")]
+    public async Task ResidentPagesPreserveReferenceAndPublicStatusOnReload(ReportStatus status, string label)
+    {
+        using var submitted = await Send(HttpMethod.Post, "/api/reports/utility-anomalies", Form());
+        var created = (await submitted.Content.ReadFromJsonAsync<UtilityAnomalyCreated>())!;
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var report = await db.Reports.SingleAsync(); report.Status = status; report.Title = "<script>unsafe title</script>";
+            await db.SaveChangesAsync();
+        }
+        foreach (var url in new[] { $"/Reports/Confirmation/{created.Id}", "/Reports/Mine", $"/Reports/Detail/{created.Id}", $"/reports/reference/{created.ReferenceNo}" })
+        {
+            using var response = await Send(HttpMethod.Get, url);
+            if (url.StartsWith("/reports/reference/", StringComparison.Ordinal))
+                Assert.Equal($"/Reports/Detail/{created.Id}", response.Headers.Location!.ToString());
+            using var followed = response.StatusCode == HttpStatusCode.Found ? await Send(HttpMethod.Get, response.Headers.Location!.ToString()) : null;
+            var pageResponse = followed ?? response;
+            Assert.Equal(HttpStatusCode.OK, pageResponse.StatusCode); Assert.True(pageResponse.Headers.CacheControl!.NoStore);
+            var html = await pageResponse.Content.ReadAsStringAsync(); Assert.Contains(created.ReferenceNo, html); Assert.Contains(label, html);
+            Assert.DoesNotContain("<script>unsafe title</script>", html);
+            using var other = await Send(HttpMethod.Get, url, id: "2");
+            if (url == "/Reports/Mine") Assert.DoesNotContain(created.ReferenceNo, await other.Content.ReadAsStringAsync());
+            else Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
+        }
+        using var confirmation = await Send(HttpMethod.Get, $"/Reports/Confirmation/{created.Id}");
+        var success = await confirmation.Content.ReadAsStringAsync();
+        Assert.Contains("href=\"/Reports/Mine\"", success);
+        Assert.Contains("href=\"/reports/utility-anomalies/create\"", success);
+        Assert.Contains($"id=\"report-code\">{created.ReferenceNo}</strong>", success);
+        await using var check = app.Services.CreateAsyncScope(); var checkDb = check.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(await checkDb.Reports.ToListAsync()); Assert.Single(await checkDb.ReportStatusHistories.ToListAsync());
+    }
+    [Theory]
+    [InlineData("/reports/reference/UA-999999")]
+    [InlineData("/reports/reference/invalid")]
+    [InlineData("/reports/reference/UA-000001-extra")]
+    [InlineData("/Reports/Confirmation/999999")]
+    [InlineData("/Reports/Detail/999999")]
+    public async Task UnknownReferencesAndReportLinksReturnSafeNotFound(string url)
+    {
+        using var response = await Send(HttpMethod.Get, url); Assert.Equal(HttpStatusCode.NotFound, response.StatusCode); await AssertNoWrites();
+    }
+    [Theory]
+    [InlineData(null, 401)] [InlineData("Crew", 403)] [InlineData("Official", 403)]
+    public async Task ResidentPagesEnforceRole(string? role, int expected)
+    {
+        foreach (var url in new[] { "/Reports/Mine", "/Reports/Confirmation/1", "/reports/reference/UA-000001" })
+        {
+            using var response = await Send(HttpMethod.Get, url, role: role); Assert.Equal(expected, (int)response.StatusCode);
+        }
+        await AssertNoWrites();
+    }
+    [Fact]
+    public async Task MinePageSupportsLegacyCodesPaginationAndEmptyStates()
+    {
+        using var empty = await Send(HttpMethod.Get, "/Reports/Mine");
+        Assert.Contains("haven&#x27;t submitted", await empty.Content.ReadAsStringAsync());
+        await SeedReports(21, clock.GetUtcNow().UtcDateTime, category: ReportCategory.Other);
+        using var first = await Send(HttpMethod.Get, "/Reports/Mine");
+        var html = await first.Content.ReadAsStringAsync(); Assert.Contains("R-000021", html); Assert.DoesNotContain(">R-000001<", html);
+        Assert.Contains("Next page", html); Assert.Contains("tabindex=\"0\"", html);
+        using var second = await Send(HttpMethod.Get, "/Reports/Mine?page=2");
+        var secondHtml = await second.Content.ReadAsStringAsync(); Assert.Contains("R-000001", secondHtml); Assert.Contains("Previous page", secondHtml);
+        using var beyond = await Send(HttpMethod.Get, "/Reports/Mine?page=3"); Assert.Contains("no reports on this page", await beyond.Content.ReadAsStringAsync());
+        using var invalid = await Send(HttpMethod.Get, "/Reports/Mine?page=0"); Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
     private sealed class SubmissionTestClock : TimeProvider
     {
