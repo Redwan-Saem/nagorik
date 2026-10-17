@@ -535,7 +535,7 @@ public class OfficialReportListApiTests : IAsyncLifetime
     [InlineData("categories=unknown")]
     [InlineData("categories=999")]
     [InlineData("categories=4")]
-    [InlineData("categories=RoadDamage&categories=WaterLogging&categories=PowerOutage&categories=Complaint&categories=Request&categories=Emergency&categories=Other&categories=RoadDamage")]
+    [InlineData("categories=RoadDamage&categories=WaterLogging&categories=PowerOutage&categories=Complaint&categories=Request&categories=Emergency&categories=Other&categories=UtilityAnomaly&categories=RoadDamage")]
     [InlineData("areaId=-1")]
     [InlineData("areaId=0")]
     [InlineData("areaId=abc")]

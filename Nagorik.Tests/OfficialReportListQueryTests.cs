@@ -38,7 +38,7 @@ public class OfficialReportListQueryTests
         {
             case "numeric": query.Categories = ["4"]; break;
             case "unknown": query.Categories = ["MissingCategory"]; break;
-            case "too-many": query.Categories = Enumerable.Repeat("RoadDamage", 8).ToArray(); break;
+            case "too-many": query.Categories = Enumerable.Repeat("RoadDamage", Enum.GetValues<ReportCategory>().Length + 1).ToArray(); break;
             case "invalid-sort": query.Sort = "date;DROP TABLE Reports"; break;
             case "invalid-direction": query.Direction = "sideways"; break;
             case "zero-page": query.Page = 0; break;

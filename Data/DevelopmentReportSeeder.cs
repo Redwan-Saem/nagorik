@@ -48,7 +48,8 @@ public static class DevelopmentReportSeeder
         if (areas.Count == 0) throw new InvalidOperationException("Report area lookups must be migrated before seeding reports.");
         var existing = (await db.Reports.Where(r => r.UserId == owner.Id).Select(r => r.Title).ToListAsync(ct))
             .ToHashSet(StringComparer.Ordinal);
-        var categories = Enum.GetValues<ReportCategory>();
+        // Utility reports require their own metadata, reference and private photos.
+        var categories = Enum.GetValues<ReportCategory>().Where(c => c != ReportCategory.UtilityAnomaly).ToArray();
         var statuses = Enum.GetValues<ReportStatus>();
         var urgencies = Enum.GetValues<ReportUrgency>();
         var added = 0;

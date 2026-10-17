@@ -40,6 +40,7 @@ builder.Services.AddScoped<SosResponderDirectory>();
 builder.Services.AddScoped<SosResponderNotifier>();
 builder.Services.AddScoped<OfficialReportQueryService>();
 builder.Services.AddScoped<UtilityRoutingService>();
+builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]

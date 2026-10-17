@@ -11,6 +11,7 @@ public static class ReportLookups
             ReportCategory.WaterLogging => "Waterlogging",
             ReportCategory.RoadDamage => "Road damage",
             ReportCategory.PowerOutage => "Power outage",
+            ReportCategory.UtilityAnomaly => "Utility Anomaly",
             _ => category.ToString()
         })).ToArray());
 }
