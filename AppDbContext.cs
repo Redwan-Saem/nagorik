@@ -44,6 +44,7 @@ namespace Nagorik.Api
             base.OnModelCreating(builder);
             Data.SosModelConfiguration.Configure(builder);
             Data.ReportFilterModelConfiguration.Configure(builder);
+            Data.UtilityAnomalyModelConfiguration.Configure(builder);
 
             builder.Entity<ReportStatusHistory>(entity =>
             {

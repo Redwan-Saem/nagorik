@@ -22,6 +22,12 @@ public class Report
 
     public string? ImageUrl { get; set; }
 
+    // Utility anomaly metadata is optional for existing/general reports (T-009.1).
+    public AnomalyType? AnomalyType { get; set; }
+    public UtilityProvider? Utility { get; set; }
+    public string? ReferenceNo { get; set; }
+    public List<string> PhotoPaths { get; set; } = [];
+
 
     // Location coordinates (T-022.5)
     public double Latitude { get; set; }
