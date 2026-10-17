@@ -15,6 +15,7 @@ builder.Services.AddControllersWithViews();
 
 // Existing services
 builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
+builder.Services.AddScoped<UtilityPhotoUploadService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 

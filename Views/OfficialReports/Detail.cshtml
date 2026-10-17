@@ -5,7 +5,8 @@
     ViewData["Title"] = report == null ? "Report not found" : $"Report {report.Code}";
     string StatusLabel(string value) => value == "InProgress" ? "In Progress" : value;
     var photoUrl = report?.ImageUrl;
-    var hasPhoto = photoUrl?.StartsWith("/uploads/", StringComparison.Ordinal) == true && Url.IsLocalUrl(photoUrl);
+    var hasPhoto = (photoUrl?.StartsWith("/uploads/", StringComparison.Ordinal) == true ||
+        (photoUrl != null && Nagorik.Api.Services.LocalPhotoStorage.IsPrivateUrl(photoUrl))) && Url.IsLocalUrl(photoUrl);
 }
 @section Styles {
     <link rel="stylesheet" href="~/css/official-reports.css" asp-append-version="true" />
