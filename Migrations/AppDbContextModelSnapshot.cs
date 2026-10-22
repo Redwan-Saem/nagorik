@@ -456,6 +456,37 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ReportStatusHistories");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.ResidentZoneSubscription", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AlertsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("ResidentId", "ZoneId")
+                        .IsUnique();
+
+                    b.ToTable("ResidentZoneSubscriptions");
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -1254,6 +1285,25 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ResidentZoneSubscription", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", "Resident")
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Resident");
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>

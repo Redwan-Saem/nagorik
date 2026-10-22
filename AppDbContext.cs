@@ -21,6 +21,7 @@ namespace Nagorik.Api
         public DbSet<RainfallReading> RainfallReadings => Set<RainfallReading>();
         public DbSet<RiskHistory> RiskHistories => Set<RiskHistory>();
         public DbSet<RiskAlertEvent> RiskAlertEvents => Set<RiskAlertEvent>();
+        public DbSet<ResidentZoneSubscription> ResidentZoneSubscriptions => Set<ResidentZoneSubscription>();
         public DbSet<RiskThresholdSettings> RiskThresholdSettings => Set<RiskThresholdSettings>();
 
         public DbSet<Report> Reports => Set<Report>();
@@ -57,6 +58,12 @@ namespace Nagorik.Api
             Data.ZoneModelConfiguration.Configure(builder);
             Data.DrainagePointModelConfiguration.Configure(builder);
             Data.RainfallModelConfiguration.Configure(builder);
+            builder.Entity<ResidentZoneSubscription>(e =>
+            {
+                e.HasIndex(x => new { x.ResidentId, x.ZoneId }).IsUnique();
+                e.HasOne(x => x.Resident).WithMany().HasForeignKey(x => x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            });
             builder.Entity<RiskAlertEvent>(e =>
             {
                 e.HasOne(x => x.RiskHistory).WithMany().HasForeignKey(x => x.RiskHistoryId).OnDelete(DeleteBehavior.Restrict);
