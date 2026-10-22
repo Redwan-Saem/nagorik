@@ -167,6 +167,8 @@ namespace Nagorik.Api
 
 
             // T-004.1 Crew
+            builder.Entity<Crew>().ToTable("Crews", table => table.HasCheckConstraint("CK_Crews_Location",
+                "(\"LastLatitude\" IS NULL AND \"LastLongitude\" IS NULL AND \"LastSeenAtUtc\" IS NULL) OR (\"LastLatitude\" IS NOT NULL AND \"LastLongitude\" IS NOT NULL AND \"LastSeenAtUtc\" IS NOT NULL AND \"LastLatitude\" BETWEEN -90 AND 90 AND \"LastLongitude\" BETWEEN -180 AND 180)"));
             builder.Entity<Crew>()
                 .HasIndex(c => c.UserId)
                 .IsUnique();

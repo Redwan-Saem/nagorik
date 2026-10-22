@@ -45,6 +45,15 @@ namespace Nagorik.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<double?>("LastLatitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("LastLongitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime?>("LastSeenAtUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -57,7 +66,10 @@ namespace Nagorik.Api.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Crews");
+                    b.ToTable("Crews", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Crews_Location", "(\"LastLatitude\" IS NULL AND \"LastLongitude\" IS NULL AND \"LastSeenAtUtc\" IS NULL) OR (\"LastLatitude\" IS NOT NULL AND \"LastLongitude\" IS NOT NULL AND \"LastSeenAtUtc\" IS NOT NULL AND \"LastLatitude\" BETWEEN -90 AND 90 AND \"LastLongitude\" BETWEEN -180 AND 180)");
+                        });
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.CrewAssignment", b =>
