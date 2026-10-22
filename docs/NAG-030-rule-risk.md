@@ -33,3 +33,12 @@ fresh Low value. Failures are logged and retried next cycle. Configure
 Weather and risk jobs are independent: new weather appears on the next risk cycle.
 The old `WaterloggingRisks` and `ZoneMapData` stores are not updated; this story
 uses canonical `Zones`. Legacy resident alerts are a later story.
+
+## T-030.4 — risk history (Swapnil)
+
+Every evaluation appends a `RiskHistories` row with zone, previous/new level, UTC
+time, rule version and the complete immutable input/threshold snapshot. History
+and current zone state commit in the same transaction. Zone deletion is restricted
+while audit rows exist. There is no public history edit/delete endpoint. This
+records rule decisions, not confirmed flood labels; ML evaluation needs independent
+ground truth. Retention/archival is an operational follow-up for long deployments.

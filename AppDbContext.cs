@@ -19,6 +19,7 @@ namespace Nagorik.Api
         public DbSet<Zone> Zones => Set<Zone>();
         public DbSet<DrainagePoint> DrainagePoints => Set<DrainagePoint>();
         public DbSet<RainfallReading> RainfallReadings => Set<RainfallReading>();
+        public DbSet<RiskHistory> RiskHistories => Set<RiskHistory>();
 
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<ReportArea> ReportAreas => Set<ReportArea>();
@@ -54,6 +55,20 @@ namespace Nagorik.Api
             Data.ZoneModelConfiguration.Configure(builder);
             Data.DrainagePointModelConfiguration.Configure(builder);
             Data.RainfallModelConfiguration.Configure(builder);
+            builder.Entity<RiskHistory>(e =>
+            {
+                e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x => x.PreviousLevel).HasConversion<string>();
+                e.Property(x => x.Level).HasConversion<string>();
+                e.Property(x => x.RuleVersion).IsRequired().HasMaxLength(40);
+                e.Property(x => x.FactorsJson).IsRequired();
+                e.HasIndex(x => new { x.ZoneId, x.ComputedAtUtc });
+                e.ToTable("RiskHistories", table =>
+                {
+                    table.HasCheckConstraint("CK_RiskHistory_Levels", "\"Level\" IN ('Unknown','Low','Medium','High','Severe') AND \"PreviousLevel\" IN ('Unknown','Low','Medium','High','Severe')");
+                    table.HasCheckConstraint("CK_RiskHistory_Factors", "json_valid(\"FactorsJson\")");
+                });
+            });
 
             builder.Entity<ReportStatusHistory>(entity =>
             {

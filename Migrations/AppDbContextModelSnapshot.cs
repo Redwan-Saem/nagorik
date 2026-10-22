@@ -419,6 +419,47 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ReportStatusHistories");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.RiskHistory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ComputedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FactorsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PreviousLevel")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RuleVersion")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId", "ComputedAtUtc");
+
+                    b.ToTable("RiskHistories", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RiskHistory_Factors", "json_valid(\"FactorsJson\")");
+
+                            t.HasCheckConstraint("CK_RiskHistory_Levels", "\"Level\" IN ('Unknown','Low','Medium','High','Severe') AND \"PreviousLevel\" IN ('Unknown','Low','Medium','High','Severe')");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.SosAlert", b =>
                 {
                     b.Property<int>("Id")
@@ -1102,6 +1143,17 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskHistory", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.SosAlert", b =>

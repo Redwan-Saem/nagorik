@@ -27,6 +27,14 @@ public class RiskComputationTests
         await job.ComputeAsync();
         Assert.Equal(ZoneRiskLevel.Unknown, zone.RiskLevel);
         Assert.Contains("Fresh, aligned", zone.RiskFactorsJson);
+        var history = await db.RiskHistories.OrderBy(h => h.Id).ToListAsync();
+        Assert.Equal(2, history.Count);
+        Assert.Equal(ZoneRiskLevel.Unknown, history[0].PreviousLevel);
+        Assert.Equal(ZoneRiskLevel.High, history[0].Level);
+        Assert.Equal(ZoneRiskLevel.High, history[1].PreviousLevel);
+        Assert.Equal(ZoneRiskLevel.Unknown, history[1].Level);
+        Assert.Contains("Fresh, aligned", history[1].FactorsJson);
+        Assert.DoesNotContain("Fresh, aligned", history[0].FactorsJson);
     }
 
     [Fact]
