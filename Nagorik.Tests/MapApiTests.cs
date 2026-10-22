@@ -16,6 +16,7 @@ using Nagorik.Api;
 using Nagorik.Api.Controllers;
 using Nagorik.Api.Models;
 using Nagorik.Api.Services;
+using Nagorik.Api.Authorization;
 
 namespace Nagorik.Tests;
 
@@ -37,7 +38,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(MapApiController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddAuthentication("MapTest").AddScheme<AuthenticationSchemeOptions, MapTestAuth>("MapTest", _ => { });
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         await using (var scope = app.Services.CreateAsyncScope())
         {
@@ -64,6 +65,37 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal("High", feature.GetProperty("properties").GetProperty("riskLevel").GetString());
         Assert.Equal(90, feature.GetProperty("geometry").GetProperty("coordinates")[0][0][0].GetDouble());
         Assert.False(feature.GetProperty("properties").TryGetProperty("users", out _));
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("CityOfficial", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.OK)]
+    public async Task BothPageAndDataRequireDispatcherAndDoNotLeakMapToOtherRoles(string? role, HttpStatusCode expected)
+    {
+        if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones" })
+        {
+            using var response = await client.GetAsync(route);
+            Assert.Equal(expected, response.StatusCode);
+            var content = await response.Content.ReadAsStringAsync();
+            if (expected != HttpStatusCode.OK)
+            {
+                Assert.DoesNotContain("FeatureCollection", content);
+                Assert.DoesNotContain("id=\"risk-zone-map\"", content);
+                Assert.DoesNotContain("Sample zone", content);
+            }
+            else if (route == "/dispatcher/map")
+            {
+                Assert.Contains("Dispatcher risk map", content);
+                Assert.Contains("id=\"map-zone-toggle\"", content);
+                Assert.Contains("/dispatcher/map", content);
+            }
+        }
     }
 
     public async Task DisposeAsync()

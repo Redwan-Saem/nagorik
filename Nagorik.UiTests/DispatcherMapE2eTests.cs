@@ -12,6 +12,7 @@ using Nagorik.Api.Controllers;
 using Nagorik.Api.Data;
 using Nagorik.Api.Models;
 using Nagorik.Api.Services;
+using Nagorik.Api.Authorization;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
@@ -43,7 +44,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
                 ValidateLifetime = true, ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Key)) };
             o.Events = new JwtBearerEvents { OnMessageReceived = c => { c.Token ??= c.Request.Cookies["auth_token"]; return Task.CompletedTask; } };
         });
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build(); app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         await using (var scope = app.Services.CreateAsyncScope())
         {
@@ -74,6 +75,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         wait.Until(d => d.FindElements(By.Id("map-status")).Count == 1 && d.FindElement(By.Id("map-status")).Text.Contains("3 risk zones loaded"));
         Assert.Equal(3, browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Count);
         Assert.Contains("sample risk levels", browser.FindElement(By.TagName("body")).Text);
+        Assert.True(browser.FindElements(By.LinkText("Dispatcher risk map")).Count > 0);
         var colors = browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Select(p => p.GetAttribute("fill")).ToArray();
         Assert.Contains("#dc2626", colors); Assert.Contains("#d97706", colors); Assert.Contains("#15803d", colors);
         Assert.Contains("Unknown", browser.FindElement(By.Id("map-legend")).Text);

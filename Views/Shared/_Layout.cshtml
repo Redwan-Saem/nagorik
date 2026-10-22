@@ -56,6 +56,13 @@
                     </li>
                 }
 
+                @if (User.IsInRole("Dispatcher"))
+                {
+                    <li class="nav-item">
+                        <a class="nav-link" asp-controller="DispatcherMap" asp-action="Index">Dispatcher risk map</a>
+                    </li>
+                }
+
                 @if (User.IsInRole("Crew"))
                 {
                     <li class="nav-item">

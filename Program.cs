@@ -86,7 +86,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(Nagorik.Api.Authorization.DispatcherMapAccess.Configure);
 
 builder.Services.AddOpenApi();
 
