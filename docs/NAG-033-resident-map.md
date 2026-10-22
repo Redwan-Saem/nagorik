@@ -15,3 +15,10 @@ It uses local Leaflet, OSM background tiles, independent layer toggles, risk-col
 legend, safe text popups and per-layer empty/error/refresh feedback. Public fetches
 omit credentials. `?zone=ID` focuses the map on a canonical zone. Sample boundaries
 and uncalibrated assessments are labelled explicitly. No dispatcher scripts load.
+
+T-033.3 (Rajiya): Locate me is opt-in, uses standard longitude/latitude Polygon
+and MultiPolygon containment with holes, and displays all matching zone risks and
+evaluation times. GPS coordinates stay in this page; no application API receives
+them. Clear cancels pending callbacks and removes the marker. Denial, timeout,
+unloaded zones and outside-boundary locations have explicit feedback. OSM tiles
+are requested for the viewed map area, as with ordinary map navigation.

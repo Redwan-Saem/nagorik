@@ -13,6 +13,10 @@
     <label><input id="public-blockages-toggle" type="checkbox" checked /> Blocked drainage</label>
 </div>
 <p>Zone colors: grey Unknown · green Low · amber Medium · red High · purple Severe.</p>
+<button type="button" id="resident-locate">Locate me and show my area's risk</button>
+<button type="button" id="resident-location-clear">Clear my location</button>
+<p>GPS is optional and checked locally against the displayed zone boundaries. This page does not upload your coordinates to Nagorik.</p>
+<p id="resident-location-status" role="status" aria-live="polite"></p>
 <p id="public-zones-status" role="status"></p>
 <p id="public-reports-status" role="status"></p>
 <p id="public-blockages-status" role="status"></p>
@@ -23,4 +27,6 @@
 @section Scripts {
     <script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
     <script src="~/js/resident-map.js" asp-append-version="true"></script>
+    <script src="~/js/zone-locator.js" asp-append-version="true"></script>
+    <script src="~/js/resident-locate.js" asp-append-version="true"></script>
 }
