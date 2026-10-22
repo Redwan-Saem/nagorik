@@ -44,6 +44,13 @@ builder.Services.AddScoped<RiskZoneQueryService>();
 builder.Services.AddScoped<MapFeatureQueryService>();
 builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddOptions<WeatherOptions>().Bind(builder.Configuration.GetSection("Weather"))
+    .ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((services, client) =>
+{
+    client.Timeout = TimeSpan.FromSeconds(services.GetRequiredService<Microsoft.Extensions.Options.IOptions<WeatherOptions>>().Value.RequestTimeoutSeconds);
+    client.MaxResponseContentBufferSize = 1024 * 1024;
+});
 builder.Services.AddHostedService<AlertBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
