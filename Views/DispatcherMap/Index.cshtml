@@ -3,6 +3,7 @@
 }
 @section Styles {
     <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/leaflet-markercluster/MarkerCluster.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/dispatcher-map.css" asp-append-version="true" />
 }
 <section id="dispatcher-risk-map" aria-labelledby="map-heading">
@@ -13,6 +14,7 @@
         <button type="button" id="map-refresh">Refresh zones</button>
         <label><input type="checkbox" id="map-zone-toggle" checked /> Show risk zones</label>
         <label><input type="checkbox" id="map-drainage-toggle" checked /> Show drainage points</label>
+        <label><input type="checkbox" id="map-reports-toggle" checked /> Show reports</label>
     </div>
     <ul id="map-legend" class="map-legend" aria-label="Zone risk legend">
         <li><span class="risk-swatch risk-unknown" aria-hidden="true"></span>Unknown</li>
@@ -28,6 +30,8 @@
     <p class="muted">Drainage icons: ✓ Clear · ! Blocked · ? Unknown</p>
     <p id="map-drainage-status" role="status" aria-live="polite"></p>
     <p id="map-drainage-error" class="alert alert-bad" role="alert" hidden></p>
+    <p id="map-reports-status" role="status" aria-live="polite"></p>
+    <p id="map-reports-error" class="alert alert-bad" role="alert" hidden></p>
     <div id="risk-zone-map" tabindex="0" aria-label="Interactive Dhaka risk-zone map"></div>
     <section class="map-zone-details" aria-labelledby="zone-detail-heading">
         <h2 id="zone-detail-heading">Selected zone</h2>
@@ -37,6 +41,7 @@
 </section>
 @section Scripts {
     <script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
+    <script src="~/lib/leaflet-markercluster/leaflet.markercluster.js" asp-append-version="true"></script>
     <script src="~/js/dispatcher-map-layers.js" asp-append-version="true"></script>
     <script src="~/js/dispatcher-map.js" asp-append-version="true"></script>
 }

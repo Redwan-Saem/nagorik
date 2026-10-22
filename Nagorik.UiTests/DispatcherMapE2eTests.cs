@@ -39,6 +39,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(DispatcherMapController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
         {
             o.TokenValidationParameters = new TokenValidationParameters { ValidateIssuer = false, ValidateAudience = false,
@@ -53,6 +54,14 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
             db.Users.Add(new User { Email = "dispatcher@map.invalid", Name = "Map fixture", Role = "Dispatcher", PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password, 4) });
             await db.SaveChangesAsync();
             await DevelopmentMapSeeder.SeedAsync(db, app.Environment, builder.Configuration);
+            var owner = new User { Email = "resident@map.invalid", Name = "Fixture resident", Role = "Resident", PasswordHash = "not-a-login-fixture" };
+            db.Users.Add(owner); await db.SaveChangesAsync();
+            var storage = scope.ServiceProvider.GetRequiredService<IPhotoStorage>();
+            await using var photo = new MemoryStream(Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4YkAAAAASUVORK5CYII="));
+            var photoUrl = await storage.SavePrivateAsync(photo, ".png");
+            for (var i = 0; i < 3; i++) db.Reports.Add(new Report { UserId = owner.Id, Title = "Map fixture report " + i,
+                Location = "Dhanmondi fixture", Latitude = 23.7461, Longitude = 90.3742, ImageUrl = photoUrl });
+            await db.SaveChangesAsync();
         }
         await app.StartAsync(); url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
     }
@@ -83,6 +92,18 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         var drainageToggle = browser.FindElement(By.Id("map-drainage-toggle"));
         browser.ExecuteScript("arguments[0].click();", drainageToggle);
         wait.Until(d => d.FindElements(By.CssSelector(".drainage-marker")).Count == 0);
+        wait.Until(d => d.FindElement(By.Id("map-reports-status")).Text.Contains("3 located reports loaded"));
+        var cluster = wait.Until(d => d.FindElements(By.CssSelector(".report-cluster")).FirstOrDefault(e => e.Displayed));
+        browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", cluster);
+        cluster.Click();
+        wait.Until(d => d.FindElements(By.CssSelector(".report-marker")).Count == 3);
+        var reportMarker = browser.FindElement(By.CssSelector(".report-marker"));
+        reportMarker.Click();
+        wait.Until(d => d.FindElements(By.CssSelector(".map-report-photo")).Any(img => browser.ExecuteScript("return arguments[0].naturalWidth > 0", img) is true));
+        Assert.Contains("Status: Pending", browser.FindElement(By.CssSelector(".map-report-popup")).Text);
+        var reportToggle = browser.FindElement(By.Id("map-reports-toggle"));
+        browser.ExecuteScript("arguments[0].click();", reportToggle);
+        wait.Until(d => d.FindElements(By.CssSelector(".report-marker, .report-cluster")).Count == 0);
         browser.ExecuteScript("arguments[0].click();", drainageToggle);
         wait.Until(d => d.FindElements(By.CssSelector(".drainage-marker")).Count == 6);
         // A drainage marker sits at the sample polygon's center; hide that layer
