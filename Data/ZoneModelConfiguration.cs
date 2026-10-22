@@ -11,6 +11,9 @@ internal static class ZoneModelConfiguration
         {
             e.ToTable("Zones", table =>
             {
+                table.HasCheckConstraint("CK_Zones_Elevation", "\"ElevationMeters\" IS NULL OR \"ElevationMeters\" BETWEEN -500 AND 9000");
+                table.HasCheckConstraint("CK_Zones_Density", "\"DrainageDensityKmPerSqKm\" IS NULL OR \"DrainageDensityKmPerSqKm\" BETWEEN 0 AND 100");
+                table.HasCheckConstraint("CK_Zones_History", "\"HistoryScore\" IS NULL OR \"HistoryScore\" BETWEEN 0 AND 1");
                 table.HasCheckConstraint("CK_Zones_Code", "length(trim(\"Code\")) BETWEEN 1 AND 40 AND \"Code\" = trim(\"Code\")");
                 table.HasCheckConstraint("CK_Zones_Name", "length(trim(\"Name\")) BETWEEN 1 AND 100");
                 table.HasCheckConstraint("CK_Zones_RiskLevel", "\"RiskLevel\" IN ('Unknown', 'Low', 'Medium', 'High', 'Severe')");

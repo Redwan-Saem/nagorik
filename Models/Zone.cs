@@ -27,4 +27,10 @@ public sealed class Zone
 
     // Null means no computation has run; creation must not imply a fresh prediction.
     public DateTime? LastComputedAtUtc { get; set; }
+
+    // Unknown until surveyed/imported. Density is km of drainage per square km;
+    // history is a normalized 0..1 waterlogging frequency score.
+    public double? ElevationMeters { get; set; }
+    public double? DrainageDensityKmPerSqKm { get; set; }
+    public double? HistoryScore { get; set; }
 }

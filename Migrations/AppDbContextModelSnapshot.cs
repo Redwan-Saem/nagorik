@@ -929,6 +929,15 @@ namespace Nagorik.Api.Migrations
                         .HasColumnType("TEXT")
                         .UseCollation("NOCASE");
 
+                    b.Property<double?>("DrainageDensityKmPerSqKm")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("ElevationMeters")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("HistoryScore")
+                        .HasColumnType("REAL");
+
                     b.Property<DateTime?>("LastComputedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -955,6 +964,12 @@ namespace Nagorik.Api.Migrations
                             t.HasCheckConstraint("CK_Zones_BoundaryGeoJson", "CASE WHEN json_valid(\"BoundaryGeoJson\") THEN COALESCE(json_extract(\"BoundaryGeoJson\", '$.type') IN ('Polygon', 'MultiPolygon') AND json_type(\"BoundaryGeoJson\", '$.coordinates') = 'array' AND json_array_length(\"BoundaryGeoJson\", '$.coordinates') > 0, 0) ELSE 0 END");
 
                             t.HasCheckConstraint("CK_Zones_Code", "length(trim(\"Code\")) BETWEEN 1 AND 40 AND \"Code\" = trim(\"Code\")");
+
+                            t.HasCheckConstraint("CK_Zones_Density", "\"DrainageDensityKmPerSqKm\" IS NULL OR \"DrainageDensityKmPerSqKm\" BETWEEN 0 AND 100");
+
+                            t.HasCheckConstraint("CK_Zones_Elevation", "\"ElevationMeters\" IS NULL OR \"ElevationMeters\" BETWEEN -500 AND 9000");
+
+                            t.HasCheckConstraint("CK_Zones_History", "\"HistoryScore\" IS NULL OR \"HistoryScore\" BETWEEN 0 AND 1");
 
                             t.HasCheckConstraint("CK_Zones_Name", "length(trim(\"Name\")) BETWEEN 1 AND 100");
 
