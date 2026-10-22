@@ -173,6 +173,56 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("NotificationPreferences");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.RainfallReading", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("FetchedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsForecast")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Rainfall1HourMm")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Rainfall3HourMm")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Rainfall6HourMm")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId", "IsForecast", "TimestampUtc")
+                        .IsDescending(false, false, true);
+
+                    b.HasIndex("ZoneId", "TimestampUtc", "IsForecast", "Source")
+                        .IsUnique();
+
+                    b.ToTable("RainfallReadings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RainfallReadings_Amounts", "\"Rainfall1HourMm\" >= 0 AND \"Rainfall3HourMm\" >= \"Rainfall1HourMm\" AND \"Rainfall6HourMm\" >= \"Rainfall3HourMm\" AND \"Rainfall6HourMm\" <= 10000");
+
+                            t.HasCheckConstraint("CK_RainfallReadings_Forecast", "\"IsForecast\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_RainfallReadings_Source", "length(trim(\"Source\")) BETWEEN 1 AND 64");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.Report", b =>
                 {
                     b.Property<int>("Id")
@@ -970,6 +1020,17 @@ namespace Nagorik.Api.Migrations
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.DrainagePoint", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RainfallReading", b =>
                 {
                     b.HasOne("Nagorik.Api.Models.Zone", "Zone")
                         .WithMany()
