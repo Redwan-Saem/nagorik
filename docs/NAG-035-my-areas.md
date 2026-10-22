@@ -28,3 +28,18 @@ legacy opt-in; non-Residents and globally opted-out users are excluded. The old
 seeded-risk background worker is disabled by default to avoid parallel alerts;
 `Alerts__UseLegacyRiskWorker=true` is an explicit legacy compatibility switch.
 The canonical worker still uses the existing `INotificationService`/push delivery.
+
+T-035.5 (Labiba): each event/resident gets one durable receipt. A database lease
+serializes processors; delivery claims and attempt counters persist across restart.
+Successful sends are not reselected; repeated elevated transitions within a
+resident/zone cooldown are suppressed. Recipient eligibility is checked again
+before delivery, so pending retries honor opt-outs. Old/inapplicable events are
+not sent. A failed or unconfirmed push retries with a bounded attempt count.
+
+Defaults under `RiskAlerts`: Enabled=true, CooldownMinutes=60, MaxAttempts=3,
+RetryMinutes=5, LeaseMinutes=2, SendTimeoutSeconds=30, MaxEventAgeMinutes=60.
+An evaluation older than 15 minutes is not eligible. Admins can inspect the latest
+100 receipts at `/admin/risk-alert-deliveries`; endpoint acceptance is not proof
+that a person read the alert. A crash after an external push succeeds but before
+the receipt is saved can still cause a retry: external delivery cannot guarantee
+mathematical exactly-once behavior. The lease exceeds the bounded send timeout.

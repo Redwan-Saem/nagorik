@@ -155,6 +155,15 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AlertDeliveryDiagnosticsAreAdminOnly()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        using var denied=await client.GetAsync("/admin/risk-alert-deliveries");Assert.Equal(HttpStatusCode.Forbidden,denied.StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","Admin");
+        var html=await client.GetStringAsync("/admin/risk-alert-deliveries");Assert.Contains("No risk alert receipts yet",html);
+    }
+
+    [Fact]
     public async Task MyAreasPageRequiresResidentAndProvidesSecurityToken()
     {
         client.DefaultRequestHeaders.Add("X-Test-Role","Dispatcher");

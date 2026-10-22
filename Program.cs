@@ -53,6 +53,8 @@ builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvide
 builder.Services.AddScoped<RiskComputationService>();
 builder.Services.AddScoped<ZoneRiskAlertRecipients>();
 builder.Services.AddScoped<ZoneRiskAlertService>();
+builder.Services.AddOptions<RiskAlertOptions>().Bind(builder.Configuration.GetSection("RiskAlerts"))
+    .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddHostedService<ZoneRiskAlertBackgroundService>();
 builder.Services.AddOptions<RiskJobOptions>().Bind(builder.Configuration.GetSection("RiskJob"))
     .ValidateDataAnnotations().ValidateOnStart();
