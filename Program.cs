@@ -44,6 +44,9 @@ builder.Services.AddScoped<RiskZoneQueryService>();
 builder.Services.AddScoped<MapFeatureQueryService>();
 builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<RiskPredictionService>();
+builder.Services.AddOptions<RiskScoringOptions>().Bind(builder.Configuration.GetSection("RiskScoring"))
+    .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<WeatherOptions>().Bind(builder.Configuration.GetSection("Weather"))
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((services, client) =>
