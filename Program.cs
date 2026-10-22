@@ -48,6 +48,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<RiskPredictionService>();
 builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
 builder.Services.AddScoped<RiskComputationService>();
+builder.Services.AddScoped<ZoneRiskAlertRecipients>();
+builder.Services.AddScoped<ZoneRiskAlertService>();
+builder.Services.AddHostedService<ZoneRiskAlertBackgroundService>();
 builder.Services.AddOptions<RiskJobOptions>().Bind(builder.Configuration.GetSection("RiskJob"))
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddHostedService<RiskBackgroundService>();

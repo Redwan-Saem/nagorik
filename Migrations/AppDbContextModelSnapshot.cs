@@ -431,6 +431,31 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ReportStatusHistories");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("RiskHistoryId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RiskHistoryId")
+                        .IsUnique();
+
+                    b.HasIndex("ProcessedAtUtc", "Id");
+
+                    b.ToTable("RiskAlertEvents");
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.RiskHistory", b =>
                 {
                     b.Property<long>("Id")
@@ -1192,6 +1217,17 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.RiskHistory", "RiskHistory")
+                        .WithMany()
+                        .HasForeignKey("RiskHistoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RiskHistory");
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.RiskHistory", b =>
