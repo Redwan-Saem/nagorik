@@ -42,3 +42,12 @@ and current zone state commit in the same transaction. Zone deletion is restrict
 while audit rows exist. There is no public history edit/delete endpoint. This
 records rule decisions, not confirmed flood labels; ML evaluation needs independent
 ground truth. Retention/archival is an operational follow-up for long deployments.
+
+## T-030.5 — contributing factors (Rajiya)
+
+Dispatcher map popups and the accessible selected-zone panel show the stored
+evaluation time, score, rainfall intensity, vulnerability, input fields, thresholds,
+source window and explanation. Missing data explains Unknown. All content uses
+text nodes. The GeoJSON endpoint adds a typed `factors` object; malformed legacy
+factor JSON is omitted rather than breaking the whole map. Refresh zones after a
+job runs. Historical popup values are snapshots, not continuous GPS/weather feeds.

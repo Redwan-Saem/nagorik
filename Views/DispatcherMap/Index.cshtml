@@ -10,7 +10,7 @@
     <h1 id="map-heading">Dispatcher risk map</h1>
     @Html.AntiForgeryToken()
     <p>Inspect zone boundaries and stored waterlogging risk.</p>
-    <p class="alert alert-warn">Development zones labelled “sample boundary” use synthetic boundaries and sample risk levels. They are not live forecasts or official geographic boundaries.</p>
+    <p class="alert alert-warn">Development zones labelled “sample boundary” use synthetic boundaries, not official geography. Computed levels use an uncalibrated rule baseline. Unknown means required data is missing or stale. Check the evaluation and rainfall timestamps in each popup.</p>
     <div class="map-toolbar">
         <button type="button" id="map-refresh">Refresh zones</button>
         <label><input type="checkbox" id="map-zone-toggle" checked /> Show risk zones</label>
