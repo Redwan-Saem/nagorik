@@ -12,6 +12,7 @@
     <div class="map-toolbar">
         <button type="button" id="map-refresh">Refresh zones</button>
         <label><input type="checkbox" id="map-zone-toggle" checked /> Show risk zones</label>
+        <label><input type="checkbox" id="map-drainage-toggle" checked /> Show drainage points</label>
     </div>
     <ul id="map-legend" class="map-legend" aria-label="Zone risk legend">
         <li><span class="risk-swatch risk-unknown" aria-hidden="true"></span>Unknown</li>
@@ -24,6 +25,9 @@
     <p id="map-error" class="alert alert-bad" role="alert" hidden></p>
     <a id="map-login" href="/login.html?returnUrl=%2Fdispatcher%2Fmap" hidden>Log in again</a>
     <p id="map-tile-status" class="muted" role="status"></p>
+    <p class="muted">Drainage icons: ✓ Clear · ! Blocked · ? Unknown</p>
+    <p id="map-drainage-status" role="status" aria-live="polite"></p>
+    <p id="map-drainage-error" class="alert alert-bad" role="alert" hidden></p>
     <div id="risk-zone-map" tabindex="0" aria-label="Interactive Dhaka risk-zone map"></div>
     <section class="map-zone-details" aria-labelledby="zone-detail-heading">
         <h2 id="zone-detail-heading">Selected zone</h2>
@@ -33,5 +37,6 @@
 </section>
 @section Scripts {
     <script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
+    <script src="~/js/dispatcher-map-layers.js" asp-append-version="true"></script>
     <script src="~/js/dispatcher-map.js" asp-append-version="true"></script>
 }

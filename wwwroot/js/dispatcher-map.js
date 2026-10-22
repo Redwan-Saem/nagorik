@@ -66,7 +66,8 @@
             else { map.closePopup(); map.removeLayer(layer); }
         });
         const ready = load();
-        return { map, ready, reload: load };
+        const pointLayers = globalThis.DispatcherMapLayers?.mount({ map, document, leaflet, fetcher });
+        return { map, ready, reload: load, pointLayers };
     }
     globalThis.DispatcherRiskMap = { colors, colorForRisk, mount };
     if (typeof document !== 'undefined') mount();

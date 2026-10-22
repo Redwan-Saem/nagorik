@@ -77,6 +77,18 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         Assert.Equal(3, browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Count);
         Assert.Contains("sample risk levels", browser.FindElement(By.TagName("body")).Text);
         Assert.True(browser.FindElements(By.LinkText("Dispatcher risk map")).Count > 0);
+        wait.Until(d => d.FindElement(By.Id("map-drainage-status")).Text.Contains("6 drainage points loaded"));
+        Assert.Equal(3, browser.FindElements(By.CssSelector(".drainage-blocked")).Count);
+        Assert.Equal(3, browser.FindElements(By.CssSelector(".drainage-clear")).Count);
+        var drainageToggle = browser.FindElement(By.Id("map-drainage-toggle"));
+        browser.ExecuteScript("arguments[0].click();", drainageToggle);
+        wait.Until(d => d.FindElements(By.CssSelector(".drainage-marker")).Count == 0);
+        browser.ExecuteScript("arguments[0].click();", drainageToggle);
+        wait.Until(d => d.FindElements(By.CssSelector(".drainage-marker")).Count == 6);
+        // A drainage marker sits at the sample polygon's center; hide that layer
+        // while testing the underlying polygon rather than bypassing click targeting.
+        browser.ExecuteScript("arguments[0].click();", drainageToggle);
+        wait.Until(d => d.FindElements(By.CssSelector(".drainage-marker")).Count == 0);
         var colors = browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Select(p => p.GetAttribute("fill")).ToArray();
         Assert.Contains("#dc2626", colors); Assert.Contains("#d97706", colors); Assert.Contains("#15803d", colors);
         Assert.Contains("Unknown", browser.FindElement(By.Id("map-legend")).Text);

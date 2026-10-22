@@ -11,5 +11,7 @@
 .zone-popup h3 { color: #17212b; margin: 0 0 .5rem; }
 .zone-popup p { margin: .4rem 0; }
 .map-zone-details { overflow-wrap: anywhere; }
+.drainage-marker { border: 2px solid white; border-radius: 50%; color: white; font: bold 19px/24px sans-serif; text-align: center; box-shadow: 0 1px 5px #0008; }
+.drainage-clear { background: #15803d; } .drainage-blocked { background: #b91c1c; } .drainage-unknown { background: #475569; }
 #dispatcher-risk-map [hidden] { display: none !important; }
 @media (max-width: 600px) { #risk-zone-map { min-height: 320px; height: 55vh; } }
