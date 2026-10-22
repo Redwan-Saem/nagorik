@@ -17,6 +17,7 @@ namespace Nagorik.Api
         public DbSet<ZoneMapData> ZoneMapData { get; set; }
 
         public DbSet<Zone> Zones => Set<Zone>();
+        public DbSet<DrainagePoint> DrainagePoints => Set<DrainagePoint>();
 
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<ReportArea> ReportAreas => Set<ReportArea>();
@@ -50,6 +51,7 @@ namespace Nagorik.Api
             Data.UtilityAnomalyModelConfiguration.Configure(builder);
             Data.UtilityRoutingModelConfiguration.Configure(builder);
             Data.ZoneModelConfiguration.Configure(builder);
+            Data.DrainagePointModelConfiguration.Configure(builder);
 
             builder.Entity<ReportStatusHistory>(entity =>
             {

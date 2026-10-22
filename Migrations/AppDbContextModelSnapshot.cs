@@ -87,6 +87,41 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("CrewAssignments");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.DrainagePoint", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Unknown");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId", "Status");
+
+                    b.ToTable("DrainagePoints", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DrainagePoints_Latitude", "\"Latitude\" BETWEEN -90 AND 90");
+
+                            t.HasCheckConstraint("CK_DrainagePoints_Longitude", "\"Longitude\" BETWEEN -180 AND 180");
+
+                            t.HasCheckConstraint("CK_DrainagePoints_Status", "\"Status\" IN ('Unknown', 'Clear', 'Blocked')");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.NotificationLog", b =>
                 {
                     b.Property<int>("Id")
@@ -932,6 +967,17 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("Crew");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.DrainagePoint", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.Report", b =>
