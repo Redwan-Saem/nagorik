@@ -1,0 +1,4 @@
+#risk-zone-map { height: min(65vh, 650px); min-height: 360px; width: 100%; border: 1px solid #526d78; border-radius: 12px; margin-block: 1rem; z-index: 0; }
+.map-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+#dispatcher-risk-map [hidden] { display: none !important; }
+@media (max-width: 600px) { #risk-zone-map { min-height: 320px; height: 55vh; } }
