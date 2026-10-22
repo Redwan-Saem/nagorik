@@ -95,6 +95,8 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     await DevDataSeeder.SeedAsync(scope.ServiceProvider);
+    await Nagorik.Api.Data.DevelopmentMapSeeder.SeedAsync(
+        scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
     await Nagorik.Api.Data.DevelopmentReportSeeder.SeedAsync(
         scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
 }
