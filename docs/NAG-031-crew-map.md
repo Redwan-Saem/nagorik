@@ -15,3 +15,11 @@ T-031.3 (Redwan): `GET /api/map/crews` is Dispatcher-only GeoJSON. Busy means an
 Assigned/InProgress report exists. Unknown locations are omitted and counted;
 locations older than 15 minutes are explicitly stale, not current tracking. No
 email, user ID or phone is exposed. Responses are no-store and capped at 5000.
+
+T-031.4 (Rajiya): dispatcher map includes an independent crew layer with F/B/?
+markers, recent/stale labels, last-seen UTC, safe name popups, refresh, empty/error
+states and no continuous tracking. Unknown GPS cannot create an invented marker.
+
+Verified per-task: 5 schema tests, 16 workflow tests, 48 crew API tests, 34 map/API
+tests, and dedicated client tests. Apply `dotnet ef database update` with the app
+stopped before running; the working demo database is not changed by these tests.

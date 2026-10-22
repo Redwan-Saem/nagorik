@@ -16,6 +16,7 @@
         <label><input type="checkbox" id="map-zone-toggle" checked /> Show risk zones</label>
         <label><input type="checkbox" id="map-drainage-toggle" checked /> Show drainage points</label>
         <label><input type="checkbox" id="map-reports-toggle" checked /> Show reports</label>
+        <label><input type="checkbox" id="map-crews-toggle" checked /> Show crew locations</label>
     </div>
     <ul id="map-legend" class="map-legend" aria-label="Zone risk legend">
         <li><span class="risk-swatch risk-unknown" aria-hidden="true"></span>Unknown</li>
@@ -35,6 +36,8 @@
     <p id="map-drainage-action-error" class="alert alert-bad" role="alert" hidden></p>
     <p id="map-reports-status" role="status" aria-live="polite"></p>
     <p id="map-reports-error" class="alert alert-bad" role="alert" hidden></p>
+    <p id="map-crews-status" role="status" aria-live="polite"></p>
+    <p class="muted">Crews: F = free, B = busy, ? = stale (older than 15 minutes). GPS is shared only with successful task updates.</p>
     <div id="risk-zone-map" tabindex="0" aria-label="Interactive Dhaka risk-zone map"></div>
     <section class="map-zone-details" aria-labelledby="zone-detail-heading">
         <h2 id="zone-detail-heading">Selected zone</h2>
@@ -46,5 +49,6 @@
     <script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
     <script src="~/lib/leaflet-markercluster/leaflet.markercluster.js" asp-append-version="true"></script>
     <script src="~/js/dispatcher-map-layers.js" asp-append-version="true"></script>
+    <script src="~/js/dispatcher-crews.js" asp-append-version="true"></script>
     <script src="~/js/dispatcher-map.js" asp-append-version="true"></script>
 }
