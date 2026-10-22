@@ -41,6 +41,7 @@ builder.Services.AddScoped<SosResponderNotifier>();
 builder.Services.AddScoped<OfficialReportQueryService>();
 builder.Services.AddScoped<UtilityRoutingService>();
 builder.Services.AddScoped<RiskZoneQueryService>();
+builder.Services.AddScoped<MapFeatureQueryService>();
 builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHostedService<AlertBackgroundService>();

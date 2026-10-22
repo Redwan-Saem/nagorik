@@ -38,6 +38,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={Path.Combine(root, "map.db")};Pooling=False"));
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(DispatcherMapController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
+        builder.Services.AddScoped<MapFeatureQueryService>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
         {
             o.TokenValidationParameters = new TokenValidationParameters { ValidateIssuer = false, ValidateAudience = false,

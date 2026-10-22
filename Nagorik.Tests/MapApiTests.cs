@@ -37,14 +37,17 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite(connection));
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(MapApiController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
+        builder.Services.AddScoped<MapFeatureQueryService>();
         builder.Services.AddAuthentication("MapTest").AddScheme<AuthenticationSchemeOptions, MapTestAuth>("MapTest", _ => { });
         builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         await using (var scope = app.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); await db.Database.EnsureCreatedAsync();
-            db.Zones.Add(new Zone { Code = "Z1", Name = "Sample zone", RiskLevel = ZoneRiskLevel.High,
-                BoundaryGeoJson = "{\"type\":\"Polygon\",\"coordinates\":[[[90,23],[91,23],[91,24],[90,23]]]}" });
+            var zone = new Zone { Code = "Z1", Name = "Sample zone", RiskLevel = ZoneRiskLevel.High,
+                BoundaryGeoJson = "{\"type\":\"Polygon\",\"coordinates\":[[[90,23],[91,23],[91,24],[90,23]]]}" };
+            db.Zones.Add(zone);
+            db.DrainagePoints.Add(new DrainagePoint { Zone = zone, Latitude = 23.74, Longitude = 90.37, Status = DrainageStatus.Blocked });
             await db.SaveChangesAsync();
         }
         await app.StartAsync();
@@ -78,7 +81,7 @@ public class MapApiTests : IAsyncLifetime
     public async Task BothPageAndDataRequireDispatcherAndDoNotLeakMapToOtherRoles(string? role, HttpStatusCode expected)
     {
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
-        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones" })
+        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points" })
         {
             using var response = await client.GetAsync(route);
             Assert.Equal(expected, response.StatusCode);
@@ -96,6 +99,24 @@ public class MapApiTests : IAsyncLifetime
                 Assert.Contains("/dispatcher/map", content);
             }
         }
+    }
+
+    [Fact]
+    public async Task DrainageEndpointUsesPointGeoJsonAndZoneStatusProperties()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var response = await client.GetAsync("/api/map/drainage-points");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/geo+json", response.Content.Headers.ContentType!.MediaType);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("FeatureCollection", json.RootElement.GetProperty("type").GetString());
+        var point = json.RootElement.GetProperty("features")[0];
+        Assert.Equal("Point", point.GetProperty("geometry").GetProperty("type").GetString());
+        Assert.Equal(90.37, point.GetProperty("geometry").GetProperty("coordinates")[0].GetDouble());
+        Assert.Equal(23.74, point.GetProperty("geometry").GetProperty("coordinates")[1].GetDouble());
+        Assert.Equal("Blocked", point.GetProperty("properties").GetProperty("status").GetString());
+        Assert.Equal("Z1", point.GetProperty("properties").GetProperty("zoneCode").GetString());
+        Assert.Equal(0, json.RootElement.GetProperty("omittedCount").GetInt32());
     }
 
     public async Task DisposeAsync()
