@@ -48,11 +48,13 @@ builder.Services.AddOptions<WeatherOptions>().Bind(builder.Configuration.GetSect
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((services, client) =>
 {
-    client.Timeout = TimeSpan.FromSeconds(services.GetRequiredService<Microsoft.Extensions.Options.IOptions<WeatherOptions>>().Value.RequestTimeoutSeconds);
+    // The service applies a separate bounded timeout to each attempt.
+    client.Timeout = Timeout.InfiniteTimeSpan;
     client.MaxResponseContentBufferSize = 1024 * 1024;
 });
 builder.Services.AddHostedService<AlertBackgroundService>();
 builder.Services.AddScoped<IWeatherCollector, WeatherCollectionService>();
+builder.Services.AddScoped<WeatherReadingQueryService>();
 builder.Services.AddHostedService<WeatherBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]

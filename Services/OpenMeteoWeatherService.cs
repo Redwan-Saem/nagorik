@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
+using Nagorik.Api.Models;
 
 namespace Nagorik.Api.Services;
 
@@ -12,7 +14,8 @@ public interface IWeatherService
     Task<WeatherRainfall> FetchAsync(double latitude, double longitude, DateTime hourUtc, CancellationToken ct = default);
 }
 
-public sealed class OpenMeteoWeatherService(HttpClient client) : IWeatherService
+public sealed class OpenMeteoWeatherService(HttpClient client, IOptions<WeatherOptions> options, TimeProvider clock,
+    ILogger<OpenMeteoWeatherService> logger) : IWeatherService
 {
     public const string Source = "Open-Meteo";
 
@@ -23,11 +26,47 @@ public sealed class OpenMeteoWeatherService(HttpClient client) : IWeatherService
         if (hourUtc.Kind != DateTimeKind.Utc || hourUtc.Ticks % TimeSpan.TicksPerHour != 0)
             throw new ArgumentException("Supply a whole UTC hour.", nameof(hourUtc));
         var query = FormattableString.Invariant($"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&hourly=rain,showers&precipitation_unit=mm&timezone=UTC&timeformat=unixtime&start_hour={hourUtc.AddHours(-5):yyyy-MM-ddTHH:mm}&end_hour={hourUtc.AddHours(6):yyyy-MM-ddTHH:mm}");
-        using var response = await client.GetAsync(query, ct);
-        response.EnsureSuccessStatusCode();
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-        return Parse(document.RootElement, hourUtc);
+        for (var attempt = 0; ; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            HttpResponseMessage response;
+            try
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeout.CancelAfter(TimeSpan.FromSeconds(options.Value.RequestTimeoutSeconds));
+                response = await client.GetAsync(query, timeout.Token);
+            }
+            catch (Exception error) when ((error is HttpRequestException || error is OperationCanceledException) && !ct.IsCancellationRequested)
+            {
+                if (attempt >= options.Value.MaxRetries) throw;
+                logger.LogWarning(error, "Weather request failed; retry {Attempt}", attempt + 1);
+                await DelayAsync(attempt, null, ct); continue;
+            }
+            using (response)
+            {
+                var status = (int)response.StatusCode;
+                if ((status == 408 || status == 429 || status >= 500) && attempt < options.Value.MaxRetries)
+                {
+                    var after = response.Headers.RetryAfter;
+                    var wait = after?.Delta ?? (after?.Date is { } date ? date - clock.GetUtcNow() : (TimeSpan?)null);
+                    // Do not hold the collector for an unbounded provider Retry-After.
+                    if (wait > TimeSpan.FromSeconds(30)) throw new HttpRequestException("Provider deferred weather collection; cached readings retained until a later cycle.", null, response.StatusCode);
+                    logger.LogWarning("Weather provider returned {Status}; retry {Attempt}", status, attempt + 1);
+                    await DelayAsync(attempt, wait, ct); continue;
+                }
+                response.EnsureSuccessStatusCode();
+                await using var stream = await response.Content.ReadAsStreamAsync(ct);
+                using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+                return Parse(document.RootElement, hourUtc);
+            }
+        }
+    }
+
+    private Task DelayAsync(int attempt, TimeSpan? retryAfter, CancellationToken ct)
+    {
+        var backoff = TimeSpan.FromMilliseconds(options.Value.RetryDelayMilliseconds * Math.Pow(2, attempt));
+        var delay = retryAfter > backoff ? retryAfter.Value : backoff;
+        return Task.Delay(delay > TimeSpan.FromSeconds(30) ? TimeSpan.FromSeconds(30) : delay, clock, ct);
     }
 
     private static WeatherRainfall Parse(JsonElement root, DateTime hourUtc)

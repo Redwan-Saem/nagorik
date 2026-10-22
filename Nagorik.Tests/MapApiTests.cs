@@ -40,6 +40,8 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(MapApiController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddAuthentication("MapTest").AddScheme<AuthenticationSchemeOptions, MapTestAuth>("MapTest", _ => { });
         builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
@@ -83,7 +85,7 @@ public class MapApiTests : IAsyncLifetime
     public async Task BothPageAndDataRequireDispatcherAndDoNotLeakMapToOtherRoles(string? role, HttpStatusCode expected)
     {
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
-        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports" })
+        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports", "/api/map/weather" })
         {
             using var response = await client.GetAsync(route);
             Assert.Equal(expected, response.StatusCode);
@@ -140,6 +142,17 @@ public class MapApiTests : IAsyncLifetime
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    [Fact]
+    public async Task WeatherEndpointExplicitlyReportsMissingDataInsteadOfZeroRain()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var response = await client.GetAsync("/api/map/weather"); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var zone = json.RootElement.GetProperty("zones")[0]; Assert.Equal("Unavailable", zone.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, zone.GetProperty("past").ValueKind); Assert.Equal(JsonValueKind.Null, zone.GetProperty("forecast").ValueKind);
+        Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
     }
 
     private async Task<HttpResponseMessage> ChangeAsync(int id, string status, string expected, string? token)
