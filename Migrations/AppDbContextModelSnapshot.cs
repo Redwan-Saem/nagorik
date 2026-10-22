@@ -105,6 +105,10 @@ namespace Nagorik.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("LastWorkReportId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("REAL");
 
@@ -121,6 +125,8 @@ namespace Nagorik.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LastWorkReportId");
 
                     b.HasIndex("ZoneId", "Status");
 
@@ -1156,11 +1162,18 @@ namespace Nagorik.Api.Migrations
 
             modelBuilder.Entity("Nagorik.Api.Models.DrainagePoint", b =>
                 {
+                    b.HasOne("Nagorik.Api.Models.Report", "LastWorkReport")
+                        .WithMany()
+                        .HasForeignKey("LastWorkReportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nagorik.Api.Models.Zone", "Zone")
                         .WithMany()
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("LastWorkReport");
 
                     b.Navigation("Zone");
                 });

@@ -42,6 +42,10 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<MapFeatureQueryService>();
         builder.Services.AddScoped<CrewMapQueryService>();
         builder.Services.AddScoped<FlaggedDrainageQueryService>();
+        builder.Services.AddScoped<DrainageDispatchService>();
+        builder.Services.AddScoped<CrewAssignmentService>();
+        builder.Services.AddSingleton<ICrewTaskNotifier, NullCrewTaskNotifier>();
+        builder.Services.AddSingleton(ResidentNotificationTestHelper.Create());
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
@@ -147,6 +151,17 @@ public class MapApiTests : IAsyncLifetime
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    [Fact]
+    public async Task FlaggedPanelRequiresDispatcherAndAssignmentNeedsCsrf()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Resident");
+        using var forbidden = await client.GetAsync("/dispatcher/flagged-drainage"); Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role"); client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var page = await client.GetAsync("/dispatcher/flagged-drainage"); Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        using var noToken = await client.PostAsync("/dispatcher/flagged-drainage/1/assign", new FormUrlEncodedContent(new Dictionary<string,string> { ["CrewId"] = "1" }));
+        Assert.Equal(HttpStatusCode.BadRequest, noToken.StatusCode);
     }
 
     [Fact]
