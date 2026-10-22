@@ -22,3 +22,9 @@ evaluation times. GPS coordinates stay in this page; no application API receives
 them. Clear cancels pending callbacks and removes the marker. Denial, timeout,
 unloaded zones and outside-boundary locations have explicit feedback. OSM tiles
 are requested for the viewed map area, as with ordinary map navigation.
+
+T-033.4 (Labiba): `/dispatcher/report-verification` supports explicit verify/hide
+decisions with reviewer/time and a monotonically increasing revision. Role checks,
+CSRF and an atomic expected-revision update prevent unauthorized and stale writes.
+Publishing requires usable coordinates. The page explains which fields become
+public. Workflow approval/completion is independent from publication.

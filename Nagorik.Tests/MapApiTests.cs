@@ -155,6 +155,31 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task VerificationRequiresDispatcherCsrfAndRevisionAndControlsPublicVisibility()
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); db.Users.Add(new() { Id = 1, Role = "Dispatcher" });
+            db.Reports.Add(new() { UserId = 1, Latitude = 23.7, Longitude = 90.3 }); await db.SaveChangesAsync();
+        }
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Resident");
+        using var denied = await client.GetAsync("/dispatcher/report-verification"); Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role"); client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var noCsrf = await client.PostAsync("/dispatcher/report-verification/1", new FormUrlEncodedContent(new Dictionary<string,string> { ["Publish"] = "true", ["ExpectedRevision"] = "0" }));
+        Assert.Equal(HttpStatusCode.BadRequest, noCsrf.StatusCode);
+        var token = await SecurityTokenAsync();
+        async Task<HttpResponseMessage> Review(bool publish, int revision) => await client.PostAsync("/dispatcher/report-verification/1", new FormUrlEncodedContent(new Dictionary<string,string>
+            { ["Publish"] = publish.ToString(), ["ExpectedRevision"] = revision.ToString(), ["__RequestVerificationToken"] = token }));
+        using var published = await Review(true,0); Assert.Equal(HttpStatusCode.OK, published.StatusCode);
+        using (var json = JsonDocument.Parse(await client.GetStringAsync("/api/public/map/reports"))) Assert.Equal(1, json.RootElement.GetProperty("features").GetArrayLength());
+        using var stale = await Review(false,0); Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var hidden = await Review(false,1); Assert.Equal(HttpStatusCode.OK, hidden.StatusCode);
+        using (var json = JsonDocument.Parse(await client.GetStringAsync("/api/public/map/reports"))) Assert.Equal(0, json.RootElement.GetProperty("features").GetArrayLength());
+        using var finalScope = app.Services.CreateScope(); var report = await finalScope.ServiceProvider.GetRequiredService<AppDbContext>().Reports.SingleAsync();
+        Assert.Equal(2, report.PublicVerificationRevision); Assert.Equal(1, report.PublicVerifiedByUserId); Assert.NotNull(report.PublicVerifiedAtUtc);
+    }
+
+    [Fact]
     public async Task ResidentMapPageIsPublicAndLoadsOnlyPublicMapScripts()
     {
         var html = await client.GetStringAsync("/map");
