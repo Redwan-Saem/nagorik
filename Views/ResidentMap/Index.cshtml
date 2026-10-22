@@ -1,0 +1,26 @@
+@{ ViewData["Title"] = "Area risk map"; }
+@section Styles {
+    <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/dispatcher-map.css" asp-append-version="true" />
+}
+<h1>Area risk map</h1>
+<p>Rule-based risk assessments, publicly verified issue markers and blocked drainage. No crew locations or private report details are shown.</p>
+<p class="alert alert-warn">Zones labelled “sample boundary” are synthetic demonstration boundaries. Assessments are an uncalibrated rule baseline, not confirmed floods. Unknown means missing or stale inputs. Check evaluation timestamps.</p>
+<div>
+    <button type="button" id="public-map-refresh">Refresh map data</button>
+    <label><input id="public-zones-toggle" type="checkbox" checked /> Zones</label>
+    <label><input id="public-reports-toggle" type="checkbox" checked /> Verified reports</label>
+    <label><input id="public-blockages-toggle" type="checkbox" checked /> Blocked drainage</label>
+</div>
+<p>Zone colors: grey Unknown · green Low · amber Medium · red High · purple Severe.</p>
+<p id="public-zones-status" role="status"></p>
+<p id="public-reports-status" role="status"></p>
+<p id="public-blockages-status" role="status"></p>
+<p id="public-tile-status" role="status"></p>
+<div id="resident-risk-map" style="height:60vh;min-height:360px" aria-label="Public area risk map" tabindex="0"></div>
+<p id="public-zone-details" role="status" aria-live="polite">Select a zone to inspect its risk and evaluation time.</p>
+<noscript>Enable JavaScript to display the map. Public GeoJSON is available under /api/public/map.</noscript>
+@section Scripts {
+    <script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
+    <script src="~/js/resident-map.js" asp-append-version="true"></script>
+}

@@ -155,6 +155,15 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ResidentMapPageIsPublicAndLoadsOnlyPublicMapScripts()
+    {
+        var html = await client.GetStringAsync("/map");
+        Assert.Contains("resident-risk-map", html); Assert.Contains("/js/resident-map.js", html);
+        Assert.DoesNotContain("/js/dispatcher-map.js", html);
+        Assert.Contains("uncalibrated rule baseline", html);
+    }
+
+    [Fact]
     public async Task PublicMapIsAnonymousAndDoesNotExposeUnverifiedOrPrivateFields()
     {
         using (var scope = app.Services.CreateScope())
