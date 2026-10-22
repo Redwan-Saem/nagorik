@@ -41,6 +41,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
         builder.Services.AddScoped<CrewMapQueryService>();
+        builder.Services.AddScoped<FlaggedDrainageQueryService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
@@ -89,7 +90,7 @@ public class MapApiTests : IAsyncLifetime
     public async Task BothPageAndDataRequireDispatcherAndDoNotLeakMapToOtherRoles(string? role, HttpStatusCode expected)
     {
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
-        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports", "/api/map/weather", "/api/map/crews" })
+        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports", "/api/map/weather", "/api/map/crews", "/api/map/flagged-drainage" })
         {
             using var response = await client.GetAsync(route);
             Assert.Equal(expected, response.StatusCode);
@@ -146,6 +147,26 @@ public class MapApiTests : IAsyncLifetime
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    [Fact]
+    public async Task FlagsOnlyFreshElevatedZones()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); var zone = await db.Zones.SingleAsync();
+            zone.LastComputedAtUtc = DateTime.UtcNow; await db.SaveChangesAsync();
+        }
+        using var fresh = JsonDocument.Parse(await client.GetStringAsync("/api/map/flagged-drainage"));
+        Assert.Equal(1, fresh.RootElement.GetProperty("points").GetArrayLength());
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); var zone = await db.Zones.SingleAsync();
+            zone.LastComputedAtUtc = DateTime.UtcNow.AddHours(-1); await db.SaveChangesAsync();
+        }
+        using var stale = JsonDocument.Parse(await client.GetStringAsync("/api/map/flagged-drainage"));
+        Assert.Equal(0, stale.RootElement.GetProperty("points").GetArrayLength());
     }
 
     [Fact]
