@@ -460,6 +460,43 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.RiskThresholdSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("HighThreshold")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("MediumThreshold")
+                        .HasColumnType("REAL");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("SevereThreshold")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RiskThresholdSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RiskThresholdSettings_Order", "\"MediumThreshold\" > 0 AND \"MediumThreshold\" < \"HighThreshold\" AND \"HighThreshold\" < \"SevereThreshold\" AND \"SevereThreshold\" <= 10000");
+
+                            t.HasCheckConstraint("CK_RiskThresholdSettings_Singleton", "\"Id\" = 1 AND \"Revision\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.SosAlert", b =>
                 {
                     b.Property<int>("Id")

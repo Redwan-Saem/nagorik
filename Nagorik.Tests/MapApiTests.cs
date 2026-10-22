@@ -42,6 +42,9 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<MapFeatureQueryService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<WeatherReadingQueryService>();
+        builder.Services.AddSingleton<RiskPredictionService>();
+        builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
+        builder.Services.AddScoped<RiskComputationService>();
         builder.Services.AddAuthentication("MapTest").AddScheme<AuthenticationSchemeOptions, MapTestAuth>("MapTest", _ => { });
         builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
@@ -142,6 +145,72 @@ public class MapApiTests : IAsyncLifetime
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.OK)]
+    public async Task OnlyAdminCanAccessThresholdScreen(string? role, HttpStatusCode expected)
+    {
+        if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        using var response = await client.GetAsync("/admin/risk-thresholds");
+        Assert.Equal(expected, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdminThresholdsRequireCsrfValidatePersistRejectStaleAndDriveComputation()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Admin");
+        var html = await client.GetStringAsync("/admin/risk-thresholds");
+        var token = WebUtility.HtmlDecode(Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"").Groups[1].Value);
+        async Task<HttpResponseMessage> Save(string medium, string high, string severe, string revision, bool csrf = true)
+        {
+            var values = new Dictionary<string, string> { ["Thresholds.MediumThreshold"] = medium,
+                ["Thresholds.HighThreshold"] = high, ["Thresholds.SevereThreshold"] = severe, ["Revision"] = revision };
+            if (csrf) values["__RequestVerificationToken"] = token;
+            return await client.PostAsync("/admin/risk-thresholds", new FormUrlEncodedContent(values));
+        }
+        using var missing = await Save("5", "15", "30", "0", false); Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        using var invalid = await Save("20", "15", "30", "0"); Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using var valid = await Save("2", "4", "8", "0"); Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
+        using var stale = await Save("3", "5", "10", "0"); Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var saved = await db.RiskThresholdSettings.SingleAsync(); Assert.Equal(1, saved.Revision); Assert.Equal(2, saved.MediumThreshold);
+            var effective = await scope.ServiceProvider.GetRequiredService<RiskThresholdProvider>().GetAsync(); Assert.Equal(8, effective.SevereThreshold);
+        }
+        using var badVulnerability = await client.PostAsync("/admin/risk-thresholds/zones/1/vulnerability", new FormUrlEncodedContent(new Dictionary<string,string>
+            { ["__RequestVerificationToken"] = token, ["ElevationMeters"] = "5", ["DrainageDensityKmPerSqKm"] = "2", ["HistoryScore"] = "2" }));
+        Assert.Equal(HttpStatusCode.BadRequest, badVulnerability.StatusCode);
+        using var goodVulnerability = await client.PostAsync("/admin/risk-thresholds/zones/1/vulnerability", new FormUrlEncodedContent(new Dictionary<string,string>
+            { ["__RequestVerificationToken"] = token, ["ElevationMeters"] = "5", ["DrainageDensityKmPerSqKm"] = "2", ["HistoryScore"] = "0.3" }));
+        Assert.Equal(HttpStatusCode.OK, goodVulnerability.StatusCode);
+        using var recompute = await client.PostAsync("/admin/risk-thresholds/recompute", new FormUrlEncodedContent(new Dictionary<string,string> { ["__RequestVerificationToken"] = token }));
+        Assert.Equal(HttpStatusCode.OK, recompute.StatusCode);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var zone = await db.Zones.SingleAsync(); Assert.Equal(ZoneRiskLevel.Unknown, zone.RiskLevel); // no rainfall fixture
+            Assert.Equal(.3, zone.HistoryScore); Assert.Single(await db.RiskHistories.ToListAsync());
+            Assert.Contains("Fresh, aligned", zone.RiskFactorsJson);
+        }
+    }
+
+    [Theory]
+    [InlineData("Resident")]
+    [InlineData("Dispatcher")]
+    public async Task NonAdminCannotMutateThresholdsOrVulnerabilityOrEvaluate(string role)
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        foreach (var path in new[] { "/admin/risk-thresholds", "/admin/risk-thresholds/recompute", "/admin/risk-thresholds/zones/1/vulnerability" })
+        {
+            using var result = await client.PostAsync(path, new FormUrlEncodedContent(new Dictionary<string,string>()));
+            Assert.Equal(HttpStatusCode.Forbidden, result.StatusCode);
+        }
     }
 
     [Fact]

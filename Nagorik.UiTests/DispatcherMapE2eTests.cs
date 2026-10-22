@@ -39,6 +39,11 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(DispatcherMapController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<RiskPredictionService>();
+        builder.Services.AddScoped<WeatherReadingQueryService>();
+        builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
+        builder.Services.AddScoped<RiskComputationService>();
         builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
         {
@@ -52,6 +57,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); await db.Database.MigrateAsync();
             db.Users.Add(new User { Email = "dispatcher@map.invalid", Name = "Map fixture", Role = "Dispatcher", PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password, 4) });
+            db.Users.Add(new User { Email = "admin@map.invalid", Name = "Admin fixture", Role = "Admin", PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password, 4) });
             await db.SaveChangesAsync();
             await DevelopmentMapSeeder.SeedAsync(db, app.Environment, builder.Configuration);
             var owner = new User { Email = "resident@map.invalid", Name = "Fixture resident", Role = "Resident", PasswordHash = "not-a-login-fixture" };
@@ -64,6 +70,51 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
             await db.SaveChangesAsync();
         }
         await app.StartAsync(); url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+    }
+
+    [Fact]
+    public async Task AdminEditsThresholdsAndVulnerabilityThenEvaluatesInBrowser()
+    {
+        var options = new ChromeOptions(); options.AddArgument("--headless=new"); options.AddArgument("--window-size=1280,1000");
+        var service = ChromeDriverService.CreateDefaultService(); service.HideCommandPromptWindow = true;
+        browser = new ChromeDriver(service, options, TimeSpan.FromSeconds(90));
+        var wait = new WebDriverWait(browser, TimeSpan.FromSeconds(25));
+        browser.Navigate().GoToUrl(url + "/login.html?returnUrl=%2Fadmin%2Frisk-thresholds");
+        browser.FindElement(By.Id("email")).SendKeys("admin@map.invalid");
+        browser.FindElement(By.Id("password")).SendKeys(Password);
+        browser.FindElement(By.CssSelector("button")).Click();
+        wait.Until(d => d.FindElements(By.Id("Thresholds_MediumThreshold")).Count == 1);
+        void Set(string id, string value) { var input = browser.FindElement(By.Id(id)); input.Clear(); input.SendKeys(value); }
+        Set("Thresholds_MediumThreshold", "20");
+        browser.FindElement(By.CssSelector("form[action='/admin/risk-thresholds'] button")).Click();
+        wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("strictly increasing (medium"));
+        Set("Thresholds_MediumThreshold", "5");
+        browser.FindElement(By.CssSelector("form[action='/admin/risk-thresholds'] button")).Click();
+        wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Thresholds saved."));
+        Set("elevation-1", "0"); Set("density-1", "0"); Set("history-1", "1");
+        browser.FindElement(By.CssSelector("form[action$='/zones/1/vulnerability'] button")).Click();
+        wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Vulnerability saved."));
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var now = DateTime.UtcNow;
+            var hour = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerHour, DateTimeKind.Utc);
+            foreach (var forecast in new[] { false, true }) db.RainfallReadings.Add(new RainfallReading
+            { ZoneId = 1, TimestampUtc = hour, FetchedAtUtc = now, IsForecast = forecast,
+                Rainfall1HourMm = 10, Rainfall3HourMm = 30, Rainfall6HourMm = 60 });
+            await db.SaveChangesAsync();
+        }
+        var evaluateButton = browser.FindElement(By.CssSelector("form[action$='/recompute'] button"));
+        browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", evaluateButton);
+        evaluateButton.Click();
+        wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Evaluated 3 zones."));
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            Assert.Equal(ZoneRiskLevel.Severe, (await db.Zones.SingleAsync(z => z.Id == 1)).RiskLevel);
+            Assert.Equal(3, await db.RiskHistories.CountAsync());
+            Assert.Equal(1, (await db.RiskThresholdSettings.SingleAsync()).Revision);
+        }
     }
 
     [Theory]
@@ -84,7 +135,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         browser.FindElement(By.CssSelector("button")).Click();
         wait.Until(d => d.FindElements(By.Id("map-status")).Count == 1 && d.FindElement(By.Id("map-status")).Text.Contains("3 risk zones loaded"));
         Assert.Equal(3, browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Count);
-        Assert.Contains("sample risk levels", browser.FindElement(By.TagName("body")).Text);
+        Assert.Contains("uncalibrated rule baseline", browser.FindElement(By.TagName("body")).Text);
         Assert.True(browser.FindElements(By.LinkText("Dispatcher risk map")).Count > 0);
         wait.Until(d => d.FindElement(By.Id("map-drainage-status")).Text.Contains("6 drainage points loaded"));
         Assert.Equal(3, browser.FindElements(By.CssSelector(".drainage-blocked")).Count);

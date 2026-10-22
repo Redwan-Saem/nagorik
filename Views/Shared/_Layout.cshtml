@@ -63,6 +63,11 @@
                     </li>
                 }
 
+                @if (User.IsInRole("Admin"))
+                {
+                    <li><a href="/admin/risk-thresholds">Risk thresholds</a></li>
+                }
+
                 @if (User.IsInRole("Crew"))
                 {
                     <li class="nav-item">

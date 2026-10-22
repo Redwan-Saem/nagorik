@@ -20,6 +20,7 @@ namespace Nagorik.Api
         public DbSet<DrainagePoint> DrainagePoints => Set<DrainagePoint>();
         public DbSet<RainfallReading> RainfallReadings => Set<RainfallReading>();
         public DbSet<RiskHistory> RiskHistories => Set<RiskHistory>();
+        public DbSet<RiskThresholdSettings> RiskThresholdSettings => Set<RiskThresholdSettings>();
 
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<ReportArea> ReportAreas => Set<ReportArea>();
@@ -55,6 +56,16 @@ namespace Nagorik.Api
             Data.ZoneModelConfiguration.Configure(builder);
             Data.DrainagePointModelConfiguration.Configure(builder);
             Data.RainfallModelConfiguration.Configure(builder);
+            builder.Entity<RiskThresholdSettings>(e =>
+            {
+                e.Property(x => x.Revision).IsConcurrencyToken();
+                e.Property(x => x.UpdatedByUserId).IsRequired().HasMaxLength(100);
+                e.ToTable("RiskThresholdSettings", table =>
+                {
+                    table.HasCheckConstraint("CK_RiskThresholdSettings_Singleton", "\"Id\" = 1 AND \"Revision\" > 0");
+                    table.HasCheckConstraint("CK_RiskThresholdSettings_Order", "\"MediumThreshold\" > 0 AND \"MediumThreshold\" < \"HighThreshold\" AND \"HighThreshold\" < \"SevereThreshold\" AND \"SevereThreshold\" <= 10000");
+                });
+            });
             builder.Entity<RiskHistory>(e =>
             {
                 e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
