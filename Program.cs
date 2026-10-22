@@ -52,6 +52,8 @@ builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((servic
     client.MaxResponseContentBufferSize = 1024 * 1024;
 });
 builder.Services.AddHostedService<AlertBackgroundService>();
+builder.Services.AddScoped<IWeatherCollector, WeatherCollectionService>();
+builder.Services.AddHostedService<WeatherBackgroundService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
