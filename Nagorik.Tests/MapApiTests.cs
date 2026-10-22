@@ -155,6 +155,16 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task MyAreasPageRequiresResidentAndProvidesSecurityToken()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role","Dispatcher");
+        using var denied=await client.GetAsync("/resident/areas");Assert.Equal(HttpStatusCode.Forbidden,denied.StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        var html=await client.GetStringAsync("/resident/areas");Assert.Contains("__RequestVerificationToken",html);
+        Assert.Contains("/js/my-areas.js",html);Assert.Contains("My areas",html);
+    }
+
+    [Fact]
     public async Task ResidentAreasArePrivateIdempotentValidatedAndCsrfProtected()
     {
         using (var scope = app.Services.CreateScope())

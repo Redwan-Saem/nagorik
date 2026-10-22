@@ -15,3 +15,9 @@ taken only from the authenticated resident; clients cannot select another user.
 Subscribe is an atomic idempotent upsert. Unsubscribe removes the matching legacy
 opt-in too, preventing unexpected fallback alerts. Global notification preferences
 are never silently enabled by adding an area.
+
+T-035.3 (Rajiya): `/resident/areas` has a real zone picker, saved memberships,
+per-area alert toggles and remove buttons. It surfaces global opt-out state and
+links to existing global/device push settings. Optional GPS only suggests a zone;
+the user must confirm saving. Coordinates are matched locally and never uploaded.
+The page uses safe text nodes, CSRF-protected writes and explicit failure feedback.
