@@ -6,14 +6,49 @@
         const get = id => document.getElementById(id);
         if (!get('map-drainage-toggle')) return;
         const toggle = get('map-drainage-toggle'), status = get('map-drainage-status'), error = get('map-drainage-error');
-        let group, pending = false;
+        let group, pending = false, saving = false;
         function describe(feature, marker) {
             const properties = feature.properties || {};
             const popup = document.createElement('div'); popup.className = 'zone-popup';
             const title = document.createElement('h3'); title.textContent = `Drainage point #${feature.id}`; popup.appendChild(title);
             const zone = document.createElement('p'); zone.textContent = `Zone: ${properties.zoneName} (${properties.zoneCode})`; popup.appendChild(zone);
             const state = document.createElement('p'); state.textContent = `Status: ${properties.status}`; popup.appendChild(state);
+            const actions = document.createElement('div'); actions.className = 'drainage-actions';
+            for (const next of ['Clear', 'Blocked']) {
+                const button = document.createElement('button'); button.type = 'button';
+                button.textContent = `Mark ${next.toLowerCase()}`; button.dataset.drainageStatus = next;
+                button.disabled = next === properties.status;
+                button.addEventListener('click', () => updateDrainage(feature, next, actions)); actions.appendChild(button);
+            }
+            popup.appendChild(actions);
             marker.bindPopup(popup);
+        }
+        async function updateDrainage(feature, next, actions) {
+            if (saving) return;
+            const feedback = get('map-drainage-action'), failure = get('map-drainage-action-error');
+            failure.hidden = true;
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            if (!token) { failure.hidden = false; failure.textContent = 'Security token is missing. Refresh the page before editing drainage.'; return; }
+            saving = true; for (const button of actions.children) button.disabled = true;
+            feedback.textContent = `Updating drainage point #${feature.id}…`;
+            try {
+                const response = await fetcher(`/api/map/drainage-points/${feature.id}/status`, {
+                    method: 'PATCH', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', RequestVerificationToken: token },
+                    body: JSON.stringify({ status: next, expectedStatus: feature.properties.status })
+                });
+                if (!response.ok) throw new Error(response.status === 409 ? 'This drainage point changed. Refresh the map before editing again.' :
+                    response.status === 401 ? 'Session expired. Log in again.' :
+                    response.status === 403 ? 'Only dispatchers may change drainage status.' :
+                    'Update was not confirmed. Refresh the map before retrying.');
+                const result = await response.json();
+                if (result.id !== feature.id || result.status !== next) throw new Error('Update response was not confirmed. Refresh the map before retrying.');
+                await loadDrainage();
+                feedback.textContent = `Drainage point #${feature.id} marked ${next}.`;
+            } catch (problem) {
+                feedback.textContent = ''; failure.hidden = false;
+                failure.textContent = problem.message || 'Update was not confirmed. Refresh the map before retrying.';
+            } finally { saving = false; }
         }
         async function loadDrainage() {
             if (pending) return;

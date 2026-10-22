@@ -106,6 +106,29 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         wait.Until(d => d.FindElements(By.CssSelector(".report-marker, .report-cluster")).Count == 0);
         browser.ExecuteScript("arguments[0].click();", drainageToggle);
         wait.Until(d => d.FindElements(By.CssSelector(".drainage-marker")).Count == 6);
+        var clearMarker = browser.FindElement(By.CssSelector(".drainage-clear"));
+        var changedPoint = clearMarker.GetAttribute("title")!.Split('—')[0].Trim();
+        browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", clearMarker);
+        clearMarker.Click();
+        wait.Until(d => d.FindElements(By.CssSelector("button[data-drainage-status='Blocked']")).Any(b => b.Displayed));
+        browser.FindElement(By.CssSelector("button[data-drainage-status='Blocked']")).Click();
+        wait.Until(d => d.FindElement(By.Id("map-drainage-action")).Text.Contains("marked Blocked"));
+        wait.Until(d => d.FindElements(By.CssSelector(".drainage-blocked")).Count == 4);
+        Assert.Equal(2, browser.FindElements(By.CssSelector(".drainage-clear")).Count);
+        browser.Navigate().Refresh();
+        wait.Until(d => d.FindElements(By.CssSelector(".drainage-blocked")).Count == 4);
+        Assert.Equal(2, browser.FindElements(By.CssSelector(".drainage-clear")).Count);
+        // Hide reports after refresh before checking a zone under the markers.
+        reportToggle = browser.FindElement(By.Id("map-reports-toggle"));
+        browser.ExecuteScript("arguments[0].click();", reportToggle);
+        var blockedMarker = browser.FindElement(By.CssSelector($".drainage-blocked[title^='{changedPoint}']"));
+        browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", blockedMarker);
+        blockedMarker.Click();
+        wait.Until(d => d.FindElements(By.CssSelector("button[data-drainage-status='Clear']")).Any(b => b.Displayed));
+        browser.FindElement(By.CssSelector("button[data-drainage-status='Clear']")).Click();
+        wait.Until(d => d.FindElement(By.Id("map-drainage-action")).Text.Contains("marked Clear"));
+        wait.Until(d => d.FindElements(By.CssSelector(".drainage-clear")).Count == 3);
+        drainageToggle = browser.FindElement(By.Id("map-drainage-toggle"));
         // A drainage marker sits at the sample polygon's center; hide that layer
         // while testing the underlying polygon rather than bypassing click targeting.
         browser.ExecuteScript("arguments[0].click();", drainageToggle);

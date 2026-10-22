@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -130,6 +132,87 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal("FeatureCollection", json.RootElement.GetProperty("type").GetString());
         Assert.Equal(0, json.RootElement.GetProperty("features").GetArrayLength());
         Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
+    }
+
+    private async Task<string> SecurityTokenAsync()
+    {
+        var html = await client.GetStringAsync("/dispatcher/map");
+        var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
+        Assert.True(token.Success);
+        return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    private async Task<HttpResponseMessage> ChangeAsync(int id, string status, string expected, string? token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/map/drainage-points/{id}/status")
+            { Content = JsonContent.Create(new { status, expectedStatus = expected }) };
+        if (token != null) request.Headers.Add("RequestVerificationToken", token);
+        return await client.SendAsync(request);
+    }
+
+    [Fact]
+    public async Task DrainageStatusWritesPersistAndRejectStaleExpectedState()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        var token = await SecurityTokenAsync();
+        using var first = await ChangeAsync(1, "Clear", "Blocked", token);
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        using var stale = await ChangeAsync(1, "Blocked", "Blocked", token);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        using var json = JsonDocument.Parse(await client.GetStringAsync("/api/map/drainage-points"));
+        Assert.Equal("Clear", json.RootElement.GetProperty("features")[0].GetProperty("properties").GetProperty("status").GetString());
+        using var restored = await ChangeAsync(1, "Blocked", "Clear", token);
+        Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
+    }
+
+    [Fact]
+    public async Task StatusWriteRequiresValidAntiforgeryToken()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var missing = await ChangeAsync(1, "Clear", "Blocked", null);
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);
+        using var forged = await ChangeAsync(1, "Clear", "Blocked", "forged");
+        Assert.Equal(HttpStatusCode.BadRequest, forged.StatusCode);
+        using var json = JsonDocument.Parse(await client.GetStringAsync("/api/map/drainage-points"));
+        Assert.Equal("Blocked", json.RootElement.GetProperty("features")[0].GetProperty("properties").GetProperty("status").GetString());
+    }
+
+    [Theory]
+    [InlineData("Unknown", "Blocked")]
+    [InlineData("Broken", "Blocked")]
+    [InlineData("", "Blocked")]
+    [InlineData("Clear", "Invalid")]
+    [InlineData("Clear", "")]
+    public async Task InvalidStatusPayloadsAreRejected(string status, string expected)
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var result = await ChangeAsync(1, status, expected, await SecurityTokenAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, result.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("CityOfficial", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    public async Task OtherRolesCannotWriteDrainageStatus(string? role, HttpStatusCode expected)
+    {
+        if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        using var result = await ChangeAsync(1, "Clear", "Blocked", null);
+        Assert.Equal(expected, result.StatusCode);
+    }
+
+    [Fact]
+    public async Task MissingPointReturnsNotFoundAndZeroIdIsInvalid()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        var token = await SecurityTokenAsync();
+        using var missing = await ChangeAsync(999, "Clear", "Unknown", token);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        using var invalid = await ChangeAsync(0, "Clear", "Unknown", token);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
 
     public async Task DisposeAsync()

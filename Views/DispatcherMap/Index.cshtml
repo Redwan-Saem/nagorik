@@ -8,6 +8,7 @@
 }
 <section id="dispatcher-risk-map" aria-labelledby="map-heading">
     <h1 id="map-heading">Dispatcher risk map</h1>
+    @Html.AntiForgeryToken()
     <p>Inspect zone boundaries and stored waterlogging risk.</p>
     <p class="alert alert-warn">Development zones labelled “sample boundary” use synthetic boundaries and sample risk levels. They are not live forecasts or official geographic boundaries.</p>
     <div class="map-toolbar">
@@ -30,6 +31,8 @@
     <p class="muted">Drainage icons: ✓ Clear · ! Blocked · ? Unknown</p>
     <p id="map-drainage-status" role="status" aria-live="polite"></p>
     <p id="map-drainage-error" class="alert alert-bad" role="alert" hidden></p>
+    <p id="map-drainage-action" role="status" aria-live="polite"></p>
+    <p id="map-drainage-action-error" class="alert alert-bad" role="alert" hidden></p>
     <p id="map-reports-status" role="status" aria-live="polite"></p>
     <p id="map-reports-error" class="alert alert-bad" role="alert" hidden></p>
     <div id="risk-zone-map" tabindex="0" aria-label="Interactive Dhaka risk-zone map"></div>

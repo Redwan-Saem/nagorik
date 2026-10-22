@@ -8,7 +8,7 @@ const drainage = { type: 'FeatureCollection', features: [{ type: 'Feature', id: 
 function setup(fetcher, reportsEnabled = false) {
     const context = {}; runInNewContext(script, context);
     const nodes = new Map(), layers = [], markers = [], requests = [];
-    const element = () => ({ children: [], textContent: '', appendChild(child) { this.children.push(child); }, addEventListener(name, handler) { this[name] = handler; }, set innerHTML(_) { assert.fail('Use text nodes for untrusted data'); } });
+    const element = () => ({ children: [], dataset: {}, textContent: '', appendChild(child) { this.children.push(child); }, addEventListener(name, handler) { this[name] = handler; }, set innerHTML(_) { assert.fail('Use text nodes for untrusted data'); } });
     const get = id => { if (id === 'map-reports-toggle' && !reportsEnabled) return null; if (!nodes.has(id)) nodes.set(id, { ...element(), checked: true }); return nodes.get(id); };
     const map = { added: 0, removed: 0, closePopup() {}, removeLayer() { this.removed++; } };
     const clusters = [];
@@ -16,7 +16,7 @@ function setup(fetcher, reportsEnabled = false) {
         divIcon: options => options, marker(latlng, options) { const marker = { latlng, options, bindPopup(popup) { this.popup = popup; } }; markers.push(marker); return marker; },
         geoJSON(data, options) { for (const feature of data.features) { const point = options.pointToLayer(feature, [feature.geometry.coordinates[1], feature.geometry.coordinates[0]]); options.onEachFeature(feature, point); }
             const layer = { addTo() { map.added++; return this; } }; layers.push(layer); return layer; } };
-    const ui = context.DispatcherMapLayers.mount({ map, document: { getElementById: get, createElement: element }, leaflet,
+    const ui = context.DispatcherMapLayers.mount({ map, document: { getElementById: get, createElement: element, querySelector: () => ({ value: 'fixture-csrf-token' }) }, leaflet,
         fetcher: async (url, options) => { requests.push({ url, options }); return fetcher(url, options); } });
     return { ui, get, map, layers, markers, requests, clusters, api: context.DispatcherMapLayers };
 }
@@ -73,4 +73,33 @@ test('report loading failure does not break drainage layer', async () => {
     const state = setup(async url => url.endsWith('/reports') ? { ok: false, status: 500 } : { ok: true, json: async () => drainage }, true);
     await state.ui.ready; assert.equal(state.get('map-reports-error').hidden, false);
     assert.match(state.get('map-drainage-status').textContent, /1 drainage points/);
+});
+
+test('status editing sends CSRF token and expected state then reloads markers', async () => {
+    const state = setup(async (url, options) => options.method === 'PATCH' ? { ok: true, json: async () => ({ id: 1, status: 'Clear' }) } : { ok: true, json: async () => drainage });
+    await state.ui.ready;
+    const clear = state.markers[0].popup.children.at(-1).children[0];
+    await clear.click();
+    const request = state.requests.find(r => r.options.method === 'PATCH');
+    assert.equal(request.url, '/api/map/drainage-points/1/status');
+    assert.equal(request.options.headers.RequestVerificationToken, 'fixture-csrf-token');
+    assert.deepEqual(JSON.parse(request.options.body), { status: 'Clear', expectedStatus: 'Blocked' });
+    assert.match(state.get('map-drainage-action').textContent, /marked Clear/);
+    assert.equal(state.layers.length, 2);
+});
+test('double clicks cannot issue a second status write while pending', async () => {
+    let finish;
+    const state = setup(async (url, options) => options.method === 'PATCH' ? new Promise(resolve => { finish = resolve; }) : { ok: true, json: async () => drainage });
+    await state.ui.ready;
+    const clear = state.markers[0].popup.children.at(-1).children[0];
+    const first = clear.click(); await clear.click();
+    assert.equal(state.requests.filter(r => r.options.method === 'PATCH').length, 1);
+    finish({ ok: true, json: async () => ({ id: 1, status: 'Clear' }) }); await first;
+});
+for (const status of [400, 401, 403, 409, 500]) test(`status HTTP ${status} requires refresh without blind retry`, async () => {
+    const state = setup(async (url, options) => options.method === 'PATCH' ? { ok: false, status } : { ok: true, json: async () => drainage });
+    await state.ui.ready; await state.markers[0].popup.children.at(-1).children[0].click();
+    assert.equal(state.get('map-drainage-action-error').hidden, false);
+    assert.equal(state.requests.filter(r => r.options.method === 'PATCH').length, 1);
+    assert.equal(state.layers.length, 1);
 });
