@@ -39,6 +39,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(DispatcherMapController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddScoped<CrewMapQueryService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();

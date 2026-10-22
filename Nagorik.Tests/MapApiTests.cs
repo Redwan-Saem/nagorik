@@ -40,6 +40,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(MapApiController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddScoped<CrewMapQueryService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
@@ -88,7 +89,7 @@ public class MapApiTests : IAsyncLifetime
     public async Task BothPageAndDataRequireDispatcherAndDoNotLeakMapToOtherRoles(string? role, HttpStatusCode expected)
     {
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
-        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports", "/api/map/weather" })
+        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports", "/api/map/weather", "/api/map/crews" })
         {
             using var response = await client.GetAsync(route);
             Assert.Equal(expected, response.StatusCode);
@@ -145,6 +146,28 @@ public class MapApiTests : IAsyncLifetime
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    [Fact]
+    public async Task CrewGeoJsonOmitsUnknownLocationsAndReportsBusyAndStaleWithoutUserIdentity()
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var located = new Crew { Name = "Located", User = new User { Email = "private@crew.invalid" },
+                LastLatitude = 23.7, LastLongitude = 90.3, LastSeenAtUtc = DateTime.UtcNow.AddHours(-1) };
+            db.Crews.AddRange(located, new Crew { Name = "Unknown", User = new User { Email = "unknown@crew.invalid" } });
+            db.Reports.Add(new Report { User = new User { Email = "owner@crew.invalid" }, AssignedCrew = located, Status = ReportStatus.InProgress });
+            await db.SaveChangesAsync();
+        }
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        var body = await client.GetStringAsync("/api/map/crews"); using var json = JsonDocument.Parse(body);
+        Assert.Equal(1, json.RootElement.GetProperty("omittedCount").GetInt32());
+        var feature = json.RootElement.GetProperty("features")[0];
+        Assert.Equal(90.3, feature.GetProperty("geometry").GetProperty("coordinates")[0].GetDouble());
+        Assert.True(feature.GetProperty("properties").GetProperty("isBusy").GetBoolean());
+        Assert.True(feature.GetProperty("properties").GetProperty("isStale").GetBoolean());
+        Assert.DoesNotContain("private@", body); Assert.DoesNotContain("userId", body);
     }
 
     [Theory]
