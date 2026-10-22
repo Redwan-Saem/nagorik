@@ -828,6 +828,55 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("WaterloggingRisks");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.Zone", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BoundaryGeoJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .UseCollation("NOCASE");
+
+                    b.Property<DateTime?>("LastComputedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RiskLevel")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Unknown");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("RiskLevel", "LastComputedAtUtc");
+
+                    b.ToTable("Zones", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Zones_BoundaryGeoJson", "CASE WHEN json_valid(\"BoundaryGeoJson\") THEN COALESCE(json_extract(\"BoundaryGeoJson\", '$.type') IN ('Polygon', 'MultiPolygon') AND json_type(\"BoundaryGeoJson\", '$.coordinates') = 'array' AND json_array_length(\"BoundaryGeoJson\", '$.coordinates') > 0, 0) ELSE 0 END");
+
+                            t.HasCheckConstraint("CK_Zones_Code", "length(trim(\"Code\")) BETWEEN 1 AND 40 AND \"Code\" = trim(\"Code\")");
+
+                            t.HasCheckConstraint("CK_Zones_Name", "length(trim(\"Name\")) BETWEEN 1 AND 100");
+
+                            t.HasCheckConstraint("CK_Zones_RiskLevel", "\"RiskLevel\" IN ('Unknown', 'Low', 'Medium', 'High', 'Severe')");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.ZoneMapData", b =>
                 {
                     b.Property<int>("Id")
