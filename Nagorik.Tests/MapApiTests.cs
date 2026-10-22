@@ -155,6 +155,50 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ResidentAreasArePrivateIdempotentValidatedAndCsrfProtected()
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Users.AddRange(new User { Id = 1, Role = "Resident" }, new User { Id = 2, Role = "Resident" });
+            db.ResidentZoneSubscriptions.Add(new() { ResidentId = 2, ZoneId = 1 });
+            db.AreaSubscriptions.Add(new() { UserId = "1", ZoneId = "Z1" }); await db.SaveChangesAsync();
+        }
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Resident");
+        using (var json = JsonDocument.Parse(await client.GetStringAsync("/api/resident/areas"))) Assert.Equal(0, json.RootElement.GetProperty("subscriptions").GetArrayLength());
+        using var noToken = await client.PutAsJsonAsync("/api/resident/areas/1", new { alertsEnabled = true });
+        Assert.Equal(HttpStatusCode.BadRequest, noToken.StatusCode);
+        using var security = JsonDocument.Parse(await client.GetStringAsync("/api/resident/areas/security-token"));
+        var token = security.RootElement.GetProperty("requestToken").GetString();
+        async Task<HttpResponseMessage> Write(HttpMethod method, int id, object? payload = null)
+        {
+            using var request = new HttpRequestMessage(method,$"/api/resident/areas/{id}");
+            request.Headers.Add("RequestVerificationToken", token);
+            if (payload != null) request.Content = JsonContent.Create(payload);
+            return await client.SendAsync(request);
+        }
+        using var subscribed = await Write(HttpMethod.Put,1,new { alertsEnabled = true, residentId = 2 }); Assert.Equal(HttpStatusCode.OK,subscribed.StatusCode);
+        using var repeated = await Write(HttpMethod.Put,1,new { alertsEnabled = true }); Assert.Equal(HttpStatusCode.OK,repeated.StatusCode);
+        using var invalid = await Write(HttpMethod.Put,1,new { }); Assert.Equal(HttpStatusCode.BadRequest,invalid.StatusCode);
+        using var unknown = await Write(HttpMethod.Put,999,new { alertsEnabled = true }); Assert.Equal(HttpStatusCode.NotFound,unknown.StatusCode);
+        using var disabled = await Write(HttpMethod.Put,1,new { alertsEnabled = false }); Assert.Equal(HttpStatusCode.OK,disabled.StatusCode);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); Assert.Equal(2,await db.ResidentZoneSubscriptions.CountAsync());
+            Assert.False((await db.ResidentZoneSubscriptions.SingleAsync(s=>s.ResidentId==1)).AlertsEnabled);
+        }
+        using var removed = await Write(HttpMethod.Delete,1); Assert.Equal(HttpStatusCode.NoContent,removed.StatusCode);
+        using var again = await Write(HttpMethod.Delete,1); Assert.Equal(HttpStatusCode.NoContent,again.StatusCode);
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); Assert.Equal(2,(await db.ResidentZoneSubscriptions.SingleAsync()).ResidentId);
+            Assert.Empty(await db.AreaSubscriptions.ToListAsync());
+        }
+        client.DefaultRequestHeaders.Remove("X-Test-Role"); client.DefaultRequestHeaders.Add("X-Test-Role","Dispatcher");
+        using var forbidden = await client.GetAsync("/api/resident/areas"); Assert.Equal(HttpStatusCode.Forbidden,forbidden.StatusCode);
+    }
+
+    [Fact]
     public async Task VerificationRequiresDispatcherCsrfAndRevisionAndControlsPublicVisibility()
     {
         using (var scope = app.Services.CreateScope())
