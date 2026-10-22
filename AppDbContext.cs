@@ -114,6 +114,11 @@ namespace Nagorik.Api
             // Report configuration
             builder.Entity<Report>(e =>
             {
+                e.Property(r => r.PublicVerificationRevision).IsConcurrencyToken();
+                e.HasOne<User>().WithMany().HasForeignKey(r => r.PublicVerifiedByUserId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(r => new { r.IsPubliclyVerified, r.CreatedAt });
+                e.ToTable("Reports", table => table.HasCheckConstraint("CK_Reports_PublicVerification",
+                    "\"PublicVerificationRevision\" >= 0 AND (\"IsPubliclyVerified\" = 0 OR (\"PublicVerifiedByUserId\" IS NOT NULL AND \"PublicVerifiedAtUtc\" IS NOT NULL))"));
                 e.HasKey(r => r.Id);
 
                 e.Property(r => r.Title)

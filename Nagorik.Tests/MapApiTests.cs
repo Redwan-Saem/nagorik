@@ -40,6 +40,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(MapApiController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddScoped<PublicMapQueryService>();
         builder.Services.AddScoped<CrewMapQueryService>();
         builder.Services.AddScoped<FlaggedDrainageQueryService>();
         builder.Services.AddScoped<DrainageDispatchService>();
@@ -151,6 +152,30 @@ public class MapApiTests : IAsyncLifetime
         var token = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"");
         Assert.True(token.Success);
         return WebUtility.HtmlDecode(token.Groups[1].Value);
+    }
+
+    [Fact]
+    public async Task PublicMapIsAnonymousAndDoesNotExposeUnverifiedOrPrivateFields()
+    {
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var owner = new User { Name = "Secret owner", Email = "secret@map.invalid" }; db.Users.Add(owner); await db.SaveChangesAsync();
+            db.Reports.AddRange(new Report { UserId = owner.Id, Title = "Unverified secret", Latitude = 23.7, Longitude = 90.3 },
+                new Report { UserId = owner.Id, Title = "Private title", Description = "Private description", Location = "Private address",
+                    Latitude = 23.8, Longitude = 90.4, IsPubliclyVerified = true, PublicVerifiedByUserId = owner.Id, PublicVerifiedAtUtc = DateTime.UtcNow });
+            db.DrainagePoints.Add(new() { ZoneId = 1, Latitude = 23.8, Longitude = 90.4, Status = DrainageStatus.Clear });
+            await db.SaveChangesAsync();
+        }
+        foreach (var path in new[] { "/api/public/map/risk-zones", "/api/public/map/reports", "/api/public/map/blockages" })
+        {
+            using var response = await client.GetAsync(path); Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal("application/geo+json", response.Content.Headers.ContentType!.MediaType);
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("Private", body); Assert.DoesNotContain("secret@", body); Assert.DoesNotContain("Unverified secret", body);
+            Assert.DoesNotContain("crew", body, StringComparison.OrdinalIgnoreCase); Assert.DoesNotContain("photoUrl", body);
+            if (!path.EndsWith("risk-zones")) { using var json = JsonDocument.Parse(body); Assert.Equal(1, json.RootElement.GetProperty("features").GetArrayLength()); }
+        }
     }
 
     [Fact]

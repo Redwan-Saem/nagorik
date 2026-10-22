@@ -281,6 +281,9 @@ namespace Nagorik.Api.Migrations
                     b.Property<bool>("IsPossibleDuplicate")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsPubliclyVerified")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("REAL");
 
@@ -296,6 +299,16 @@ namespace Nagorik.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasDefaultValueSql("'[]'");
+
+                    b.Property<long>("PublicVerificationRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("PublicVerifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PublicVerifiedByUserId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReferenceNo")
                         .HasMaxLength(32)
@@ -325,6 +338,8 @@ namespace Nagorik.Api.Migrations
 
                     b.HasIndex("AssignedCrewId");
 
+                    b.HasIndex("PublicVerifiedByUserId");
+
                     b.HasIndex("ReferenceNo")
                         .IsUnique()
                         .HasFilter("\"ReferenceNo\" IS NOT NULL");
@@ -333,6 +348,8 @@ namespace Nagorik.Api.Migrations
 
                     b.HasIndex("CreatedAt", "Id")
                         .IsDescending();
+
+                    b.HasIndex("IsPubliclyVerified", "CreatedAt");
 
                     b.HasIndex("AreaId", "CreatedAt", "Id")
                         .IsDescending(false, true, true);
@@ -361,6 +378,8 @@ namespace Nagorik.Api.Migrations
                             t.HasCheckConstraint("CK_Reports_HighRiskUrgency", "\"AnomalyType\" IS NULL OR \"AnomalyType\" NOT IN ('ExposedWire', 'GasLeak', 'FallenPole') OR \"Urgency\" IN (2, 3)");
 
                             t.HasCheckConstraint("CK_Reports_PhotoPaths", "CASE WHEN json_valid(\"PhotoPaths\") THEN json_type(\"PhotoPaths\") = 'array' AND json_array_length(\"PhotoPaths\") <= 3 AND (json_type(\"PhotoPaths\", '$[0]') IS NULL OR (json_type(\"PhotoPaths\", '$[0]') = 'text' AND length(trim(json_extract(\"PhotoPaths\", '$[0]'), char(9) || char(10) || char(13) || ' ')) > 0)) AND (json_type(\"PhotoPaths\", '$[1]') IS NULL OR (json_type(\"PhotoPaths\", '$[1]') = 'text' AND length(trim(json_extract(\"PhotoPaths\", '$[1]'), char(9) || char(10) || char(13) || ' ')) > 0)) AND (json_type(\"PhotoPaths\", '$[2]') IS NULL OR (json_type(\"PhotoPaths\", '$[2]') = 'text' AND length(trim(json_extract(\"PhotoPaths\", '$[2]'), char(9) || char(10) || char(13) || ' ')) > 0)) ELSE 0 END");
+
+                            t.HasCheckConstraint("CK_Reports_PublicVerification", "\"PublicVerificationRevision\" >= 0 AND (\"IsPubliclyVerified\" = 0 OR (\"PublicVerifiedByUserId\" IS NOT NULL AND \"PublicVerifiedAtUtc\" IS NOT NULL))");
 
                             t.HasCheckConstraint("CK_Reports_ReferenceNo", "\"ReferenceNo\" IS NULL OR (length(\"ReferenceNo\") BETWEEN 9 AND 32 AND substr(\"ReferenceNo\", 1, 3) = 'UA-' AND substr(\"ReferenceNo\", 4) NOT GLOB '*[^0-9]*')");
 
@@ -1199,6 +1218,11 @@ namespace Nagorik.Api.Migrations
                     b.HasOne("Nagorik.Api.Models.Crew", "AssignedCrew")
                         .WithMany()
                         .HasForeignKey("AssignedCrewId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("PublicVerifiedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Nagorik.Api.Models.User", "User")

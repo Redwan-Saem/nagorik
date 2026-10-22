@@ -42,6 +42,7 @@ builder.Services.AddScoped<OfficialReportQueryService>();
 builder.Services.AddScoped<UtilityRoutingService>();
 builder.Services.AddScoped<RiskZoneQueryService>();
 builder.Services.AddScoped<MapFeatureQueryService>();
+builder.Services.AddScoped<PublicMapQueryService>();
 builder.Services.AddScoped<CrewMapQueryService>();
 builder.Services.AddScoped<FlaggedDrainageQueryService>();
 builder.Services.AddScoped<DrainageDispatchService>();
