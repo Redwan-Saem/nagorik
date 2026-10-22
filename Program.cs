@@ -67,7 +67,9 @@ builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((servic
     client.Timeout = Timeout.InfiniteTimeSpan;
     client.MaxResponseContentBufferSize = 1024 * 1024;
 });
-builder.Services.AddHostedService<AlertBackgroundService>();
+// Canonical rule-risk events replace legacy seeded-risk polling by default.
+if (builder.Configuration.GetValue<bool>("Alerts:UseLegacyRiskWorker"))
+    builder.Services.AddHostedService<AlertBackgroundService>();
 builder.Services.AddScoped<IWeatherCollector, WeatherCollectionService>();
 builder.Services.AddScoped<WeatherReadingQueryService>();
 builder.Services.AddHostedService<WeatherBackgroundService>();

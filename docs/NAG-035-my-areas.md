@@ -21,3 +21,10 @@ per-area alert toggles and remove buttons. It surfaces global opt-out state and
 links to existing global/device push settings. Optional GPS only suggests a zone;
 the user must confirm saving. Coordinates are matched locally and never uploaded.
 The page uses safe text nodes, CSRF-protected writes and explicit failure feedback.
+
+T-035.4 (Labiba): risk-change recipients combine enabled canonical memberships and
+legacy opt-ins without duplicate users. A canonical disabled choice overrides the
+legacy opt-in; non-Residents and globally opted-out users are excluded. The old
+seeded-risk background worker is disabled by default to avoid parallel alerts;
+`Alerts__UseLegacyRiskWorker=true` is an explicit legacy compatibility switch.
+The canonical worker still uses the existing `INotificationService`/push delivery.

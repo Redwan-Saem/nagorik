@@ -4,12 +4,19 @@ namespace Nagorik.Api.Services;
 
 public class ZoneRiskAlertRecipients(AppDbContext db)
 {
-    public virtual async Task<IReadOnlyList<string>> ListAsync(int zoneId, string code, CancellationToken ct = default) =>
-        await (from subscription in db.AreaSubscriptions
+    public virtual async Task<IReadOnlyList<string>> ListAsync(int zoneId, string code, CancellationToken ct = default)
+    {
+        var canonical = await db.ResidentZoneSubscriptions.AsNoTracking().Where(s => s.ZoneId == zoneId && s.AlertsEnabled &&
+            s.Resident.Role == "Resident" && db.NotificationPreferences.Any(p => p.UserId == s.ResidentId.ToString() && p.NotificationsEnabled))
+            .Select(s => s.ResidentId.ToString()).ToListAsync(ct);
+        var legacy = await (from subscription in db.AreaSubscriptions
                join preference in db.NotificationPreferences on subscription.UserId equals preference.UserId
                join user in db.Users on subscription.UserId equals user.Id.ToString()
-               where subscription.ZoneId == code && preference.NotificationsEnabled && user.Role == "Resident"
+               where subscription.ZoneId == code && preference.NotificationsEnabled && user.Role == "Resident" &&
+                   !db.ResidentZoneSubscriptions.Any(s => s.ResidentId == user.Id && s.ZoneId == zoneId)
                select subscription.UserId).Distinct().ToListAsync(ct);
+        return canonical.Concat(legacy).Distinct(StringComparer.Ordinal).ToList();
+    }
 }
 
 public sealed class ZoneRiskAlertService(AppDbContext db, ZoneRiskAlertRecipients recipients,
