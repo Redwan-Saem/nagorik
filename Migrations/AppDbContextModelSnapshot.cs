@@ -946,6 +946,9 @@ namespace Nagorik.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RiskFactorsJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("RiskLevel")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -972,6 +975,8 @@ namespace Nagorik.Api.Migrations
                             t.HasCheckConstraint("CK_Zones_History", "\"HistoryScore\" IS NULL OR \"HistoryScore\" BETWEEN 0 AND 1");
 
                             t.HasCheckConstraint("CK_Zones_Name", "length(trim(\"Name\")) BETWEEN 1 AND 100");
+
+                            t.HasCheckConstraint("CK_Zones_RiskFactors", "\"RiskFactorsJson\" IS NULL OR json_valid(\"RiskFactorsJson\")");
 
                             t.HasCheckConstraint("CK_Zones_RiskLevel", "\"RiskLevel\" IN ('Unknown', 'Low', 'Medium', 'High', 'Severe')");
                         });

@@ -45,6 +45,11 @@ builder.Services.AddScoped<MapFeatureQueryService>();
 builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<RiskPredictionService>();
+builder.Services.AddScoped<RiskThresholdProvider>();
+builder.Services.AddScoped<RiskComputationService>();
+builder.Services.AddOptions<RiskJobOptions>().Bind(builder.Configuration.GetSection("RiskJob"))
+    .ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddHostedService<RiskBackgroundService>();
 builder.Services.AddOptions<RiskScoringOptions>().Bind(builder.Configuration.GetSection("RiskScoring"))
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<WeatherOptions>().Bind(builder.Configuration.GetSection("Weather"))

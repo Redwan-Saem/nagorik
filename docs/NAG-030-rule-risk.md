@@ -22,3 +22,14 @@ lower scores are Low. Configure the `RiskScoring` section (or environment keys
 Missing vulnerability, stale/missing weather, or unaligned windows produce Unknown.
 These coefficients are transparent demonstration rules, not scientifically
 calibrated waterlogging probabilities. Open-Meteo rainfall is model data.
+
+## T-030.3 — scheduled computation (Redwan)
+
+At startup and every five minutes `RiskBackgroundService` evaluates all zones,
+publishing their level, evaluation timestamp and exact input/threshold snapshots
+in one transaction. Missing or stale inputs yield Unknown with a reason, not a
+fresh Low value. Failures are logged and retried next cycle. Configure
+`RiskJob__Enabled=false` to disable or `RiskJob__PollMinutes` (1..1440).
+Weather and risk jobs are independent: new weather appears on the next risk cycle.
+The old `WaterloggingRisks` and `ZoneMapData` stores are not updated; this story
+uses canonical `Zones`. Legacy resident alerts are a later story.
