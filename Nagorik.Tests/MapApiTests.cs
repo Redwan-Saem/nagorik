@@ -81,7 +81,7 @@ public class MapApiTests : IAsyncLifetime
     public async Task BothPageAndDataRequireDispatcherAndDoNotLeakMapToOtherRoles(string? role, HttpStatusCode expected)
     {
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
-        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points" })
+        foreach (var route in new[] { "/dispatcher/map", "/api/map/risk-zones", "/api/map/drainage-points", "/api/map/reports" })
         {
             using var response = await client.GetAsync(route);
             Assert.Equal(expected, response.StatusCode);
@@ -117,6 +117,19 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal("Blocked", point.GetProperty("properties").GetProperty("status").GetString());
         Assert.Equal("Z1", point.GetProperty("properties").GetProperty("zoneCode").GetString());
         Assert.Equal(0, json.RootElement.GetProperty("omittedCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task ReportMapEndpointReturnsEmptyGeoJsonWithNoReports()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
+        using var response = await client.GetAsync("/api/map/reports");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/geo+json", response.Content.Headers.ContentType!.MediaType);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("FeatureCollection", json.RootElement.GetProperty("type").GetString());
+        Assert.Equal(0, json.RootElement.GetProperty("features").GetArrayLength());
+        Assert.Contains("no-store", response.Headers.CacheControl!.ToString());
     }
 
     public async Task DisposeAsync()
