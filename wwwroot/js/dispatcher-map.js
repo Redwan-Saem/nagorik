@@ -14,6 +14,22 @@
         }).addTo(map);
         tiles.on('tileerror', () => { get('map-tile-status').textContent = 'Background tiles are unavailable. Zone boundaries can still be inspected.'; });
         let layer, busy = false;
+        const toggle = get('map-zone-toggle');
+        function describeZone(feature, zoneLayer) {
+            const properties = feature.properties || {};
+            const popup = document.createElement('div'); popup.className = 'zone-popup';
+            const title = document.createElement('h3'); title.textContent = `${properties.name || 'Unnamed zone'} (${properties.code || feature.id})`;
+            popup.appendChild(title);
+            const risk = document.createElement('p'); risk.textContent = `Risk: ${properties.riskLevel || 'Unknown'}`; popup.appendChild(risk);
+            const time = document.createElement('p');
+            const computed = properties.lastComputedAtUtc ? new Date(properties.lastComputedAtUtc) : null;
+            time.textContent = computed && !Number.isNaN(computed.getTime())
+                ? `Last computed: ${computed.toLocaleString()} (${computed.toISOString()})`
+                : 'Not computed yet; any displayed sample level is not a live prediction.';
+            popup.appendChild(time);
+            zoneLayer.bindPopup(popup);
+            zoneLayer.on('click', () => { get('map-zone-details').textContent = `${title.textContent}. ${risk.textContent}. ${time.textContent}`; });
+        }
         async function load() {
             if (busy) return;
             busy = true; refresh.disabled = true; error.hidden = true; get('map-login').hidden = true;
@@ -27,12 +43,14 @@
                 if (!response.ok) throw new Error('Risk zones could not be loaded. Choose Refresh zones to retry.');
                 const data = await response.json();
                 if (data?.type !== 'FeatureCollection' || !Array.isArray(data.features)) throw new Error('The server returned an invalid map response.');
-                const next = leaflet.geoJSON(data, { style: feature => ({
+                const next = leaflet.geoJSON(data, { onEachFeature: describeZone, style: feature => ({
                     color: colorForRisk(feature.properties.riskLevel), fillColor: colorForRisk(feature.properties.riskLevel),
                     weight: 2, fillOpacity: .35
                 }) });
                 if (layer) map.removeLayer(layer);
-                layer = next; layer.addTo(map);
+                layer = next;
+                if (toggle.checked) layer.addTo(map);
+                get('map-zone-details').textContent = 'Select a zone on the map to inspect its risk and last computation time.';
                 if (data.features.length && layer.getBounds().isValid()) map.fitBounds(layer.getBounds(), { padding: [25, 25], maxZoom: 14 });
                 status.textContent = data.features.length ? `${data.features.length} risk zones loaded.` : 'No risk zones are available yet.';
                 if (data.invalidZoneCount > 0) status.textContent += ` ${data.invalidZoneCount} invalid zone boundaries were omitted.`;
@@ -42,6 +60,11 @@
             } finally { busy = false; refresh.disabled = false; }
         }
         refresh.addEventListener('click', load);
+        toggle.addEventListener('change', () => {
+            if (!layer) return;
+            if (toggle.checked) layer.addTo(map);
+            else { map.closePopup(); map.removeLayer(layer); }
+        });
         const ready = load();
         return { map, ready, reload: load };
     }

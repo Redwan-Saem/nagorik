@@ -76,6 +76,19 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         Assert.Contains("sample risk levels", browser.FindElement(By.TagName("body")).Text);
         var colors = browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Select(p => p.GetAttribute("fill")).ToArray();
         Assert.Contains("#dc2626", colors); Assert.Contains("#d97706", colors); Assert.Contains("#15803d", colors);
+        Assert.Contains("Unknown", browser.FindElement(By.Id("map-legend")).Text);
+        Assert.Contains("Severe", browser.FindElement(By.Id("map-legend")).Text);
+        var polygon = browser.FindElement(By.CssSelector("#risk-zone-map path.leaflet-interactive"));
+        browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", polygon);
+        polygon.Click();
+        wait.Until(d => d.FindElements(By.CssSelector(".leaflet-popup-content")).Any(p => p.Text.Contains("Not computed yet")));
+        Assert.Contains("Not computed yet", browser.FindElement(By.CssSelector(".leaflet-popup-content")).Text);
+        Assert.Contains("Risk:", browser.FindElement(By.Id("map-zone-details")).Text);
+        var toggle = browser.FindElement(By.Id("map-zone-toggle"));
+        browser.ExecuteScript("arguments[0].click();", toggle);
+        wait.Until(d => d.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Count == 0);
+        browser.ExecuteScript("arguments[0].click();", toggle);
+        wait.Until(d => d.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Count == 3);
         Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);
     }
 

@@ -11,12 +11,24 @@
     <p class="alert alert-warn">Development zones labelled “sample boundary” use synthetic boundaries and sample risk levels. They are not live forecasts or official geographic boundaries.</p>
     <div class="map-toolbar">
         <button type="button" id="map-refresh">Refresh zones</button>
+        <label><input type="checkbox" id="map-zone-toggle" checked /> Show risk zones</label>
     </div>
+    <ul id="map-legend" class="map-legend" aria-label="Zone risk legend">
+        <li><span class="risk-swatch risk-unknown" aria-hidden="true"></span>Unknown</li>
+        <li><span class="risk-swatch risk-low" aria-hidden="true"></span>Low</li>
+        <li><span class="risk-swatch risk-medium" aria-hidden="true"></span>Medium</li>
+        <li><span class="risk-swatch risk-high" aria-hidden="true"></span>High</li>
+        <li><span class="risk-swatch risk-severe" aria-hidden="true"></span>Severe</li>
+    </ul>
     <p id="map-status" role="status" aria-live="polite">Loading risk zones…</p>
     <p id="map-error" class="alert alert-bad" role="alert" hidden></p>
     <a id="map-login" href="/login.html?returnUrl=%2Fdispatcher%2Fmap" hidden>Log in again</a>
     <p id="map-tile-status" class="muted" role="status"></p>
     <div id="risk-zone-map" tabindex="0" aria-label="Interactive Dhaka risk-zone map"></div>
+    <section class="map-zone-details" aria-labelledby="zone-detail-heading">
+        <h2 id="zone-detail-heading">Selected zone</h2>
+        <p id="map-zone-details" role="status" aria-live="polite">Select a zone on the map to inspect its risk and last computation time.</p>
+    </section>
     <noscript><p>Enable JavaScript to display the map. Zone data is available to dispatchers at /api/map/risk-zones.</p></noscript>
 </section>
 @section Scripts {
