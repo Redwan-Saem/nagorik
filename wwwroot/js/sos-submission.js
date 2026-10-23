@@ -5,7 +5,7 @@
         }
     }
     class SosSubmission {
-        constructor({ fetcher = fetch, storage, uuid = () => crypto.randomUUID(), online = () => navigator.onLine !== false,
+        constructor({ fetcher = (...args) => globalThis.fetch(...args), storage, uuid = () => crypto.randomUUID(), online = () => navigator.onLine !== false,
             onRetry = () => {}, attempts = 3, timeoutMs = 20000, sleep } = {}) {
             Object.assign(this, { fetcher, uuid, online, onRetry, attempts, timeoutMs });
             try { this.storage = storage ?? sessionStorage; this.requestId = this.storage.getItem('sos-pending-request'); } catch { }
