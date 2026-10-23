@@ -24,6 +24,8 @@ namespace Nagorik.Api
         public DbSet<MunicipalSchedule> MunicipalSchedules => Set<MunicipalSchedule>();
         public DbSet<CivicCase> CivicCases => Set<CivicCase>();
         public DbSet<CivicCaseReview> CivicCaseReviews => Set<CivicCaseReview>();
+        public DbSet<ManagedDataChange> ManagedDataChanges => Set<ManagedDataChange>();
+        public DbSet<TransportCatalogState> TransportCatalogStates => Set<TransportCatalogState>();
         public DbSet<LoadsheddingSchedule> LoadsheddingSchedules => Set<LoadsheddingSchedule>();
         public DbSet<ScheduleZoneDemand> ScheduleZoneDemands => Set<ScheduleZoneDemand>();
         public DbSet<LoadsheddingSlot> LoadsheddingSlots => Set<LoadsheddingSlot>();
@@ -68,6 +70,14 @@ namespace Nagorik.Api
             Data.TransportModelConfiguration.Configure(builder);
             Data.MunicipalScheduleConfiguration.Configure(builder);
             Data.CivicCaseConfiguration.Configure(builder);
+            builder.Entity<Zone>(e=>{e.Property(x=>x.GeoRevision).IsConcurrencyToken();e.Property(x=>x.BoundarySource).HasMaxLength(300);e.Property(x=>x.InputSource).HasMaxLength(300);});
+            builder.Entity<ManagedDataChange>(e=>
+            {
+                e.HasOne<Zone>().WithMany().HasForeignKey(x=>x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x=>x.ActorUserId).HasMaxLength(100);e.Property(x=>x.Source).HasMaxLength(300);e.Property(x=>x.Kind).HasMaxLength(30);e.HasIndex(x=>new{x.ZoneId,x.AtUtc});
+                e.ToTable("ManagedDataChanges",t=>t.HasCheckConstraint("CK_ManagedDataChange_Json","json_valid(PayloadJson)"));
+            });
+            builder.Entity<TransportCatalogState>(e=>{e.Property(x=>x.Revision).IsConcurrencyToken();e.ToTable("TransportCatalogStates",t=>t.HasCheckConstraint("CK_TransportCatalogState_Singleton","Id = 1 AND Revision > 0"));});
             builder.Entity<BusOccupancyReport>(e=>
             {
                 e.HasOne<User>().WithMany().HasForeignKey(x=>x.ResidentId).OnDelete(DeleteBehavior.Restrict);
