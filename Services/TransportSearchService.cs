@@ -90,7 +90,8 @@ public sealed partial class TransportSearchService(AppDbContext db)
             if(truncated)break;
         }
         // Transfer waiting time is explicit in totals; fares are added separately.
-        found=found.Select(x=>x with{Minutes=x.Minutes+x.Transfers*5}).ToList();
+        var rules=await db.TransportFareRules.AsNoTracking().ToDictionaryAsync(x=>x.Mode,ct);
+        found=found.Select(x=>TransportFareService.Price(x with{Minutes=x.Minutes+x.Transfers*5},rules)).ToList();
         return new(found.OrderBy(x=>x.Minutes).ThenBy(x=>x.Id).ToArray(),found.Count==0?"No routes found for these locations":"Options use catalog estimates; verify services before travel.",truncated);
     }
 }
