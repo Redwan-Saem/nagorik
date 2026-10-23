@@ -27,6 +27,9 @@
                 ? `Last computed: ${computed.toLocaleString()} (${computed.toISOString()})`
                 : 'Not computed yet; any displayed sample level is not a live prediction.';
             popup.appendChild(time);
+            for (const [label, source, sample] of [['Boundary', properties.boundarySource, properties.boundaryIsSample], ['Metrics', properties.inputSource, properties.inputIsSample]]) {
+                const node = document.createElement('p'); node.textContent = `${label}: ${sample === true ? 'Sample' : sample === false ? 'User-supplied' : 'Unknown provenance'}; ${source || 'Source unrecorded'}`; popup.appendChild(node);
+            }
             const factors = document.createElement('p');
             const details = properties.factors, assessment = details?.assessment;
             const number = value => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : 'Unknown';
