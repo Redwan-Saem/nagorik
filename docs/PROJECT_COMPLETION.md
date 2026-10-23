@@ -73,5 +73,12 @@ and official APIs, public weekly view and draft/edit/publish/retire forms. Four
 shared service tests, one water HTTP test and a complete water browser workflow
 passed. See `NAG-010-011-service-schedules.md` for roles, source limitations and demo.
 
-NAG-011 (waste scheduling) is next. A dedicated homepage/dashboard remains to be
-built; the existing Home controller redirects.
+## NAG-011 — managed waste schedules
+
+All three tasks are implemented using the shared schedule model and city-specific
+authorization. Waste API privacy/role checks passed, and both water/waste browser
+workflows passed on the final run. Public pickup notes and real publication times
+appear only after confirmed publication. No fake operational schedules are seeded.
+
+NAG-012 (air quality) is next. A dedicated homepage/dashboard remains to be built;
+the existing Home controller redirects.

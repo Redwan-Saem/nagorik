@@ -96,6 +96,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
 
     [Theory]
     [InlineData("water","UtilityOfficial")]
+    [InlineData("waste","Official")]
     public async Task MunicipalScheduleDraftPublishEditAndRetireWorkInBrowser(string kind,string role)
     {
         await using(var scope=app.Services.CreateAsyncScope())

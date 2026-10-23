@@ -51,3 +51,20 @@ Verification: four shared service cases passed (both Water and Waste), plus the
 water HTTP authorization/CSRF/privacy/publication/revision test. A real Chrome
 water workflow passed for draft creation/edit, hidden drafts, confirmed publication,
 anonymous seven-day/source display and confirmed retirement back to Unknown.
+
+## Waste demonstration and verification
+
+Use `official1@test.com` (initial `Test@12345`) at `/official/services/waste`.
+The same workflow applies, with collection/pickup notes and an actual bulletin
+reference (or a clearly labelled demo source). Public readers use
+`/services/waste?zoneId=<id>` and `/api/services/waste?zoneId=<id>`.
+Official JSON actions use `/api/official/services/waste/...` with the same draft,
+revision, confirmation and CSRF contracts. Water officials cannot manage Waste;
+city officials cannot manage Water. Admin can manage either explicitly.
+
+The waste HTTP test passed for privacy, confirmed publication and role separation.
+Both Water and Waste Chrome scenarios passed on the final run: real form draft
+creation, editing, hidden drafts, confirmed publication, anonymous schedule/source
+display and retirement back to Unknown. No new migration is needed beyond the
+shared AddMunicipalSchedules migration. Production remains empty until officials
+publish real operating plans.
