@@ -18,6 +18,8 @@ internal static class DrainagePointModelConfiguration
             e.Property(p => p.Status).HasConversion<string>().HasDefaultValue(DrainageStatus.Unknown);
             e.HasOne(p => p.Zone).WithMany().HasForeignKey(p => p.ZoneId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(p => new { p.ZoneId, p.Status });
+            e.Property(p => p.LastWorkReportId).IsConcurrencyToken();
+            e.HasOne(p => p.LastWorkReport).WithMany().HasForeignKey(p => p.LastWorkReportId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
