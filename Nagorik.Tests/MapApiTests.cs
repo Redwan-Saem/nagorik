@@ -54,6 +54,8 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<MunicipalScheduleService>();
+        builder.Services.AddMemoryCache();builder.Services.Configure<AirQualityOptions>(_=>{});
+        builder.Services.AddSingleton<AirQualityCache>();builder.Services.AddScoped<AirQualityService>();builder.Services.AddSingleton<IAirQualityProvider,FixtureAirQualityProvider>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -72,6 +74,19 @@ public class MapApiTests : IAsyncLifetime
         }
         await app.StartAsync();
         client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    }
+
+    private sealed class FixtureAirQualityProvider:IAirQualityProvider
+    {
+        public Task<AirQualityReading> FetchAsync(double latitude,double longitude,CancellationToken ct=default)=>Task.FromResult(new AirQualityReading(133,60.1,63.8,DateTime.UtcNow,DateTime.UtcNow));
+    }
+    [Fact]
+    public async Task AirQualityApiIsPublicAndValidatesCanonicalZoneWithoutExposingPrivateFields()
+    {
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/air-quality")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync("/api/air-quality?zoneId=9999")).StatusCode);
+        var data=await client.GetFromJsonAsync<JsonElement>("/api/air-quality?zoneId=1");Assert.Equal("Model estimate",data.GetProperty("status").GetString());Assert.Equal(133,data.GetProperty("usAqi").GetDouble());
+        Assert.Equal("Unhealthy for sensitive groups",data.GetProperty("band").GetString());Assert.DoesNotContain("riskFactors",data.ToString());Assert.DoesNotContain("residentId",data.ToString());
     }
 
     [Fact]
