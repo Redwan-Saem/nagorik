@@ -208,7 +208,8 @@ public class UtilityAnomalySchemaTests
         await TestDb.AddLegacyReportAsync(db, title: "Legacy with photo");
         await TestDb.AddLegacyReportAsync(db, id: 2, title: "Legacy without photo");
         await TestDb.AddLegacyReportAsync(db, id: 3, title: "Legacy blank photo");
-        db.Crews.Add(new Crew { Id = 1, UserId = 2, Name = "Existing crew" }); await db.SaveChangesAsync();
+        // Seed only the columns present before the later crew-location migration.
+        await db.Database.ExecuteSqlRawAsync("INSERT INTO Crews (Id,UserId,Name) VALUES (1,2,'Existing crew')");
         await db.Database.ExecuteSqlRawAsync("UPDATE Reports SET ImageUrl = '/uploads/reports/existing.jpg', AssignedCrewId = 1, Status = 'Assigned', Urgency = 3, AreaId = 1 WHERE Id = 1;");
         await db.Database.ExecuteSqlRawAsync("UPDATE Reports SET ImageUrl = '  ' WHERE Id = 3;");
         db.ReportStatusHistories.Add(new ReportStatusHistory { ReportId = 1, Status = ReportStatus.Assigned, ChangedByUserId = 1 });

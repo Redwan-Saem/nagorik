@@ -1,0 +1,24 @@
+@model Nagorik.Api.Controllers.FlaggedDrainageViewModel
+@{ ViewData["Title"] = "Flagged drainage"; }
+<h1>Flagged drainage points</h1>
+<p>High/Severe rule-risk zones evaluated within 15 minutes. Up to 100 points appear here. Clear points remain listed because the flag describes zone risk.</p>
+<p><a href="/dispatcher/map">Dispatcher map</a> · <a href="/dispatcher/flagged-drainage">Refresh panel</a></p>
+@if (TempData["DrainageMessage"] is string message) { <p role="alert">@message</p> }
+@if (Model.Points.Count == 0) { <p>No recently evaluated elevated-risk drainage points.</p> }
+@foreach (var point in Model.Points)
+{
+    <section class="card">
+        <h2>Point #@point.Id — @point.ZoneName</h2>
+        <p>Status: @point.Status · Risk: @point.RiskLevel · Evaluated: @point.LastComputedAtUtc.ToString("u")</p>
+        <form method="post" action="/dispatcher/flagged-drainage/@point.Id/assign">
+            @Html.AntiForgeryToken()
+            <label for="crew-@point.Id">Assign crew</label>
+            <select id="crew-@point.Id" name="CrewId" required>
+                <option value="">Choose a crew</option>
+                @foreach (var crew in Model.Crews) { <option value="@crew.Id">@crew.Name — @(crew.IsBusy ? "BUSY" : "Free")</option> }
+            </select>
+            <label><input type="checkbox" name="ConfirmBusy" value="true" /> Confirm an additional assignment if this crew is busy</label>
+            <button type="submit">Create and assign inspection task</button>
+        </form>
+    </section>
+}
