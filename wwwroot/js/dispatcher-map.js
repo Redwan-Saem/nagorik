@@ -79,6 +79,7 @@
         });
         const ready = load();
         const pointLayers = globalThis.DispatcherMapLayers?.mount({ map, document, leaflet, fetcher });
+        globalThis.DispatcherCrews?.mount({ map, document, leaflet, fetcher });
         return { map, ready, reload: load, pointLayers };
     }
     globalThis.DispatcherRiskMap = { colors, colorForRisk, mount };

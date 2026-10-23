@@ -1,0 +1,42 @@
+@model Nagorik.Api.Models.RiskAdminViewModel
+@{ ViewData["Title"] = "Risk thresholds"; }
+<h1>Risk thresholds</h1>
+<p>Rule baseline only: these scores are not calibrated flood probabilities. Use reviewed vulnerability data for real zones. Sample boundaries and demonstration inputs are not surveyed data.</p>
+@if (TempData["RiskMessage"] is string message) { <p role="status">@message</p> }
+<form method="post" action="/admin/risk-thresholds">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="All" role="alert"></div>
+    <input type="hidden" asp-for="Revision" />
+    <p>Score = rainfall intensity × vulnerability. Thresholds must be positive and strictly increasing.</p>
+    <p><label asp-for="Thresholds.MediumThreshold">Medium minimum</label>
+    <input asp-for="Thresholds.MediumThreshold" type="number" step="any" min="0.01" max="10000" required /></p>
+    <p><label asp-for="Thresholds.HighThreshold">High minimum</label>
+    <input asp-for="Thresholds.HighThreshold" type="number" step="any" min="0.01" max="10000" required /></p>
+    <p><label asp-for="Thresholds.SevereThreshold">Severe minimum</label>
+    <input asp-for="Thresholds.SevereThreshold" type="number" step="any" min="0.01" max="10000" required /></p>
+    <button type="submit">Save thresholds</button>
+</form>
+<h2>Zone vulnerability inputs</h2>
+<p>Missing inputs produce Unknown. Supply elevation in metres, drainage length in km per km², and history score from 0 to 1. Saving inputs clears the old prediction until evaluation runs.</p>
+@foreach (var zone in Model.Zones)
+{
+    <section>
+        <h3>@zone.Name (@zone.Code)</h3>
+        <p>Current risk: @zone.RiskLevel · Evaluated: @(zone.LastComputedAtUtc?.ToString("u") ?? "Not evaluated")</p>
+        <form method="post" action="/admin/risk-thresholds/zones/@zone.Id/vulnerability">
+            @Html.AntiForgeryToken()
+            <p><label for="elevation-@zone.Id">Elevation (m)</label>
+            <input id="elevation-@zone.Id" name="ElevationMeters" value="@(zone.ElevationMeters?.ToString(System.Globalization.CultureInfo.InvariantCulture))" type="number" min="-500" max="9000" step="any" required /></p>
+            <p><label for="density-@zone.Id">Drainage density (km/km²)</label>
+            <input id="density-@zone.Id" name="DrainageDensityKmPerSqKm" value="@(zone.DrainageDensityKmPerSqKm?.ToString(System.Globalization.CultureInfo.InvariantCulture))" type="number" min="0" max="100" step="any" required /></p>
+            <p><label for="history-@zone.Id">History score (0..1)</label>
+            <input id="history-@zone.Id" name="HistoryScore" value="@(zone.HistoryScore?.ToString(System.Globalization.CultureInfo.InvariantCulture))" type="number" min="0" max="1" step="any" required /></p>
+            <button type="submit">Save vulnerability for @zone.Code</button>
+        </form>
+    </section>
+}
+<form method="post" action="/admin/risk-thresholds/recompute">
+    @Html.AntiForgeryToken()
+    <button type="submit">Evaluate all zones now</button>
+</form>
+<p>Evaluation uses the latest cached weather; it does not fetch new readings. Missing, stale or unaligned weather produces Unknown. The scheduled job also runs every five minutes by default.</p>

@@ -35,8 +35,11 @@ public sealed class RiskComputationService(AppDbContext db, WeatherReadingQueryS
             zone.LastComputedAtUtc = now;
             zone.RiskFactorsJson = JsonSerializer.Serialize(new RiskComputationDetails(result, zone.ElevationMeters,
                 zone.DrainageDensityKmPerSqKm, zone.HistoryScore, snapshot?.Past, snapshot?.Forecast, settings));
-            db.RiskHistories.Add(new RiskHistory { ZoneId = zone.Id, ComputedAtUtc = now,
-                PreviousLevel = previousLevel, Level = result.Level, FactorsJson = zone.RiskFactorsJson });
+            var history = new RiskHistory { ZoneId = zone.Id, ComputedAtUtc = now,
+                PreviousLevel = previousLevel, Level = result.Level, FactorsJson = zone.RiskFactorsJson };
+            db.RiskHistories.Add(history);
+            if (previousLevel != result.Level && result.Level is ZoneRiskLevel.High or ZoneRiskLevel.Severe)
+                db.RiskAlertEvents.Add(new RiskAlertEvent { RiskHistory = history, CreatedAtUtc = now });
         }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
