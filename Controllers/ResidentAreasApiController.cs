@@ -10,6 +10,10 @@ public sealed class ResidentAreaInput
 {
     [Required] public bool? AlertsEnabled { get; set; }
 }
+public sealed class ResidentGlobalAlertsInput
+{
+    [Required] public bool? Enabled { get; set; }
+}
 [ApiController, Authorize(Roles = "Resident"), Route("api/resident/areas")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class ResidentAreasApiController(AppDbContext db, TimeProvider clock) : ControllerBase
@@ -18,6 +22,15 @@ public sealed class ResidentAreasApiController(AppDbContext db, TimeProvider clo
     public IActionResult SecurityToken([FromServices] Microsoft.AspNetCore.Antiforgery.IAntiforgery antiforgery) =>
         Ok(new { requestToken = antiforgery.GetAndStoreTokens(HttpContext).RequestToken });
     private int? ResidentId => int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) && id > 0 ? id : null;
+    [HttpPut("global-preference"), ValidateAntiForgeryToken]
+    public async Task<IActionResult> GlobalPreference([FromBody] ResidentGlobalAlertsInput input,CancellationToken ct)
+    {
+        if(ResidentId is not {} id)return Unauthorized();
+        if(!await db.Users.AnyAsync(u=>u.Id==id && u.Role=="Resident",ct))return Forbid();
+        var userId=id.ToString();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO NotificationPreferences (UserId, NotificationsEnabled) VALUES ({userId}, {input.Enabled!.Value}) ON CONFLICT(UserId) DO UPDATE SET NotificationsEnabled = excluded.NotificationsEnabled",ct);
+        return Ok(new{enabled=input.Enabled.Value});
+    }
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken ct)
     {
