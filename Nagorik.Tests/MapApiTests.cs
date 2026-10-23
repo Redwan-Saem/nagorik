@@ -50,6 +50,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<LoadsheddingRotationEngine>();
         builder.Services.AddScoped<LoadsheddingScheduleService>();
+        builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -105,6 +106,15 @@ public class MapApiTests : IAsyncLifetime
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
         foreach (var path in new[] { "/api/official/loadshedding/zones", "/api/official/loadshedding/security-token" })
             Assert.Equal(expected, (await client.GetAsync(path)).StatusCode);
+        var page = await client.GetAsync("/official/loadshedding");
+        Assert.Equal(expected, page.StatusCode);
+        if (expected == HttpStatusCode.OK)
+        {
+            var html = await page.Content.ReadAsStringAsync();
+            Assert.Contains("schedule-generate", html);
+            Assert.Contains("Sample zone", html);
+            Assert.Contains("__RequestVerificationToken", html);
+        }
     }
 
     [Fact]
@@ -127,12 +137,110 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal("Draft", json.GetProperty("state").GetString());
         Assert.Equal(1, json.GetProperty("revision").GetInt32());
         Assert.Empty(json.GetProperty("slots").EnumerateArray());
+        var reviewPage = await client.GetStringAsync("/official/loadshedding/1");
+        Assert.Contains("schedule-review", reviewPage);
+        Assert.Contains("schedule-publish", reviewPage);
+        Assert.Contains("__RequestVerificationToken", reviewPage);
         var edit = new { expectedRevision = 1, slotId = 0, zoneId = 1, date = "2026-10-23", startMinute = 0, endMinute = 120 };
         Assert.Equal(HttpStatusCode.OK, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", edit)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", edit)).StatusCode);
         var saved = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/1");
         Assert.Equal(2, saved.GetProperty("revision").GetInt32());
         Assert.Single(saved.GetProperty("slots").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("CityOfficial", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    public async Task OtherRolesCannotMutateOrAuditSchedules(string? role, HttpStatusCode expected)
+    {
+        if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        Assert.Equal(expected, (await client.PostAsJsonAsync("/api/official/loadshedding", new { })).StatusCode);
+        Assert.Equal(expected, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", new { })).StatusCode);
+        Assert.Equal(expected, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", new { })).StatusCode);
+        Assert.Equal(expected, (await client.GetAsync("/api/official/loadshedding/1/audit")).StatusCode);
+    }
+
+    [Fact]
+    public async Task PublicationHttpRequiresCsrfConfirmationAndFreezesTheVersion()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "UtilityOfficial");
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = TestDb.AddUser(db); user.Role = "UtilityOfficial"; await db.SaveChangesAsync();
+        }
+        var token = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/security-token");
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", token.GetProperty("requestToken").GetString());
+        var generated = await client.PostAsJsonAsync("/api/official/loadshedding", new { startDate = "2026-10-23", endDate = "2026-10-23",
+            availableCapacityMw = 10, slotMinutes = 120, zones = new[] { new { zoneId = 1, demandMw = 10 } } });
+        Assert.Equal(HttpStatusCode.OK, generated.StatusCode);
+        client.DefaultRequestHeaders.Remove("RequestVerificationToken");
+        var confirm = new { expectedRevision = 1, confirm = true, acknowledgeWarnings = true };
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", confirm)).StatusCode);
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", token.GetProperty("requestToken").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", new { expectedRevision = 1 })).StatusCode);
+        var published = await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", confirm);
+        Assert.Equal(HttpStatusCode.OK, published.StatusCode);
+        var body = await published.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Published", body.GetProperty("state").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", confirm)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", new { expectedRevision=2, slotId=0, zoneId=1, date="2026-10-23", startMinute=0, endMinute=120 })).StatusCode);
+        var audit = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/1/audit");
+        Assert.Equal(2, audit.GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.OK)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    [InlineData("UtilityOfficial", HttpStatusCode.Forbidden)]
+    public async Task ResidentScheduleApiHasRoleBoundary(string? role, HttpStatusCode expected)
+    {
+        if(role!=null)client.DefaultRequestHeaders.Add("X-Test-Role",role);
+        foreach(var path in new[]{"/api/resident/loadshedding?zoneId=1","/api/resident/loadshedding/zones"})
+            Assert.Equal(expected,(await client.GetAsync(path)).StatusCode);
+        var page=await client.GetAsync("/resident/loadshedding");Assert.Equal(expected,page.StatusCode);
+        if(expected==HttpStatusCode.OK)
+        {
+            var html=await page.Content.ReadAsStringAsync();Assert.Contains("resident-schedule",html);
+            Assert.Contains("schedule-zone",html);Assert.Contains("schedule-locate",html);Assert.Contains("Asia/Dhaka",html);
+        }
+    }
+
+    [Fact]
+    public async Task ResidentScheduleApiHidesDraftInputsAndUsesActualPublication()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        int scheduleId;
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();var user=TestDb.AddUser(db);user.Role="UtilityOfficial";await db.SaveChangesAsync();
+            var today=DateOnly.FromDateTime(DhakaTime.ToLocal(DateTime.UtcNow));
+            var row=await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().GenerateAsync(new(today,today,5,120,[new(1,10)]),1);
+            scheduleId=row.Id;
+        }
+        var draft=await client.GetFromJsonAsync<JsonElement>("/api/resident/loadshedding?zoneId=1");
+        Assert.Equal("NotPublished",draft.GetProperty("status").GetString());Assert.Equal(7,draft.GetProperty("days").GetArrayLength());
+        Assert.All(draft.GetProperty("days").EnumerateArray(),day=>Assert.Empty(day.GetProperty("outages").EnumerateArray()));
+        await using(var scope=app.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().PublishAsync(scheduleId,new(){ExpectedRevision=1,Confirm=true,AcknowledgeWarnings=true},1);
+        var response=await client.GetAsync("/api/resident/loadshedding?zoneId=1");Assert.Contains("no-store",response.Headers.CacheControl!.ToString());
+        var body=await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("PartiallyPublished",body.GetProperty("status").GetString());Assert.Equal(12,body.GetProperty("days")[0].GetProperty("outages").GetArrayLength());
+        Assert.Equal("Asia/Dhaka",body.GetProperty("timeZone").GetString());
+        foreach(var field in new[]{"demands","availableCapacityMw","createdByUserId","publishedByUserId","audit"})Assert.False(body.TryGetProperty(field,out _));
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/resident/loadshedding?zoneId=0")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/resident/loadshedding")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync("/api/resident/loadshedding?zoneId=99999")).StatusCode);
     }
 
     [Fact]

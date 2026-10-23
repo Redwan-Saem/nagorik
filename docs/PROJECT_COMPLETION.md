@@ -32,3 +32,23 @@ Verification: 51 focused API/navigation tests passed. No existing legacy tables
 were deleted. Old prediction links open the canonical map without mapping legacy
 numeric IDs to unrelated canonical zones. Generated workbook outputs are excluded
 from application compilation/content discovery.
+
+## NAG-016 — official loadshedding workflow
+
+All eight planned tasks are implemented. Official generation, revision-checked
+editing, validation warnings, confirmed publication, partial supersession and
+audit are covered by 738 passing backend regressions and desktop/mobile browser
+scenarios. See `NAG-016-loadshedding.md` for acceptance, routes, account and caveats.
+
+## NAG-015 — resident loadshedding schedules
+
+All six planned tasks are implemented: published-only seven-day queries and API,
+local GPS polygon matching with manual selection, resident navigation and cards,
+30-second refresh, and an explicitly labelled offline plan with safe shell caching.
+Six query tests, eight focused API tests, 155 working-checkout client tests and two
+desktop/mobile resident browser scenarios passed. The browser scenarios include
+draft isolation, automatic publication refresh and a full offline reload. See
+`NAG-015-resident-schedules.md` for routes, acceptance and offline/GPS limitations.
+
+NAG-018 (transport routes/fares) is next. A dedicated homepage/dashboard remains
+to be built; the existing Home controller redirects.
