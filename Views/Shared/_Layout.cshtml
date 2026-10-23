@@ -16,6 +16,7 @@
                 <li><a href="/map">Area risk map</a></li>
                 <li><a href="/transport">Transport routes</a></li>
                 <li><a href="/transport/occupancy">Bus occupancy</a></li>
+                <li><a href="/services/water">Water schedule</a></li>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <li class="nav-item">
@@ -64,6 +65,11 @@
                 @if (Nagorik.Api.Authorization.UtilityScheduleAccess.IsOfficial(User))
                 {
                     <li><a href="/official/loadshedding">Loadshedding schedules</a></li>
+                }
+
+                @if (User.IsInRole("UtilityOfficial") || User.IsInRole("WASAOfficial") || User.IsInRole("Admin"))
+                {
+                    <li><a href="/official/services/water">Manage water schedules</a></li>
                 }
 
                 @if (User.IsInRole("Dispatcher"))
