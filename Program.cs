@@ -25,6 +25,8 @@ builder.Services.AddScoped<TransportSearchService>();
 builder.Services.AddScoped<BusOccupancyService>();
 builder.Services.AddScoped<MunicipalScheduleService>();
 builder.Services.AddScoped<CivicCaseService>();
+builder.Services.AddScoped<GeographicDataService>();
+builder.Services.AddScoped<TransportCatalogService>();
 builder.Services.AddMemoryCache();
 builder.Services.Configure<AirQualityOptions>(builder.Configuration.GetSection("AirQuality"));
 builder.Services.AddSingleton<AirQualityCache>();
