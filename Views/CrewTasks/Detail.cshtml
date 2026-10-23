@@ -31,6 +31,10 @@
     <div class="task-actions">
         @if (nextStatus != null)
         {
+            <p>Optionally share your current GPS location with dispatchers when updating this task.</p>
+            <button type="button" id="crew-location-capture">Use my location for this update</button>
+            <button type="button" id="crew-location-clear">Skip location sharing</button>
+            <p id="crew-location-status" role="status" aria-live="polite">Location sharing is off.</p>
             <button type="button" id="update-task-status" data-next-status="@nextStatus">
                 @(nextStatus == "InProgress" ? "Start task" : "Complete task")
             </button>
@@ -65,5 +69,6 @@
     }
 </section>
 @section Scripts {
+    <script src="~/js/crew-location.js" asp-append-version="true"></script>
     <script src="~/js/crew-task-detail.js" asp-append-version="true"></script>
 }

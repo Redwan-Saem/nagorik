@@ -29,7 +29,7 @@ public class CrewTasksApiController(ReportStatusWorkflowService workflow) : Cont
         if (next == null)
             return Problem(statusCode: 400, title: "Invalid task status.", detail: "Status must be InProgress or Completed.");
 
-        var result = await workflow.ChangeCrewTaskStatusAsync(id, next.Value, userId, ct);
+        var result = await workflow.ChangeCrewTaskStatusAsync(id, next.Value, userId, ct, request.Location);
         return result.Outcome switch
         {
             StatusChangeOutcome.Changed => Ok(new { id, status = next.Value.ToString(), message = result.Message }),
@@ -43,6 +43,7 @@ public class CrewTasksApiController(ReportStatusWorkflowService workflow) : Cont
 
 public sealed class UpdateCrewTaskStatusRequest
 {
+    public CrewLocationUpdate? Location { get; set; }
     [Required]
     [RegularExpression("^(InProgress|Completed)$", ErrorMessage = "Status must be InProgress or Completed.")]
     public string Status { get; set; } = "";
