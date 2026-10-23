@@ -155,6 +155,34 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GlobalRiskPreferenceUsesCsrfAndPreservesAllAreaMemberships()
+    {
+        using(var scope=app.Services.CreateScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();db.Users.Add(new(){Id=1,Role="Resident"});
+            db.ResidentZoneSubscriptions.Add(new(){ResidentId=1,ZoneId=1});db.AreaSubscriptions.Add(new(){UserId="1",ZoneId="Z1"});await db.SaveChangesAsync();
+        }
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        using var missing=await client.PutAsJsonAsync("/api/resident/areas/global-preference",new{enabled=true});Assert.Equal(HttpStatusCode.BadRequest,missing.StatusCode);
+        using var security=JsonDocument.Parse(await client.GetStringAsync("/api/resident/areas/security-token"));
+        using var request=new HttpRequestMessage(HttpMethod.Put,"/api/resident/areas/global-preference"){Content=JsonContent.Create(new{enabled=true})};
+        request.Headers.Add("RequestVerificationToken",security.RootElement.GetProperty("requestToken").GetString());
+        using var response=await client.SendAsync(request);Assert.Equal(HttpStatusCode.OK,response.StatusCode);
+        using var finalScope=app.Services.CreateScope();var saved=finalScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True((await saved.NotificationPreferences.SingleAsync()).NotificationsEnabled);
+        Assert.Single(await saved.ResidentZoneSubscriptions.ToListAsync());Assert.Single(await saved.AreaSubscriptions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task AlertDeliveryDiagnosticsAreAdminOnly()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        using var denied=await client.GetAsync("/admin/risk-alert-deliveries");Assert.Equal(HttpStatusCode.Forbidden,denied.StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","Admin");
+        var html=await client.GetStringAsync("/admin/risk-alert-deliveries");Assert.Contains("No risk alert receipts yet",html);
+    }
+
+    [Fact]
     public async Task MyAreasPageRequiresResidentAndProvidesSecurityToken()
     {
         client.DefaultRequestHeaders.Add("X-Test-Role","Dispatcher");

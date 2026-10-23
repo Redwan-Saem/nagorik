@@ -70,6 +70,7 @@
                 @if (User.IsInRole("Admin"))
                 {
                     <li><a href="/admin/risk-thresholds">Risk thresholds</a></li>
+                    <li><a href="/admin/risk-alert-deliveries">Risk alert delivery diagnostics</a></li>
                 }
 
                 @if (User.IsInRole("Crew"))
@@ -86,6 +87,7 @@
                                 class="btn btn-sm btn-outline-light">
                             Enable notifications
                         </button>
+                        <span id="push-status" role="status" aria-live="polite"></span>
                     </li>
                 }
             </ul>

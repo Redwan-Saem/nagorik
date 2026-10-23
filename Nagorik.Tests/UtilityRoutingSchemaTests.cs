@@ -91,9 +91,8 @@ public class UtilityRoutingSchemaTests
         const string previous = "20261016221457_AddUtilityAnomalySchema";
         await migrator.MigrateAsync(previous);
         TestDb.AddUser(db);
-        db.Reports.Add(new Report { UserId = 1, Title = "Existing anomaly", AnomalyType = AnomalyType.WaterLeak,
-            Utility = UtilityProvider.Unassigned, ReferenceNo = "UA-000001", PhotoPaths = ["/uploads/reports/one.jpg"] });
-        await db.SaveChangesAsync();
+        await TestDb.AddLegacyReportAsync(db,title:"Existing anomaly");
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Reports SET AnomalyType = {"WaterLeak"}, Utility = {"Unassigned"}, ReferenceNo = {"UA-000001"}, PhotoPaths = {"[\"/uploads/reports/one.jpg\"]"} WHERE Id = 1");
         await migrator.MigrateAsync();
         Assert.Equal(20, await db.UtilityRoutingRules.CountAsync());
         Assert.False(db.Database.HasPendingModelChanges());
@@ -104,7 +103,7 @@ public class UtilityRoutingSchemaTests
         Assert.Equal(UtilityRoutingOutcome.NoMatch, (await new UtilityRoutingService(db).ResolveAsync(AnomalyType.WaterLeak)).Outcome);
         await migrator.MigrateAsync(previous);
         db.ChangeTracker.Clear();
-        var report = await db.Reports.SingleAsync();
+        var report = await db.Reports.Select(r=>new {r.Title,r.ReferenceNo,r.PhotoPaths}).SingleAsync();
         Assert.Equal("Existing anomaly", report.Title); Assert.Equal("UA-000001", report.ReferenceNo);
         Assert.Equal(new[] { "/uploads/reports/one.jpg" }, report.PhotoPaths);
         await migrator.MigrateAsync();

@@ -487,6 +487,68 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ResidentZoneSubscriptions");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClaimToken")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("EventId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastAttemptAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("EventId", "ResidentId")
+                        .IsUnique();
+
+                    b.HasIndex("State", "NextAttemptAtUtc");
+
+                    b.HasIndex("ResidentId", "ZoneId", "SentAtUtc");
+
+                    b.ToTable("RiskAlertDeliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RiskAlertDeliveries_State", "\"Attempts\" BETWEEN 0 AND 100 AND \"State\" IN ('Pending','Sending','Sent','Failed','Suppressed') AND (\"State\" <> 'Sent' OR \"SentAtUtc\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -510,6 +572,28 @@ namespace Nagorik.Api.Migrations
                     b.HasIndex("ProcessedAtUtc", "Id");
 
                     b.ToTable("RiskAlertEvents");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertProcessorLease", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LockedUntilUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RiskAlertProcessorLeases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RiskAlertProcessorLeases_Singleton", "\"Id\" = 1");
+                        });
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.RiskHistory", b =>
@@ -1300,6 +1384,33 @@ namespace Nagorik.Api.Migrations
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Resident");
+
+                    b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertDelivery", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.RiskAlertEvent", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.User", "Resident")
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
 
                     b.Navigation("Resident");
 
