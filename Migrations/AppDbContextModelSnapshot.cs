@@ -140,6 +140,94 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.LoadsheddingSchedule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("AvailableCapacityMw")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PublishedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SlotMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("PublishedByUserId");
+
+                    b.HasIndex("State", "StartDate", "EndDate");
+
+                    b.ToTable("LoadsheddingSchedules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_LoadsheddingSchedule_Input", "\"AvailableCapacityMw\" > 0 AND \"AvailableCapacityMw\" <= 1000000 AND \"StartDate\" <= \"EndDate\" AND \"SlotMinutes\" IN (60,120,180,240,360) AND \"Revision\" > 0");
+
+                            t.HasCheckConstraint("CK_LoadsheddingSchedule_State", "\"State\" IN ('Draft','Published','Superseded') AND (\"State\" = 'Draft' OR (\"PublishedByUserId\" IS NOT NULL AND \"PublishedAtUtc\" IS NOT NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.LoadsheddingSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EndMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StartMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("ScheduleId", "ZoneId", "Date", "StartMinute")
+                        .IsUnique();
+
+                    b.ToTable("LoadsheddingSlots", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_LoadsheddingSlot_Time", "\"StartMinute\" >= 0 AND \"EndMinute\" <= 1440 AND \"StartMinute\" < \"EndMinute\"");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.NotificationLog", b =>
                 {
                     b.Property<int>("Id")
@@ -671,6 +759,86 @@ namespace Nagorik.Api.Migrations
                             t.HasCheckConstraint("CK_RiskThresholdSettings_Order", "\"MediumThreshold\" > 0 AND \"MediumThreshold\" < \"HighThreshold\" AND \"HighThreshold\" < \"SevereThreshold\" AND \"SevereThreshold\" <= 10000");
 
                             t.HasCheckConstraint("CK_RiskThresholdSettings_Singleton", "\"Id\" = 1 AND \"Revision\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ScheduleAudit", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ActorUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("ScheduleId", "Id");
+
+                    b.ToTable("ScheduleAudits");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.SchedulePublication", b =>
+                {
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("ZoneId", "Date");
+
+                    b.HasIndex("ScheduleId");
+
+                    b.ToTable("SchedulePublications");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ScheduleZoneDemand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("DemandMw")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("ScheduleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("ScheduleId", "ZoneId")
+                        .IsUnique();
+
+                    b.ToTable("ScheduleZoneDemands", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ScheduleZoneDemand_Positive", "\"DemandMw\" > 0 AND \"DemandMw\" <= 1000000");
                         });
                 });
 
@@ -1312,6 +1480,39 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("Zone");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.LoadsheddingSchedule", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.LoadsheddingSlot", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.LoadsheddingSchedule", "Schedule")
+                        .WithMany("Slots")
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+
+                    b.Navigation("Zone");
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.RainfallReading", b =>
                 {
                     b.HasOne("Nagorik.Api.Models.Zone", "Zone")
@@ -1439,6 +1640,59 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("Zone");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.ScheduleAudit", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.LoadsheddingSchedule", "Schedule")
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.SchedulePublication", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.LoadsheddingSchedule", "Schedule")
+                        .WithMany()
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", null)
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ScheduleZoneDemand", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.LoadsheddingSchedule", "Schedule")
+                        .WithMany("Demands")
+                        .HasForeignKey("ScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Schedule");
+
+                    b.Navigation("Zone");
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.SosAlert", b =>
                 {
                     b.HasOne("Nagorik.Api.Models.User", "ResponderUser")
@@ -1484,6 +1738,13 @@ namespace Nagorik.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Area");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.LoadsheddingSchedule", b =>
+                {
+                    b.Navigation("Demands");
+
+                    b.Navigation("Slots");
                 });
 #pragma warning restore 612, 618
         }
