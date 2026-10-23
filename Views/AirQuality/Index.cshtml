@@ -1,0 +1,11 @@
+@model IReadOnlyList<Nagorik.Api.Models.ServiceZone>
+@{ViewData["Title"]="Area air quality";}
+<h1>Area air quality</h1>
+<p>Regional provider model estimates for a representative point in each zone. These are not local sensor measurements or a personal exposure assessment. Nearby zones may share a model grid cell.</p>
+<p><a href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noopener noreferrer">Open-Meteo Air Quality API</a> · Copernicus CAMS global model. US AQI scale; PM2.5 and PM10 in μg/m³.</p>
+<label for="air-zone">Zone</label><select id="air-zone"><option value="">Choose a zone</option>@foreach(var zone in Model){<option value="@zone.Id">@zone.Name</option>}</select>
+<button type="button" id="air-refresh">Refresh estimate</button>
+<p id="air-status" role="status" aria-live="polite">Choose a zone to request an estimate.</p>
+<article id="air-reading" class="card" hidden></article>
+<p>Provider failures and old values are marked explicitly. Unknown means no usable reading. Current device GPS is not requested or sent to the provider.</p>
+@section Scripts {<script src="~/js/air-quality.js" asp-append-version="true"></script>}

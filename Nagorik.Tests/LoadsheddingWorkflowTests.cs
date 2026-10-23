@@ -51,4 +51,17 @@ public sealed class LoadsheddingWorkflowTests
         await service.EditAsync(row.Id,new(){ExpectedRevision=1,SlotId=row.Slots.First().Id,Remove=true},1);
         Assert.False(service.Review(row).IsValid);Assert.Empty(await db.SchedulePublications.ToListAsync());
     }
+
+    [Fact]
+    public async Task IndependentlyLoadedStaleContextCannotOverwriteNewRevision()
+    {
+        var(db,c)=TestDb.Create();await using var d=db;await using var connection=c;var ids=await Seed(db);
+        var first=Service(db);var row=await first.GenerateAsync(Input(ids),1);var slot=row.Slots.First();
+        await using var other=new Nagorik.Api.AppDbContext(new DbContextOptionsBuilder<Nagorik.Api.AppDbContext>().UseSqlite(c).Options);
+        var second=Service(other);await second.GetAsync(row.Id);
+        var request=new EditScheduleSlotRequest{ExpectedRevision=1,SlotId=slot.Id,ZoneId=slot.ZoneId,Date=slot.Date,StartMinute=slot.StartMinute,EndMinute=slot.EndMinute};
+        await first.EditAsync(row.Id,request,1);
+        Assert.Equal(409,(await Assert.ThrowsAsync<ScheduleProblem>(()=>second.EditAsync(row.Id,request,1))).Status);
+        Assert.Equal(2,await db.ScheduleAudits.CountAsync());
+    }
 }
