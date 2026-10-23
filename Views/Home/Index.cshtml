@@ -1,0 +1,6 @@
+@model Nagorik.Api.Models.DashboardViewModel
+@{ViewData["Title"]="Nagorik workspace";}
+<h1>Nagorik</h1><p>City reports, service schedules, area information and journeys.</p>
+@if(Model.Authenticated){<h2>Your workspace</h2><ul>@foreach(var card in Model.Work){<li><a href="@card.Href">@card.Title</a> — @card.Description</li>}</ul>}
+else{<p><a href="/login.html?returnUrl=%2F">Sign in</a> · <a href="/register.html">Create a resident account</a></p>}
+<h2>Explore your area</h2><ul>@foreach(var card in Model.Public){<li><a href="@card.Href">@card.Title</a> — @card.Description</li>}</ul>
