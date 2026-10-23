@@ -50,6 +50,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<LoadsheddingRotationEngine>();
         builder.Services.AddScoped<LoadsheddingScheduleService>();
+        builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -192,6 +193,48 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", new { expectedRevision=2, slotId=0, zoneId=1, date="2026-10-23", startMinute=0, endMinute=120 })).StatusCode);
         var audit = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/1/audit");
         Assert.Equal(2, audit.GetArrayLength());
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.OK)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    [InlineData("UtilityOfficial", HttpStatusCode.Forbidden)]
+    public async Task ResidentScheduleApiHasRoleBoundary(string? role, HttpStatusCode expected)
+    {
+        if(role!=null)client.DefaultRequestHeaders.Add("X-Test-Role",role);
+        foreach(var path in new[]{"/api/resident/loadshedding?zoneId=1","/api/resident/loadshedding/zones"})
+            Assert.Equal(expected,(await client.GetAsync(path)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ResidentScheduleApiHidesDraftInputsAndUsesActualPublication()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        int scheduleId;
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();var user=TestDb.AddUser(db);user.Role="UtilityOfficial";await db.SaveChangesAsync();
+            var today=DateOnly.FromDateTime(DhakaTime.ToLocal(DateTime.UtcNow));
+            var row=await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().GenerateAsync(new(today,today,5,120,[new(1,10)]),1);
+            scheduleId=row.Id;
+        }
+        var draft=await client.GetFromJsonAsync<JsonElement>("/api/resident/loadshedding?zoneId=1");
+        Assert.Equal("NotPublished",draft.GetProperty("status").GetString());Assert.Equal(7,draft.GetProperty("days").GetArrayLength());
+        Assert.All(draft.GetProperty("days").EnumerateArray(),day=>Assert.Empty(day.GetProperty("outages").EnumerateArray()));
+        await using(var scope=app.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().PublishAsync(scheduleId,new(){ExpectedRevision=1,Confirm=true,AcknowledgeWarnings=true},1);
+        var response=await client.GetAsync("/api/resident/loadshedding?zoneId=1");Assert.Contains("no-store",response.Headers.CacheControl!.ToString());
+        var body=await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("PartiallyPublished",body.GetProperty("status").GetString());Assert.Equal(12,body.GetProperty("days")[0].GetProperty("outages").GetArrayLength());
+        Assert.Equal("Asia/Dhaka",body.GetProperty("timeZone").GetString());
+        foreach(var field in new[]{"demands","availableCapacityMw","createdByUserId","publishedByUserId","audit"})Assert.False(body.TryGetProperty(field,out _));
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/resident/loadshedding?zoneId=0")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/resident/loadshedding")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync("/api/resident/loadshedding?zoneId=99999")).StatusCode);
     }
 
     [Fact]
