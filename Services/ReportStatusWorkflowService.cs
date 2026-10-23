@@ -75,9 +75,9 @@ public class ReportStatusWorkflowService
         int reportId,
         ReportStatus nextStatus,
         int crewUserId,
-        CancellationToken ct = default)
+        CancellationToken ct = default, CrewLocationUpdate? location = null)
     {
-        var report = await _db.Reports.FirstOrDefaultAsync(r =>
+        var report = await _db.Reports.Include(r => r.AssignedCrew).FirstOrDefaultAsync(r =>
             r.Id == reportId && r.AssignedCrew != null &&
             r.AssignedCrew.UserId == crewUserId, ct);
 
@@ -87,14 +87,16 @@ public class ReportStatusWorkflowService
         if (nextStatus is not (ReportStatus.InProgress or ReportStatus.Completed))
             return new(StatusChangeOutcome.InvalidTransition, "Crew may only start or complete a task.");
 
-        var result = await ApplyChangeAsync(report, nextStatus, crewUserId, ct);
+        if (location != null)
+            System.ComponentModel.DataAnnotations.Validator.ValidateObject(location, new(location), true);
+        var result = await ApplyChangeAsync(report, nextStatus, crewUserId, ct, location);
         if (result.Outcome == StatusChangeOutcome.Changed)
             await _dispatcherNotifier.NotifyAsync(report, crewUserId);
         return result;
     }
 
     private async Task<StatusChangeResult> ApplyChangeAsync(
-        Report report, ReportStatus nextStatus, int actorUserId, CancellationToken ct = default)
+        Report report, ReportStatus nextStatus, int actorUserId, CancellationToken ct = default, CrewLocationUpdate? location = null)
     {
 
         if (!CanTransition(report.Status, nextStatus))
@@ -105,6 +107,12 @@ public class ReportStatusWorkflowService
         }
 
         var previousStatus = report.Status;
+        if (location != null && report.AssignedCrew is { } crew)
+        {
+            crew.LastLatitude = location.Latitude;
+            crew.LastLongitude = location.Longitude;
+            crew.LastSeenAtUtc = DateTime.UtcNow;
+        }
         report.Status = nextStatus;
 
         var history = new ReportStatusHistory
@@ -131,6 +139,7 @@ public class ReportStatusWorkflowService
             // SaveChanges rolls back the history insert along with the losing update.
             _db.Entry(history).State = EntityState.Detached;
             await _db.Entry(report).ReloadAsync(ct);
+            if (location != null && report.AssignedCrew is { } changedCrew) await _db.Entry(changedCrew).ReloadAsync(ct);
             return new(StatusChangeOutcome.Conflict,
                 "The task status or assignment changed. Refresh the task before trying again.");
         }

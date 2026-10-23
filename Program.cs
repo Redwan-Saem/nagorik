@@ -42,11 +42,20 @@ builder.Services.AddScoped<OfficialReportQueryService>();
 builder.Services.AddScoped<UtilityRoutingService>();
 builder.Services.AddScoped<RiskZoneQueryService>();
 builder.Services.AddScoped<MapFeatureQueryService>();
+builder.Services.AddScoped<PublicMapQueryService>();
+builder.Services.AddScoped<CrewMapQueryService>();
+builder.Services.AddScoped<FlaggedDrainageQueryService>();
+builder.Services.AddScoped<DrainageDispatchService>();
 builder.Services.AddScoped<UtilityAnomalySubmissionService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<RiskPredictionService>();
-builder.Services.AddScoped<RiskThresholdProvider>();
+builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
 builder.Services.AddScoped<RiskComputationService>();
+builder.Services.AddScoped<ZoneRiskAlertRecipients>();
+builder.Services.AddScoped<ZoneRiskAlertService>();
+builder.Services.AddOptions<RiskAlertOptions>().Bind(builder.Configuration.GetSection("RiskAlerts"))
+    .ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddHostedService<ZoneRiskAlertBackgroundService>();
 builder.Services.AddOptions<RiskJobOptions>().Bind(builder.Configuration.GetSection("RiskJob"))
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddHostedService<RiskBackgroundService>();
@@ -60,7 +69,9 @@ builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((servic
     client.Timeout = Timeout.InfiniteTimeSpan;
     client.MaxResponseContentBufferSize = 1024 * 1024;
 });
-builder.Services.AddHostedService<AlertBackgroundService>();
+// Canonical rule-risk events replace legacy seeded-risk polling by default.
+if (builder.Configuration.GetValue<bool>("Alerts:UseLegacyRiskWorker"))
+    builder.Services.AddHostedService<AlertBackgroundService>();
 builder.Services.AddScoped<IWeatherCollector, WeatherCollectionService>();
 builder.Services.AddScoped<WeatherReadingQueryService>();
 builder.Services.AddHostedService<WeatherBackgroundService>();
