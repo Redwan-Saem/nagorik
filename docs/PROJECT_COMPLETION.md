@@ -103,6 +103,15 @@ types and dedicated resident/city routes. Construction HTTP validation/privacy
 passed; both Noise and Construction browser review workflows passed on the final
 run. Reports remain suspected concerns and references remain unverified.
 
-Geographic management/provenance, the homepage, older SOS fixes and final
-regression/integration remain. External GPS/push and calibration evidence require
-real hardware/configuration/data and must not be claimed from browser fixtures.
+## NAG-037 — managed geographic and transport data
+
+All four software tasks are implemented: validated provenance/revision/audit
+infrastructure, protected admin writes/import/export, editor and map metadata,
+and verification. Engine/API checks and managed-data/risk-admin browser journeys
+passed. All 163 working-checkout client tests passed. See `NAG-037-managed-data.md`.
+This enables recorded sources and curated data; it does not invent calibration
+or survey accuracy evidence.
+
+The homepage, older SOS fixes and final regression/integration remain. External
+GPS/push and calibration evidence require real hardware/configuration/data and
+must not be claimed from browser fixtures.

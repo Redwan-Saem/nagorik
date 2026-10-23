@@ -57,6 +57,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<MunicipalScheduleService>();
         builder.Services.AddScoped<CivicCaseService>();
+        builder.Services.AddScoped<GeographicDataService>();builder.Services.AddScoped<TransportCatalogService>();
         builder.Services.AddMemoryCache();builder.Services.Configure<AirQualityOptions>(_=>{});builder.Services.AddSingleton<AirQualityCache>();builder.Services.AddScoped<AirQualityService>();
         builder.Services.AddSingleton<UiAirQualityProvider>();builder.Services.AddSingleton<IAirQualityProvider>(s=>s.GetRequiredService<UiAirQualityProvider>());
         builder.Services.AddSingleton<RiskPredictionService>();
@@ -95,6 +96,25 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Fact]
+    public async Task AdminManagesSourcedGeographyAndImportsReviewedCatalogInBrowser()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())await DevelopmentTransportSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(),app.Environment,new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument("--window-size=1280,1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
+        browser.Navigate().GoToUrl(url+"/login.html?returnUrl=%2Fadmin%2Fdata");browser.FindElement(By.Id("email")).SendKeys("admin@map.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));wait.Until(d=>d.FindElements(By.Id("managed-zone")).Count==1);
+        browser.FindElement(By.Id("Input_Code")).SendKeys("G4");browser.FindElement(By.Id("Input_Name")).SendKeys("Browser managed demo zone");browser.FindElement(By.Id("Input_Source")).SendKeys("Browser survey demonstration");browser.FindElement(By.Id("Input_BoundaryGeoJson")).SendKeys("{}");Click(By.Id("Input_IsSample"));Click(By.CssSelector("#managed-zone button"));
+        wait.Until(d=>d.FindElement(By.TagName("body")).Text.Contains("Use a valid Dhaka"));Assert.Equal("G4",browser.FindElement(By.Id("Input_Code")).GetAttribute("value"));
+        browser.FindElement(By.Id("Input_BoundaryGeoJson")).Clear();browser.FindElement(By.Id("Input_BoundaryGeoJson")).SendKeys("{\"type\":\"Polygon\",\"coordinates\":[[[90.44,23.74],[90.45,23.74],[90.45,23.75],[90.44,23.75],[90.44,23.74]]]}");Click(By.CssSelector("#managed-zone button"));
+        wait.Until(d=>d.FindElement(By.TagName("body")).Text.Contains("Geographic data saved"));Assert.Contains("Browser survey demonstration",browser.FindElement(By.TagName("body")).Text);
+        var raw=Assert.IsType<string>(browser.ExecuteAsyncScript("const done=arguments[arguments.length-1]; fetch('/api/admin/data/transport').then(r=>r.json()).then(x=>{x.source='Browser curated demonstration catalog';done(JSON.stringify(x));});"));browser.ExecuteScript("arguments[0].value=arguments[1]",browser.FindElement(By.Id("catalogJson")),raw);Click(By.CssSelector("#managed-catalog button"));
+        wait.Until(d=>d.FindElement(By.TagName("body")).Text.Contains("Transport catalog imported at revision 1"));Assert.Contains("Browser curated demonstration catalog",browser.FindElement(By.TagName("body")).Text);
+        browser.Navigate().GoToUrl(url+"/map?zone=4");wait.Until(d=>d.FindElement(By.Id("public-zones-status")).Text.Contains("4 zones loaded"));Click(By.CssSelector("#resident-risk-map path.leaflet-interactive"));wait.Until(d=>d.FindElement(By.Id("public-zone-details")).Text.Contains("Browser survey demonstration"));
+        await using var finalScope=app.Services.CreateAsyncScope();var final=finalScope.ServiceProvider.GetRequiredService<AppDbContext>();Assert.Equal(2,await final.ManagedDataChanges.CountAsync());Assert.Equal(1,(await final.TransportCatalogStates.SingleAsync()).Revision);
     }
 
     [Theory]
@@ -423,6 +443,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         Click(By.CssSelector("form[action='/admin/risk-thresholds'] button"));
         wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Thresholds saved."));
         Set("elevation-1", "0"); Set("density-1", "0"); Set("history-1", "1");
+        Set("source-1","Browser fixture demonstration inputs");
         Click(By.CssSelector("form[action$='/zones/1/vulnerability'] button"));
         wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Vulnerability saved."));
         await using (var scope = app.Services.CreateAsyncScope())
