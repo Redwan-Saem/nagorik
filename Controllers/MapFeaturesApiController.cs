@@ -14,4 +14,8 @@ public sealed class MapFeaturesApiController(MapFeatureQueryService features) : 
     [HttpGet("drainage-points")]
     public async Task<IActionResult> Drainage(CancellationToken ct) =>
         new JsonResult(await features.DrainageAsync(ct)) { ContentType = "application/geo+json" };
+
+    [HttpGet("reports")]
+    public async Task<IActionResult> Reports(CancellationToken ct) =>
+        new JsonResult(await features.ReportsAsync(ct)) { ContentType = "application/geo+json" };
 }
