@@ -72,6 +72,122 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.CivicCase", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("ReportedDecibels")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SubmissionToken")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Subtype")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResidentId", "CreatedAtUtc");
+
+                    b.HasIndex("Kind", "State", "CreatedAtUtc");
+
+                    b.HasIndex("ResidentId", "Kind", "SubmissionToken")
+                        .IsUnique();
+
+                    b.ToTable("CivicCases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CivicCases_Values", "Kind IN ('Noise','Construction') AND State IN ('Pending','UnderReview','Resolved','Rejected') AND Revision > 0 AND Latitude BETWEEN 23.65 AND 23.95 AND Longitude BETWEEN 90.30 AND 90.55 AND (ReportedDecibels IS NULL OR (Kind = 'Noise' AND ReportedDecibels BETWEEN 0 AND 180))");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.CivicCaseReview", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CaseId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OfficialId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OfficialId");
+
+                    b.HasIndex("CaseId", "AtUtc");
+
+                    b.ToTable("CivicCaseReviews");
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.Crew", b =>
                 {
                     b.Property<int>("Id")
@@ -1675,6 +1791,30 @@ namespace Nagorik.Api.Migrations
                     b.HasOne("Nagorik.Api.Models.User", null)
                         .WithMany()
                         .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.CivicCase", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.CivicCaseReview", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.CivicCase", null)
+                        .WithMany()
+                        .HasForeignKey("CaseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("OfficialId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
