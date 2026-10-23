@@ -63,4 +63,46 @@ public sealed class ResidentScheduleQueryTests
         Assert.Equal(DateTimeKind.Utc,result.LastUpdatedAtUtc!.Value.Kind);
         Assert.Null(await new ResidentScheduleQueryService(db,new FixedClock(Now)).GetAsync(999));
     }
+
+    [Fact]
+    public async Task PublishedEmptyWeekHasNoOutagesRatherThanNotPublished()
+    {
+        var(db,c)=TestDb.Create();await using var d=db;await using var connection=c;await Seed(db);var day=new DateOnly(2026,10,24);
+        var plan=Plan(day);plan.EndDate=day.AddDays(6);db.LoadsheddingSchedules.Add(plan);await db.SaveChangesAsync();
+        db.SchedulePublications.AddRange(Enumerable.Range(0,7).Select(i=>new SchedulePublication{ZoneId=1,Date=day.AddDays(i),ScheduleId=plan.Id}));await db.SaveChangesAsync();
+        var result=(await new ResidentScheduleQueryService(db,new FixedClock(Now)).GetAsync(1))!;
+        Assert.Equal("NoOutages",result.Status);Assert.Null(result.NextOutage);Assert.All(result.Days,x=>Assert.True(x.IsPublished));
+    }
+
+    [Fact]
+    public async Task PartialRepublishingUsesTheNewDayAndKeepsOtherPublishedDays()
+    {
+        var(db,c)=TestDb.Create();await using var d=db;await using var connection=c;await Seed(db);var day=new DateOnly(2026,10,24);
+        db.Zones.Add(new(){Code="S2",Name="Second zone",BoundaryGeoJson="{\"type\":\"Polygon\",\"coordinates\":[[[90,23],[91,23],[91,24],[90,23]]]}"});await db.SaveChangesAsync();
+        var service=new LoadsheddingScheduleService(db,new(),new FixedClock(Now));
+        var old=await service.GenerateAsync(new(day,day.AddDays(6),10,120,[new(1,10),new(2,10)]),1);
+        await service.PublishAsync(old.Id,new(){ExpectedRevision=1,Confirm=true,AcknowledgeWarnings=true},1);
+        var replacement=await service.GenerateAsync(new(day,day,10,120,[new(1,10)]),1);
+        await service.PublishAsync(replacement.Id,new(){ExpectedRevision=1,Confirm=true,AcknowledgeWarnings=true},1);
+        var result=(await new ResidentScheduleQueryService(db,new FixedClock(Now)).GetAsync(1))!;
+        Assert.Equal("Published",result.Status);Assert.True(result.Days[0].IsPublished);Assert.Empty(result.Days[0].Outages);
+        Assert.All(result.Days.Skip(1),x=>{Assert.True(x.IsPublished);Assert.NotEmpty(x.Outages);});
+    }
+
+    [Fact]
+    public async Task IndexedReadOfCurrentVersionFitsTwoSecondBudgetWithHistoricalSlots()
+    {
+        var(db,c)=TestDb.Create();await using var d=db;await using var connection=c;await Seed(db);var day=new DateOnly(2026,10,24);
+        LoadsheddingSchedule? latest=null;
+        for(var version=0;version<30;version++)
+        {
+            latest=Plan(day);latest.EndDate=day.AddDays(6);
+            latest.Slots=Enumerable.Range(0,7).SelectMany(i=>Enumerable.Range(0,12).Select(slot=>new LoadsheddingSlot{ZoneId=1,Date=day.AddDays(i),StartMinute=slot*120,EndMinute=(slot+1)*120})).ToList();
+            db.LoadsheddingSchedules.Add(latest);
+        }
+        await db.SaveChangesAsync();db.SchedulePublications.AddRange(Enumerable.Range(0,7).Select(i=>new SchedulePublication{ZoneId=1,Date=day.AddDays(i),ScheduleId=latest!.Id}));await db.SaveChangesAsync();
+        var query=new ResidentScheduleQueryService(db,new FixedClock(Now));await query.GetAsync(1);
+        var watch=System.Diagnostics.Stopwatch.StartNew();var result=(await query.GetAsync(1))!;watch.Stop();
+        Assert.True(watch.Elapsed<TimeSpan.FromSeconds(2),$"Warm indexed query took {watch.Elapsed}");Assert.All(result.Days,x=>Assert.Equal(12,x.Outages.Count));
+    }
 }

@@ -52,6 +52,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<LoadsheddingRotationEngine>();
         builder.Services.AddScoped<LoadsheddingScheduleService>();
+        builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -88,6 +89,60 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Theory]
+    [InlineData(1280)]
+    [InlineData(390)]
+    public async Task ResidentScheduleHidesDraftsRefreshesAndReopensOffline(int width)
+    {
+        int actorId,planId;
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var actor=new User{Email="schedule@resident.invalid",Name="Schedule publisher",Role="UtilityOfficial",PasswordHash="fixture"};db.Users.Add(actor);await db.SaveChangesAsync();actorId=actor.Id;
+            var today=DateOnly.FromDateTime(DhakaTime.ToLocal(DateTime.UtcNow));
+            var row=await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().GenerateAsync(new(today,today.AddDays(6),10,120,[new(1,10),new(2,10)]),actorId);planId=row.Id;
+        }
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument($"--window-size={width},1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var driverService=ChromeDriverService.CreateDefaultService();driverService.HideCommandPromptWindow=true;
+        browser=new ChromeDriver(driverService,options,TimeSpan.FromSeconds(90));
+        if(width<600)browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride",new Dictionary<string,object?>{{"width",width},{"height",844},{"deviceScaleFactor",1},{"mobile",true}});
+        browser.ExecuteCdpCommand("Browser.grantPermissions",new Dictionary<string,object?>{{"origin",url},{"permissions",new[]{"geolocation"}}});
+        browser.ExecuteCdpCommand("Emulation.setGeolocationOverride",new Dictionary<string,object?>{{"latitude",23.7461},{"longitude",90.3742},{"accuracy",10}});
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>
+        {
+            try{var target=d.FindElement(by);if(!target.Displayed||!target.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",target);target.Click();return true;}
+            catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}
+        });
+        browser.Navigate().GoToUrl(url+"/login.html?returnUrl=%2Fresident%2Floadshedding%3Fzone%3D1");
+        browser.FindElement(By.Id("email")).SendKeys("resident@map.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
+        wait.Until(d=>d.FindElements(By.CssSelector("#schedule-days .schedule-day")).Count==7);
+        Assert.Contains("not yet published",browser.FindElement(By.Id("schedule-publication-summary")).Text);
+        await using(var scope=app.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().PublishAsync(planId,new(){ExpectedRevision=1,Confirm=true,AcknowledgeWarnings=true},actorId);
+        // Do not click Refresh: the real 30-second publication poll must pick it up.
+        wait.Until(d=>d.FindElement(By.Id("schedule-publication-summary")).Text.Contains("Published seven-day"));
+        Assert.Single(browser.FindElements(By.CssSelector(".schedule-today")));
+        Assert.DoesNotContain("Not published",browser.FindElement(By.Id("schedule-last-updated")).Text);
+        Click(By.Id("schedule-locate"));wait.Until(d=>d.FindElement(By.Id("schedule-location-status")).Text.Contains("Detected area"));
+        new SelectElement(browser.FindElement(By.Id("schedule-zone"))).SelectByValue("3");
+        wait.Until(d=>d.FindElement(By.Id("schedule-publication-summary")).Text.Contains("not yet published"));
+        new SelectElement(browser.FindElement(By.Id("schedule-zone"))).SelectByValue("1");
+        wait.Until(d=>d.FindElement(By.Id("schedule-publication-summary")).Text.Contains("Published seven-day"));
+        wait.Until(d=>browser.ExecuteScript("return !!navigator.serviceWorker.controller") is true);
+        Assert.True(browser.ExecuteAsyncScript("const done=arguments[arguments.length-1]; caches.open('nagorik-resident-schedule-shell-v1').then(c=>c.match('/resident-loadshedding-offline.html')).then(r=>done(!!r));") is true);
+        browser.ExecuteCdpCommand("Network.enable",new Dictionary<string,object?>());
+        browser.ExecuteCdpCommand("Network.emulateNetworkConditions",new Dictionary<string,object?>{{"offline",true},{"latency",0},{"downloadThroughput",0},{"uploadThroughput",0}});
+        Click(By.Id("schedule-refresh"));wait.Until(d=>d.FindElement(By.Id("schedule-cache-notice")).Displayed);
+        browser.Navigate().Refresh();
+        wait.Until(d=>d.FindElements(By.CssSelector("#schedule-days .schedule-day")).Count==7 && d.FindElement(By.Id("schedule-cache-notice")).Displayed);
+        Assert.Contains("last downloaded",browser.FindElement(By.Id("schedule-cache-notice")).Text);
+        browser.ExecuteCdpCommand("Network.emulateNetworkConditions",new Dictionary<string,object?>{{"offline",false},{"latency",0},{"downloadThroughput",-1},{"uploadThroughput",-1}});
+        browser.Navigate().Refresh();wait.Until(d=>d.FindElement(By.Id("resident-schedule-status")).Text.Contains("checked successfully"));
+        Assert.False(browser.FindElement(By.Id("schedule-cache-notice")).Displayed);
+        Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);
     }
 
     [Theory]
