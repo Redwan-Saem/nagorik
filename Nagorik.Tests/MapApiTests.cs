@@ -88,6 +88,23 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/zones/missing/risk")).StatusCode);
     }
 
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    [InlineData("UtilityOfficial", HttpStatusCode.OK)]
+    [InlineData("DPDCOfficial", HttpStatusCode.OK)]
+    [InlineData("DESCOOfficial", HttpStatusCode.OK)]
+    public async Task OnlyUtilityOfficialsAccessScheduleManagement(string? role, HttpStatusCode expected)
+    {
+        if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        foreach (var path in new[] { "/api/official/loadshedding/zones", "/api/official/loadshedding/security-token" })
+            Assert.Equal(expected, (await client.GetAsync(path)).StatusCode);
+    }
+
     [Fact]
     public async Task DispatcherGetsGeoJsonContentTypePropertiesAndCoordinates()
     {
