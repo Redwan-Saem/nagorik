@@ -7,7 +7,7 @@ namespace Nagorik.Api.Services;
 
 public sealed record RiskComputationDetails(RiskAssessment Assessment, double? ElevationMeters,
     double? DrainageDensityKmPerSqKm, double? HistoryScore, WeatherSnapshot? Past,
-    WeatherSnapshot? Forecast, RiskScoringOptions Thresholds);
+    WeatherSnapshot? Forecast, RiskScoringOptions Thresholds, int GeoRevision=0,string? InputSource=null,bool? InputIsSample=null);
 
 public class RiskThresholdProvider(IOptions<RiskScoringOptions> defaults)
 {
@@ -34,7 +34,7 @@ public sealed class RiskComputationService(AppDbContext db, WeatherReadingQueryS
             zone.RiskLevel = result.Level;
             zone.LastComputedAtUtc = now;
             zone.RiskFactorsJson = JsonSerializer.Serialize(new RiskComputationDetails(result, zone.ElevationMeters,
-                zone.DrainageDensityKmPerSqKm, zone.HistoryScore, snapshot?.Past, snapshot?.Forecast, settings));
+                zone.DrainageDensityKmPerSqKm, zone.HistoryScore, snapshot?.Past, snapshot?.Forecast, settings,zone.GeoRevision,zone.InputSource,zone.InputIsSample));
             var history = new RiskHistory { ZoneId = zone.Id, ComputedAtUtc = now,
                 PreviousLevel = previousLevel, Level = result.Level, FactorsJson = zone.RiskFactorsJson };
             db.RiskHistories.Add(history);
