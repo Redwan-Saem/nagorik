@@ -18,6 +18,8 @@ builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
 builder.Services.AddScoped<UtilityPhotoUploadService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
+builder.Services.AddSingleton<LoadsheddingRotationEngine>();
+builder.Services.AddScoped<LoadsheddingScheduleService>();
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
@@ -69,9 +71,7 @@ builder.Services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>((servic
     client.Timeout = Timeout.InfiniteTimeSpan;
     client.MaxResponseContentBufferSize = 1024 * 1024;
 });
-// Canonical rule-risk events replace legacy seeded-risk polling by default.
-if (builder.Configuration.GetValue<bool>("Alerts:UseLegacyRiskWorker"))
-    builder.Services.AddHostedService<AlertBackgroundService>();
+// Legacy seeded-risk polling is retired; canonical rule-risk events are authoritative.
 builder.Services.AddScoped<IWeatherCollector, WeatherCollectionService>();
 builder.Services.AddScoped<WeatherReadingQueryService>();
 builder.Services.AddHostedService<WeatherBackgroundService>();
@@ -133,78 +133,6 @@ if (app.Environment.IsDevelopment())
         scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
 }
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-    if (!db.WaterloggingRisks.Any())
-    {
-        db.WaterloggingRisks.AddRange(
-            new WaterloggingRisk
-            {
-                ZoneId = "Z1",
-                ZoneName = "Dhanmondi",
-                Latitude = 23.7461,
-                Longitude = 90.3742,
-                RiskLevel = "High",
-                LastUpdated = DateTime.UtcNow
-            },
-            new WaterloggingRisk
-            {
-                ZoneId = "Z2",
-                ZoneName = "Mirpur",
-                Latitude = 23.8223,
-                Longitude = 90.3654,
-                RiskLevel = "Medium",
-                LastUpdated = DateTime.UtcNow
-            },
-            new WaterloggingRisk
-            {
-                ZoneId = "Z3",
-                ZoneName = "Gulshan",
-                Latitude = 23.7925,
-                Longitude = 90.4078,
-                RiskLevel = "Low",
-                LastUpdated = DateTime.UtcNow
-            }
-        );
-
-        db.SaveChanges();
-    }
-
-    if (!db.ZoneMapData.Any())
-    {
-        db.ZoneMapData.AddRange(
-            new ZoneMapData
-            {
-                ZoneId = "Z1",
-                RiskLevel = "High",
-                DrainagePumpStatus = "Working",
-                BoundaryGeoJson =
-                    "[[23.744,90.372],[23.748,90.372],[23.748,90.376],[23.744,90.376]]"
-            },
-            new ZoneMapData
-            {
-                ZoneId = "Z2",
-                RiskLevel = "Medium",
-                DrainagePumpStatus = "Faulty",
-                BoundaryGeoJson =
-                    "[[23.820,90.363],[23.824,90.363],[23.824,90.368],[23.820,90.368]]"
-            },
-            new ZoneMapData
-            {
-                ZoneId = "Z3",
-                RiskLevel = "Low",
-                DrainagePumpStatus = "Working",
-                BoundaryGeoJson =
-                    "[[23.790,90.406],[23.795,90.406],[23.795,90.410],[23.790,90.410]]"
-            }
-        );
-
-        db.SaveChanges();
-    }
-}
-
 // HTTPS redirect must come first, before auth middleware
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -261,3 +189,4 @@ record WeatherForecast(
     public int TemperatureF =>
         32 + (int)(TemperatureC / 0.5556);
 }
+

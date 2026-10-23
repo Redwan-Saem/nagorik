@@ -17,6 +17,11 @@ namespace Nagorik.Api
         public DbSet<ZoneMapData> ZoneMapData { get; set; }
 
         public DbSet<Zone> Zones => Set<Zone>();
+        public DbSet<LoadsheddingSchedule> LoadsheddingSchedules => Set<LoadsheddingSchedule>();
+        public DbSet<ScheduleZoneDemand> ScheduleZoneDemands => Set<ScheduleZoneDemand>();
+        public DbSet<LoadsheddingSlot> LoadsheddingSlots => Set<LoadsheddingSlot>();
+        public DbSet<SchedulePublication> SchedulePublications => Set<SchedulePublication>();
+        public DbSet<ScheduleAudit> ScheduleAudits => Set<ScheduleAudit>();
         public DbSet<DrainagePoint> DrainagePoints => Set<DrainagePoint>();
         public DbSet<RainfallReading> RainfallReadings => Set<RainfallReading>();
         public DbSet<RiskHistory> RiskHistories => Set<RiskHistory>();
@@ -53,6 +58,7 @@ namespace Nagorik.Api
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            Data.LoadsheddingModelConfiguration.Configure(builder);
             Data.SosModelConfiguration.Configure(builder);
             Data.ReportFilterModelConfiguration.Configure(builder);
             Data.UtilityAnomalyModelConfiguration.Configure(builder);
