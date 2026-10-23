@@ -39,6 +39,39 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("AreaSubscriptions");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.BusOccupancyReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LinkId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId", "ObservedAtUtc");
+
+                    b.HasIndex("ResidentId", "LinkId")
+                        .IsUnique();
+
+                    b.ToTable("BusOccupancyReports", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BusOccupancy_Level", "Level IN ('SeatsAvailable','Standing','Full')");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.Crew", b =>
                 {
                     b.Property<int>("Id")
@@ -963,6 +996,132 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.TransportFareRule", b =>
+                {
+                    b.Property<string>("Mode")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("BaseBdt")
+                        .HasColumnType("REAL");
+
+                    b.Property<bool>("IsExact")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("MinimumBdt")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("PerKmBdt")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("UpperMultiplier")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Mode");
+
+                    b.ToTable("TransportFareRules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TransportFareRules_Values", "BaseBdt BETWEEN 0 AND 10000 AND PerKmBdt BETWEEN 0 AND 10000 AND MinimumBdt BETWEEN 0 AND 10000 AND UpperMultiplier BETWEEN 1 AND 10 AND Mode IN ('Bus','Metro','CNG','Rickshaw','Walk')");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.TransportLink", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("DistanceKm")
+                        .HasColumnType("REAL");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FromStopId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSample")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Line")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Minutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ToStopId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ToStopId");
+
+                    b.HasIndex("FromStopId", "Enabled");
+
+                    b.ToTable("TransportLinks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TransportLinks_Values", "FromStopId <> ToStopId AND DistanceKm > 0 AND DistanceKm <= 100 AND Minutes BETWEEN 1 AND 300 AND Mode IN ('Bus','Metro','CNG','Rickshaw','Walk')");
+                        });
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.TransportStop", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsSample")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Enabled", "Name");
+
+                    b.ToTable("TransportStops", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TransportStops_Coordinates", "Latitude BETWEEN -90 AND 90 AND Longitude BETWEEN -180 AND 180");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -1432,6 +1591,21 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ZoneMapData");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.BusOccupancyReport", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.TransportLink", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.Crew", b =>
                 {
                     b.HasOne("Nagorik.Api.Models.User", "User")
@@ -1728,6 +1902,21 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ActorUser");
 
                     b.Navigation("SosAlert");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.TransportLink", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.TransportStop", null)
+                        .WithMany()
+                        .HasForeignKey("FromStopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.TransportStop", null)
+                        .WithMany()
+                        .HasForeignKey("ToStopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.UtilityRoutingRule", b =>

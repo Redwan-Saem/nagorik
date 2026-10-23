@@ -14,6 +14,8 @@
         <nav>
             <ul>
                 <li><a href="/map">Area risk map</a></li>
+                <li><a href="/transport">Transport routes</a></li>
+                <li><a href="/transport/occupancy">Bus occupancy</a></li>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <li class="nav-item">
@@ -23,6 +25,7 @@
                 @if (User.IsInRole("Resident"))
                 {
                     <li><a href="/resident/areas">My areas</a></li>
+                    <li><a href="/resident/loadshedding">Loadshedding schedule</a></li>
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="Reports" asp-action="UtilityCreate">Report utility anomaly</a>
                     </li>
@@ -56,6 +59,11 @@
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="OfficialReports" asp-action="Index">City reports</a>
                     </li>
+                }
+
+                @if (Nagorik.Api.Authorization.UtilityScheduleAccess.IsOfficial(User))
+                {
+                    <li><a href="/official/loadshedding">Loadshedding schedules</a></li>
                 }
 
                 @if (User.IsInRole("Dispatcher"))
