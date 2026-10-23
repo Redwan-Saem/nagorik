@@ -96,9 +96,9 @@ public sealed class ZoneRiskAlertService(AppDbContext db, ZoneRiskAlertRecipient
                 {
                     using var sendTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
                     sendTimeout.CancelAfter(TimeSpan.FromSeconds(settings.SendTimeoutSeconds));
-                    delivered = await notifications.SendToUserAsync(delivery.ResidentId.ToString(),$"Zone risk alert: {history.Zone.Name}",
-                        $"Rule-based assessment changed to {history.Level}. Evaluated {history.ComputedAtUtc:u}. Check the map for details.",
-                        $"/map?zone={history.ZoneId}",history.ComputedAtUtc,sendTimeout.Token).WaitAsync(sendTimeout.Token)>0;
+                    var message=ZoneRiskAlertMessage.Build(history);
+                    delivered = await notifications.SendToUserAsync(delivery.ResidentId.ToString(),message.Title,message.Body,
+                        message.Url,history.ComputedAtUtc,sendTimeout.Token).WaitAsync(sendTimeout.Token)>0;
                     if(!delivered)failure="No push endpoint confirmed delivery.";
                 }
                 catch(OperationCanceledException)when(ct.IsCancellationRequested){throw;}

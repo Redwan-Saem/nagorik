@@ -43,3 +43,17 @@ An evaluation older than 15 minutes is not eligible. Admins can inspect the late
 that a person read the alert. A crash after an external push succeeds but before
 the receipt is saved can still cause a retry: external delivery cannot guarantee
 mathematical exactly-once behavior. The lease exceeds the bounded send timeout.
+
+T-035.6 (Rajiya): notification copy names the zone, changed rule-risk level and UTC
+evaluation time and links to `/map?zone=ID`. It describes an experimental
+assessment instead of promising a flood. The global alert screen is connected to
+the real canonical settings payload through a dedicated CSRF-protected global-only
+update; saved memberships cannot be overwritten by that toggle. Device push setup
+has one handler and resaves existing subscriptions even when permission was
+already granted. Failures are shown rather than throwing an unhandled browser
+error. Delivery requires valid existing VAPID configuration and device permission.
+
+The final integrated browser scenario covers crew GPS/status, busy/free map,
+flagged-point assignment/duplicate prevention, report publication, anonymous map,
+actual service-worker activation, resident GPS, My areas and global preference
+changes. See `NON_ML_RUNBOOK.md` for local setup, routes and honest demo limits.
