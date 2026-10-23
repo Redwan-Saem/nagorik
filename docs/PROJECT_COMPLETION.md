@@ -50,5 +50,14 @@ desktop/mobile resident browser scenarios passed. The browser scenarios include
 draft isolation, automatic publication refresh and a full offline reload. See
 `NAG-015-resident-schedules.md` for routes, acceptance and offline/GPS limitations.
 
-NAG-018 (transport routes/fares) is next. A dedicated homepage/dashboard remains
+## NAG-018 — transport routes and fares
+
+All eight tasks are implemented: a directed catalog and migration, bounded route
+search, configurable per-leg fares, sorting/detail API, local landmark/GPS/map
+selection and responsive result/detail UI. Seven backend tests, eight client tests
+and two desktop/mobile browser scenarios passed. See `NAG-018-transport.md` for
+exact bounds, demo/API steps and limitations. Development catalog routes/fares
+are explicitly synthetic, and the local provider does not geocode arbitrary streets.
+
+NAG-019 (recent bus occupancy) is next. A dedicated homepage/dashboard remains
 to be built; the existing Home controller redirects.

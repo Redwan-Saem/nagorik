@@ -53,6 +53,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddSingleton<LoadsheddingRotationEngine>();
         builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddScoped<ResidentScheduleQueryService>();
+        builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -89,6 +90,39 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Theory]
+    [InlineData(1280)]
+    [InlineData(390)]
+    public async Task TransportSearchSortDetailsGpsAndNetworkRetryWork(int width)
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+            await DevelopmentTransportSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(),app.Environment,new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument($"--window-size={width},1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        if(width<600)browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride",new Dictionary<string,object?>{{"width",width},{"height",844},{"deviceScaleFactor",1},{"mobile",true}});
+        browser.ExecuteCdpCommand("Browser.grantPermissions",new Dictionary<string,object?>{{"origin",url},{"permissions",new[]{"geolocation"}}});
+        browser.ExecuteCdpCommand("Emulation.setGeolocationOverride",new Dictionary<string,object?>{{"latitude",23.7562},{"longitude",90.3758},{"accuracy",10}});
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
+        browser.Navigate().GoToUrl(url+"/transport");wait.Until(d=>d.FindElement(By.Id("transport-status")).Text.Contains("Landmarks ready"));
+        Click(By.Id("transport-search"));Assert.Contains("Choose both",browser.FindElement(By.Id("transport-validation")).Text);
+        browser.FindElement(By.Id("transport-origin")).SendKeys("Dhanmondi 27");browser.FindElement(By.Id("transport-destination")).SendKeys("Motijheel");Click(By.Id("transport-search"));
+        wait.Until(d=>d.FindElements(By.CssSelector(".transport-option")).Count>=2);
+        Assert.Contains("Demonstration route",browser.FindElement(By.Id("transport-options")).Text);Assert.Contains("Estimated BDT",browser.FindElement(By.Id("transport-options")).Text);
+        new SelectElement(browser.FindElement(By.Id("transport-sort"))).SelectByValue("cheapest");
+        wait.Until(d=>d.FindElements(By.CssSelector(".transport-option h3")).FirstOrDefault()?.Text=="Bus");
+        Click(By.CssSelector(".transport-option button"));wait.Until(d=>d.FindElement(By.Id("transport-detail")).Displayed);
+        Assert.Contains("Fare source",browser.FindElement(By.Id("transport-legs")).Text);
+        Click(By.CssSelector(".transport-option a"));wait.Until(d=>d.Url.Contains("/transport/route?")&&d.FindElement(By.Id("transport-detail")).Displayed);
+        Click(By.Id("transport-gps"));wait.Until(d=>d.FindElement(By.Id("transport-origin")).GetAttribute("value")=="Current location");Click(By.Id("transport-search"));
+        wait.Until(d=>d.FindElements(By.CssSelector(".transport-option")).Count>=2);
+        browser.ExecuteCdpCommand("Network.enable",new Dictionary<string,object?>());browser.ExecuteCdpCommand("Network.emulateNetworkConditions",new Dictionary<string,object?>{{"offline",true},{"latency",0},{"downloadThroughput",0},{"uploadThroughput",0}});
+        Click(By.Id("transport-search"));wait.Until(d=>d.FindElement(By.Id("transport-status")).Text.Contains("Your locations are kept"));Assert.Equal("Motijheel",browser.FindElement(By.Id("transport-destination")).GetAttribute("value"));
+        browser.ExecuteCdpCommand("Network.emulateNetworkConditions",new Dictionary<string,object?>{{"offline",false},{"latency",0},{"downloadThroughput",-1},{"uploadThroughput",-1}});
+        Click(By.Id("transport-retry"));wait.Until(d=>d.FindElements(By.CssSelector(".transport-option")).Count>=2);
+        Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);
     }
 
     [Theory]
