@@ -14,6 +14,11 @@
         <nav>
             <ul>
                 <li><a href="/map">Area risk map</a></li>
+                <li><a href="/transport">Transport routes</a></li>
+                <li><a href="/transport/occupancy">Bus occupancy</a></li>
+                <li><a href="/services/water">Water schedule</a></li>
+                <li><a href="/services/waste">Waste collection</a></li>
+                <li><a href="/air-quality">Air quality</a></li>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <li class="nav-item">
@@ -23,6 +28,7 @@
                 @if (User.IsInRole("Resident"))
                 {
                     <li><a href="/resident/areas">My areas</a></li>
+                    <li><a href="/resident/loadshedding">Loadshedding schedule</a></li>
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="Reports" asp-action="UtilityCreate">Report utility anomaly</a>
                     </li>
@@ -53,9 +59,20 @@
 
                 @if (Nagorik.Api.Authorization.OfficialAccess.IsOfficial(User))
                 {
+                    <li><a href="/official/services/waste">Manage waste schedules</a></li>
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="OfficialReports" asp-action="Index">City reports</a>
                     </li>
+                }
+
+                @if (Nagorik.Api.Authorization.UtilityScheduleAccess.IsOfficial(User))
+                {
+                    <li><a href="/official/loadshedding">Loadshedding schedules</a></li>
+                }
+
+                @if (User.IsInRole("UtilityOfficial") || User.IsInRole("WASAOfficial") || User.IsInRole("Admin"))
+                {
+                    <li><a href="/official/services/water">Manage water schedules</a></li>
                 }
 
                 @if (User.IsInRole("Dispatcher"))
@@ -69,6 +86,7 @@
 
                 @if (User.IsInRole("Admin"))
                 {
+                    <li><a href="/official/services/waste">Manage waste schedules</a></li>
                     <li><a href="/admin/risk-thresholds">Risk thresholds</a></li>
                     <li><a href="/admin/risk-alert-deliveries">Risk alert delivery diagnostics</a></li>
                 }
