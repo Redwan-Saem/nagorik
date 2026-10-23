@@ -14,6 +14,10 @@ public sealed class CivicCaseController(AppDbContext db,CivicCaseService service
     public async Task<IActionResult> Noise(CancellationToken ct)=>View("Submit",await Model("Noise",null,null,ct));
     [HttpPost("/resident/concerns/noise"),Authorize(Roles="Resident"),ValidateAntiForgeryToken]
     public Task<IActionResult> SubmitNoise([Bind(Prefix="Input")]CivicCaseInput input,string observedLocal,CancellationToken ct)=>Submit("Noise",input,observedLocal,ct);
+    [HttpGet("/resident/concerns/construction"),Authorize(Roles="Resident")]
+    public async Task<IActionResult> Construction(CancellationToken ct)=>View("Submit",await Model("Construction",null,null,ct));
+    [HttpPost("/resident/concerns/construction"),Authorize(Roles="Resident"),ValidateAntiForgeryToken]
+    public Task<IActionResult> SubmitConstruction([Bind(Prefix="Input")]CivicCaseInput input,string observedLocal,CancellationToken ct)=>Submit("Construction",input,observedLocal,ct);
     private async Task<IActionResult> Submit(string kind,CivicCaseInput input,string observedLocal,CancellationToken ct)
     {
         ModelState.Remove("Input.ObservedAtUtc");
@@ -29,6 +33,8 @@ public sealed class CivicCaseController(AppDbContext db,CivicCaseService service
     }
     [HttpGet("/resident/concerns/noise/{id:int}"),Authorize(Roles="Resident")]
     public Task<IActionResult> NoiseDetail(int id,CancellationToken ct)=>Detail("Noise",id,false,ct);
+    [HttpGet("/resident/concerns/construction/{id:int}"),Authorize(Roles="Resident")]
+    public Task<IActionResult> ConstructionDetail(int id,CancellationToken ct)=>Detail("Construction",id,false,ct);
     private async Task<IActionResult> Detail(string kind,int id,bool official,CancellationToken ct)
     {try{return View("Detail",new CivicDetailView(await service.DetailAsync(kind,id,Actor,official,ct),official));}catch(TransportProblem e){return StatusCode(e.Status,e.Message);}}
     [HttpGet("/official/concerns/{kind}"),Authorize(Roles="Official,CityOfficial,Admin")]

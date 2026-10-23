@@ -28,6 +28,7 @@
                 @if (User.IsInRole("Resident"))
                 {
                     <li><a href="/resident/concerns/noise">Noise concerns</a></li>
+                    <li><a href="/resident/concerns/construction">Construction concerns</a></li>
                     <li><a href="/resident/areas">My areas</a></li>
                     <li><a href="/resident/loadshedding">Loadshedding schedule</a></li>
                     <li class="nav-item">
@@ -61,6 +62,7 @@
                 @if (Nagorik.Api.Authorization.OfficialAccess.IsOfficial(User))
                 {
                     <li><a href="/official/concerns/noise">Review noise concerns</a></li>
+                    <li><a href="/official/concerns/construction">Review construction concerns</a></li>
                     <li><a href="/official/services/waste">Manage waste schedules</a></li>
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="OfficialReports" asp-action="Index">City reports</a>
@@ -89,6 +91,7 @@
                 @if (User.IsInRole("Admin"))
                 {
                     <li><a href="/official/concerns/noise">Review noise concerns</a></li>
+                    <li><a href="/official/concerns/construction">Review construction concerns</a></li>
                     <li><a href="/official/services/waste">Manage waste schedules</a></li>
                     <li><a href="/admin/risk-thresholds">Risk thresholds</a></li>
                     <li><a href="/admin/risk-alert-deliveries">Risk alert delivery diagnostics</a></li>
