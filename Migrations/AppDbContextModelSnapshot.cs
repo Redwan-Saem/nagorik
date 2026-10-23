@@ -105,6 +105,10 @@ namespace Nagorik.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("LastWorkReportId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("REAL");
 
@@ -121,6 +125,8 @@ namespace Nagorik.Api.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LastWorkReportId");
 
                     b.HasIndex("ZoneId", "Status");
 
@@ -275,6 +281,9 @@ namespace Nagorik.Api.Migrations
                     b.Property<bool>("IsPossibleDuplicate")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsPubliclyVerified")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double>("Latitude")
                         .HasColumnType("REAL");
 
@@ -290,6 +299,16 @@ namespace Nagorik.Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT")
                         .HasDefaultValueSql("'[]'");
+
+                    b.Property<long>("PublicVerificationRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("PublicVerifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PublicVerifiedByUserId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ReferenceNo")
                         .HasMaxLength(32)
@@ -319,6 +338,8 @@ namespace Nagorik.Api.Migrations
 
                     b.HasIndex("AssignedCrewId");
 
+                    b.HasIndex("PublicVerifiedByUserId");
+
                     b.HasIndex("ReferenceNo")
                         .IsUnique()
                         .HasFilter("\"ReferenceNo\" IS NOT NULL");
@@ -327,6 +348,8 @@ namespace Nagorik.Api.Migrations
 
                     b.HasIndex("CreatedAt", "Id")
                         .IsDescending();
+
+                    b.HasIndex("IsPubliclyVerified", "CreatedAt");
 
                     b.HasIndex("AreaId", "CreatedAt", "Id")
                         .IsDescending(false, true, true);
@@ -355,6 +378,8 @@ namespace Nagorik.Api.Migrations
                             t.HasCheckConstraint("CK_Reports_HighRiskUrgency", "\"AnomalyType\" IS NULL OR \"AnomalyType\" NOT IN ('ExposedWire', 'GasLeak', 'FallenPole') OR \"Urgency\" IN (2, 3)");
 
                             t.HasCheckConstraint("CK_Reports_PhotoPaths", "CASE WHEN json_valid(\"PhotoPaths\") THEN json_type(\"PhotoPaths\") = 'array' AND json_array_length(\"PhotoPaths\") <= 3 AND (json_type(\"PhotoPaths\", '$[0]') IS NULL OR (json_type(\"PhotoPaths\", '$[0]') = 'text' AND length(trim(json_extract(\"PhotoPaths\", '$[0]'), char(9) || char(10) || char(13) || ' ')) > 0)) AND (json_type(\"PhotoPaths\", '$[1]') IS NULL OR (json_type(\"PhotoPaths\", '$[1]') = 'text' AND length(trim(json_extract(\"PhotoPaths\", '$[1]'), char(9) || char(10) || char(13) || ' ')) > 0)) AND (json_type(\"PhotoPaths\", '$[2]') IS NULL OR (json_type(\"PhotoPaths\", '$[2]') = 'text' AND length(trim(json_extract(\"PhotoPaths\", '$[2]'), char(9) || char(10) || char(13) || ' ')) > 0)) ELSE 0 END");
+
+                            t.HasCheckConstraint("CK_Reports_PublicVerification", "\"PublicVerificationRevision\" >= 0 AND (\"IsPubliclyVerified\" = 0 OR (\"PublicVerifiedByUserId\" IS NOT NULL AND \"PublicVerifiedAtUtc\" IS NOT NULL))");
 
                             t.HasCheckConstraint("CK_Reports_ReferenceNo", "\"ReferenceNo\" IS NULL OR (length(\"ReferenceNo\") BETWEEN 9 AND 32 AND substr(\"ReferenceNo\", 1, 3) = 'UA-' AND substr(\"ReferenceNo\", 4) NOT GLOB '*[^0-9]*')");
 
@@ -431,6 +456,99 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("ReportStatusHistories");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.ResidentZoneSubscription", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AlertsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("ResidentId", "ZoneId")
+                        .IsUnique();
+
+                    b.ToTable("ResidentZoneSubscriptions");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ClaimToken")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("EventId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastAttemptAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("SentAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("EventId", "ResidentId")
+                        .IsUnique();
+
+                    b.HasIndex("State", "NextAttemptAtUtc");
+
+                    b.HasIndex("ResidentId", "ZoneId", "SentAtUtc");
+
+                    b.ToTable("RiskAlertDeliveries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RiskAlertDeliveries_State", "\"Attempts\" BETWEEN 0 AND 100 AND \"State\" IN ('Pending','Sending','Sent','Failed','Suppressed') AND (\"State\" <> 'Sent' OR \"SentAtUtc\" IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -454,6 +572,28 @@ namespace Nagorik.Api.Migrations
                     b.HasIndex("ProcessedAtUtc", "Id");
 
                     b.ToTable("RiskAlertEvents");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertProcessorLease", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LockedUntilUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RiskAlertProcessorLeases", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RiskAlertProcessorLeases_Singleton", "\"Id\" = 1");
+                        });
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.RiskHistory", b =>
@@ -1156,11 +1296,18 @@ namespace Nagorik.Api.Migrations
 
             modelBuilder.Entity("Nagorik.Api.Models.DrainagePoint", b =>
                 {
+                    b.HasOne("Nagorik.Api.Models.Report", "LastWorkReport")
+                        .WithMany()
+                        .HasForeignKey("LastWorkReportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Nagorik.Api.Models.Zone", "Zone")
                         .WithMany()
                         .HasForeignKey("ZoneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("LastWorkReport");
 
                     b.Navigation("Zone");
                 });
@@ -1186,6 +1333,11 @@ namespace Nagorik.Api.Migrations
                     b.HasOne("Nagorik.Api.Models.Crew", "AssignedCrew")
                         .WithMany()
                         .HasForeignKey("AssignedCrewId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("PublicVerifiedByUserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Nagorik.Api.Models.User", "User")
@@ -1217,6 +1369,52 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Report");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ResidentZoneSubscription", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", "Resident")
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Resident");
+
+                    b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.RiskAlertDelivery", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.RiskAlertEvent", "Event")
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.User", "Resident")
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("Resident");
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.RiskAlertEvent", b =>

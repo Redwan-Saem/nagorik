@@ -21,6 +21,9 @@ namespace Nagorik.Api
         public DbSet<RainfallReading> RainfallReadings => Set<RainfallReading>();
         public DbSet<RiskHistory> RiskHistories => Set<RiskHistory>();
         public DbSet<RiskAlertEvent> RiskAlertEvents => Set<RiskAlertEvent>();
+        public DbSet<ResidentZoneSubscription> ResidentZoneSubscriptions => Set<ResidentZoneSubscription>();
+        public DbSet<RiskAlertDelivery> RiskAlertDeliveries => Set<RiskAlertDelivery>();
+        public DbSet<RiskAlertProcessorLease> RiskAlertProcessorLeases => Set<RiskAlertProcessorLease>();
         public DbSet<RiskThresholdSettings> RiskThresholdSettings => Set<RiskThresholdSettings>();
 
         public DbSet<Report> Reports => Set<Report>();
@@ -57,6 +60,30 @@ namespace Nagorik.Api
             Data.ZoneModelConfiguration.Configure(builder);
             Data.DrainagePointModelConfiguration.Configure(builder);
             Data.RainfallModelConfiguration.Configure(builder);
+            builder.Entity<RiskAlertDelivery>(e =>
+            {
+                e.HasOne(x=>x.Event).WithMany().HasForeignKey(x=>x.EventId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x=>x.Resident).WithMany().HasForeignKey(x=>x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x=>x.Zone).WithMany().HasForeignKey(x=>x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x=>new{x.EventId,x.ResidentId}).IsUnique();
+                e.HasIndex(x=>new{x.ResidentId,x.ZoneId,x.SentAtUtc});
+                e.HasIndex(x=>new{x.State,x.NextAttemptAtUtc});
+                e.Property(x=>x.State).HasConversion<string>();
+                e.Property(x=>x.ClaimToken).HasMaxLength(40); e.Property(x=>x.LastError).HasMaxLength(500);
+                e.ToTable("RiskAlertDeliveries",t=>t.HasCheckConstraint("CK_RiskAlertDeliveries_State",
+                    "\"Attempts\" BETWEEN 0 AND 100 AND \"State\" IN ('Pending','Sending','Sent','Failed','Suppressed') AND (\"State\" <> 'Sent' OR \"SentAtUtc\" IS NOT NULL)"));
+            });
+            builder.Entity<RiskAlertProcessorLease>(e =>
+            {
+                e.Property(x=>x.Token).IsRequired().HasMaxLength(40);
+                e.ToTable("RiskAlertProcessorLeases",t=>t.HasCheckConstraint("CK_RiskAlertProcessorLeases_Singleton","\"Id\" = 1"));
+            });
+            builder.Entity<ResidentZoneSubscription>(e =>
+            {
+                e.HasIndex(x => new { x.ResidentId, x.ZoneId }).IsUnique();
+                e.HasOne(x => x.Resident).WithMany().HasForeignKey(x => x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            });
             builder.Entity<RiskAlertEvent>(e =>
             {
                 e.HasOne(x => x.RiskHistory).WithMany().HasForeignKey(x => x.RiskHistoryId).OnDelete(DeleteBehavior.Restrict);
@@ -114,6 +141,11 @@ namespace Nagorik.Api
             // Report configuration
             builder.Entity<Report>(e =>
             {
+                e.Property(r => r.PublicVerificationRevision).IsConcurrencyToken();
+                e.HasOne<User>().WithMany().HasForeignKey(r => r.PublicVerifiedByUserId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(r => new { r.IsPubliclyVerified, r.CreatedAt });
+                e.ToTable("Reports", table => table.HasCheckConstraint("CK_Reports_PublicVerification",
+                    "\"PublicVerificationRevision\" >= 0 AND (\"IsPubliclyVerified\" = 0 OR (\"PublicVerifiedByUserId\" IS NOT NULL AND \"PublicVerifiedAtUtc\" IS NOT NULL))"));
                 e.HasKey(r => r.Id);
 
                 e.Property(r => r.Title)

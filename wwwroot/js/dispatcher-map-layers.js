@@ -13,6 +13,9 @@
             const title = document.createElement('h3'); title.textContent = `Drainage point #${feature.id}`; popup.appendChild(title);
             const zone = document.createElement('p'); zone.textContent = `Zone: ${properties.zoneName} (${properties.zoneCode})`; popup.appendChild(zone);
             const state = document.createElement('p'); state.textContent = `Status: ${properties.status}`; popup.appendChild(state);
+            if (properties.isFlagged) {
+                const flag = document.createElement('p'); flag.textContent = `Flagged: ${properties.riskLevel} zone risk. Inspect the flagged drainage panel for crew assignment.`; popup.appendChild(flag);
+            }
             const actions = document.createElement('div'); actions.className = 'drainage-actions';
             for (const next of ['Clear', 'Blocked']) {
                 const button = document.createElement('button'); button.type = 'button';

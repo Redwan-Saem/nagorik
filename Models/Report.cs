@@ -54,4 +54,9 @@ public class Report
     public int UserId { get; set; }
 
     public User? User { get; set; }
+    // Separate publication decision; workflow approval does not make a report public.
+    public bool IsPubliclyVerified { get; set; }
+    public DateTime? PublicVerifiedAtUtc { get; set; }
+    public int? PublicVerifiedByUserId { get; set; }
+    public long PublicVerificationRevision { get; set; }
 }
