@@ -20,3 +20,7 @@
 .drainage-actions button { font-size: .85rem; padding: .4rem .6rem; }
 #dispatcher-risk-map [hidden] { display: none !important; }
 @media (max-width: 600px) { #risk-zone-map { min-height: 320px; height: 55vh; } }
+.crew-marker { border-radius: 50%; border: 2px solid white; color: white; text-align: center; font-weight: bold; line-height: 26px; background: #64748b; }
+.crew-free { background: #15803d; }
+.crew-busy { background: #b91c1c; }
+.crew-stale { background: #64748b; border-style: dashed; }
