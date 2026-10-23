@@ -87,6 +87,22 @@ public class CrewTasksApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task OwnedTaskUpdateStoresValidatedGpsAndForeignTaskCannotOverwriteIt()
+    {
+        Authenticate("2", "Crew");
+        using var invalid = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress", location = new { latitude = 200, longitude = 90 } });
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        using var valid = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "InProgress", location = new { latitude = 23.7, longitude = 90.3 } });
+        Assert.Equal(HttpStatusCode.OK, valid.StatusCode);
+        Authenticate("3", "Crew");
+        using var denied = await _client.PatchAsJsonAsync("/api/crew/tasks/1/status", new { status = "Completed", location = new { latitude = 24, longitude = 91 } });
+        Assert.Equal(HttpStatusCode.NotFound, denied.StatusCode);
+        await using var db = CreateDb();
+        var crew = await db.Crews.SingleAsync(c => c.Id == 10);
+        Assert.Equal(23.7, crew.LastLatitude); Assert.Equal(90.3, crew.LastLongitude); Assert.NotNull(crew.LastSeenAtUtc);
+    }
+
+    [Fact]
     public async Task SimultaneousAssignments_CreateOneAssignmentAndHistoryAndNotifyOnce()
     {
         Authenticate("1", "Dispatcher");

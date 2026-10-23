@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Nagorik.Api.Services;
 
-public sealed record RiskZoneProperties(string Code, string Name, string RiskLevel, DateTime? LastComputedAtUtc);
+public sealed record RiskZoneProperties(string Code, string Name, string RiskLevel, DateTime? LastComputedAtUtc,
+    RiskComputationDetails? Factors = null);
 public sealed record RiskZoneFeature(string Type, int Id, JsonElement Geometry, RiskZoneProperties Properties);
 public sealed record RiskZoneCollection(string Type, IReadOnlyList<RiskZoneFeature> Features, int InvalidZoneCount);
 
@@ -12,7 +13,7 @@ public sealed class RiskZoneQueryService(AppDbContext db, ILogger<RiskZoneQueryS
     public async Task<RiskZoneCollection> ListAsync(CancellationToken ct = default)
     {
         var zones = await db.Zones.AsNoTracking().OrderBy(z => z.Code).Select(z => new
-            { z.Id, z.Code, z.Name, z.BoundaryGeoJson, z.RiskLevel, z.LastComputedAtUtc }).ToListAsync(ct);
+            { z.Id, z.Code, z.Name, z.BoundaryGeoJson, z.RiskLevel, z.LastComputedAtUtc, z.RiskFactorsJson }).ToListAsync(ct);
         var features = new List<RiskZoneFeature>();
         var invalid = 0;
         foreach (var zone in zones)
@@ -23,7 +24,8 @@ public sealed class RiskZoneQueryService(AppDbContext db, ILogger<RiskZoneQueryS
                 using var document = JsonDocument.Parse(zone.BoundaryGeoJson);
                 if (!ValidGeometry(document.RootElement)) throw new JsonException("Invalid zone geometry.");
                 features.Add(new("Feature", zone.Id, document.RootElement.Clone(), new(zone.Code, zone.Name,
-                    zone.RiskLevel.ToString(), zone.LastComputedAtUtc is { } time ? DateTime.SpecifyKind(time, DateTimeKind.Utc) : null)));
+                    zone.RiskLevel.ToString(), zone.LastComputedAtUtc is { } time ? DateTime.SpecifyKind(time, DateTimeKind.Utc) : null,
+                    ReadFactors(zone.RiskFactorsJson))));
             }
             catch (JsonException)
             {
@@ -32,6 +34,13 @@ public sealed class RiskZoneQueryService(AppDbContext db, ILogger<RiskZoneQueryS
             }
         }
         return new("FeatureCollection", features, invalid);
+    }
+
+    private static RiskComputationDetails? ReadFactors(string? value)
+    {
+        if (value == null) return null;
+        try { return JsonSerializer.Deserialize<RiskComputationDetails>(value); }
+        catch (JsonException) { return null; }
     }
 
     // Standard GeoJSON uses longitude, latitude. Reject malformed legacy arrays

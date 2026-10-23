@@ -29,11 +29,12 @@
         error.hidden = true;
         feedback.textContent = 'Updating task status…';
         try {
+            const location = globalThis.CrewTaskLocation?.current();
             const response = await fetch(`/api/crew/tasks/${encodeURIComponent(task.dataset.taskId)}/status`, {
                 method: 'PATCH',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ status: button.dataset.nextStatus })
+                body: JSON.stringify({ status: button.dataset.nextStatus, ...(location ? { location } : {}) })
             });
             if (response.ok) {
                 try { sessionStorage.setItem(successKey, '1'); } catch { }

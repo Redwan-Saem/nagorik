@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nagorik.Api.Services;
+using Nagorik.Api.Authorization;
 
 namespace Nagorik.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Dispatcher")]
+[Authorize(Policy = DispatcherMapAccess.Policy)]
 [Route("api/map")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class MapApiController(RiskZoneQueryService zones) : ControllerBase
