@@ -50,6 +50,8 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<DispatcherTaskStatusNotifier>();
         builder.Services.AddScoped<ReportStatusWorkflowService>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<LoadsheddingRotationEngine>();
+        builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -86,6 +88,57 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Theory]
+    [InlineData(1280)]
+    [InlineData(390)]
+    public async Task UtilityOfficialGeneratesReviewsEditsAndPublishesSchedule(int width)
+    {
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Users.Add(new User { Email="utility@schedule.invalid", Name="Utility fixture", Role="UtilityOfficial", PasswordHash=BCrypt.Net.BCrypt.HashPassword(Password,4) });
+            await db.SaveChangesAsync();
+        }
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument($"--window-size={width},1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var driverService=ChromeDriverService.CreateDefaultService();driverService.HideCommandPromptWindow=true;
+        browser=new ChromeDriver(driverService,options,TimeSpan.FromSeconds(90));
+        if(width<600)browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride",new Dictionary<string,object?>{{"width",width},{"height",844},{"deviceScaleFactor",1},{"mobile",true}});
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(30));
+        void Click(By by)
+        {
+            var target=wait.Until(d=>d.FindElements(by).FirstOrDefault(e=>e.Displayed&&e.Enabled));
+            browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",target);target.Click();
+        }
+        browser.Navigate().GoToUrl(url+"/login.html?returnUrl=%2Fofficial%2Floadshedding");
+        browser.FindElement(By.Id("email")).SendKeys("utility@schedule.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
+        wait.Until(d=>d.FindElements(By.Id("schedule-generate")).Count==1);
+        browser.FindElement(By.Name("AvailableCapacityMw")).SendKeys("10");
+        browser.ExecuteScript("document.querySelector('[name=EndDate]').value=document.querySelector('[name=StartDate]').value");
+        var rows=browser.FindElements(By.CssSelector(".schedule-demand")).Take(2).ToArray();
+        foreach(var row in rows)
+        {
+            var check=row.FindElement(By.CssSelector(".zone-included"));browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",check);check.Click();
+            row.FindElement(By.CssSelector(".zone-demand")).SendKeys("10");
+        }
+        Click(By.CssSelector("#schedule-generate button[type=submit]"));
+        wait.Until(d=>d.FindElements(By.Id("review-summary")).Any(e=>e.Text.Contains("Draft")&&e.Text.Contains("Revision 1")));
+        Assert.Equal(12,browser.FindElements(By.CssSelector("#review-slots tr")).Count);
+        Click(By.CssSelector("#review-slots button"));Click(By.CssSelector("#schedule-edit button[type=submit]"));
+        wait.Until(d=>d.FindElement(By.Id("review-summary")).Text.Contains("Revision 2"));
+        Click(By.CssSelector("#schedule-publish input[name=Confirm]"));
+        Click(By.CssSelector("#schedule-publish input[name=AcknowledgeWarnings]"));Click(By.CssSelector("#schedule-publish button[type=submit]"));
+        wait.Until(d=>d.FindElement(By.Id("review-status")).Text.Contains("published successfully"));
+        Assert.False(browser.FindElement(By.Id("schedule-edit")).Displayed);
+        browser.Navigate().Refresh();wait.Until(d=>d.FindElement(By.Id("review-summary")).Text.Contains("Published"));
+        Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();var schedule=await db.LoadsheddingSchedules.SingleAsync();
+            Assert.Equal(ScheduleState.Published,schedule.State);Assert.Equal(2,await db.SchedulePublications.CountAsync());
+            Assert.Equal(new[]{"Generate","Edit","Publish"},await db.ScheduleAudits.OrderBy(a=>a.Id).Select(a=>a.Action).ToArrayAsync());
+        }
     }
 
     [Fact]

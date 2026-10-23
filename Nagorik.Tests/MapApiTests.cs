@@ -136,12 +136,62 @@ public class MapApiTests : IAsyncLifetime
         Assert.Equal("Draft", json.GetProperty("state").GetString());
         Assert.Equal(1, json.GetProperty("revision").GetInt32());
         Assert.Empty(json.GetProperty("slots").EnumerateArray());
+        var reviewPage = await client.GetStringAsync("/official/loadshedding/1");
+        Assert.Contains("schedule-review", reviewPage);
+        Assert.Contains("schedule-publish", reviewPage);
+        Assert.Contains("__RequestVerificationToken", reviewPage);
         var edit = new { expectedRevision = 1, slotId = 0, zoneId = 1, date = "2026-10-23", startMinute = 0, endMinute = 120 };
         Assert.Equal(HttpStatusCode.OK, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", edit)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", edit)).StatusCode);
         var saved = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/1");
         Assert.Equal(2, saved.GetProperty("revision").GetInt32());
         Assert.Single(saved.GetProperty("slots").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData(null, HttpStatusCode.Unauthorized)]
+    [InlineData("Resident", HttpStatusCode.Forbidden)]
+    [InlineData("Official", HttpStatusCode.Forbidden)]
+    [InlineData("CityOfficial", HttpStatusCode.Forbidden)]
+    [InlineData("Dispatcher", HttpStatusCode.Forbidden)]
+    [InlineData("Admin", HttpStatusCode.Forbidden)]
+    [InlineData("Crew", HttpStatusCode.Forbidden)]
+    public async Task OtherRolesCannotMutateOrAuditSchedules(string? role, HttpStatusCode expected)
+    {
+        if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        Assert.Equal(expected, (await client.PostAsJsonAsync("/api/official/loadshedding", new { })).StatusCode);
+        Assert.Equal(expected, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", new { })).StatusCode);
+        Assert.Equal(expected, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", new { })).StatusCode);
+        Assert.Equal(expected, (await client.GetAsync("/api/official/loadshedding/1/audit")).StatusCode);
+    }
+
+    [Fact]
+    public async Task PublicationHttpRequiresCsrfConfirmationAndFreezesTheVersion()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "UtilityOfficial");
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = TestDb.AddUser(db); user.Role = "UtilityOfficial"; await db.SaveChangesAsync();
+        }
+        var token = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/security-token");
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", token.GetProperty("requestToken").GetString());
+        var generated = await client.PostAsJsonAsync("/api/official/loadshedding", new { startDate = "2026-10-23", endDate = "2026-10-23",
+            availableCapacityMw = 10, slotMinutes = 120, zones = new[] { new { zoneId = 1, demandMw = 10 } } });
+        Assert.Equal(HttpStatusCode.OK, generated.StatusCode);
+        client.DefaultRequestHeaders.Remove("RequestVerificationToken");
+        var confirm = new { expectedRevision = 1, confirm = true, acknowledgeWarnings = true };
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", confirm)).StatusCode);
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", token.GetProperty("requestToken").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", new { expectedRevision = 1 })).StatusCode);
+        var published = await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", confirm);
+        Assert.Equal(HttpStatusCode.OK, published.StatusCode);
+        var body = await published.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Published", body.GetProperty("state").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/official/loadshedding/1/publish", confirm)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", new { expectedRevision=2, slotId=0, zoneId=1, date="2026-10-23", startMinute=0, endMinute=120 })).StatusCode);
+        var audit = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/1/audit");
+        Assert.Equal(2, audit.GetArrayLength());
     }
 
     [Fact]
