@@ -80,5 +80,13 @@ authorization. Waste API privacy/role checks passed, and both water/waste browse
 workflows passed on the final run. Public pickup notes and real publication times
 appear only after confirmed publication. No fake operational schedules are seeded.
 
-NAG-012 (air quality) is next. A dedicated homepage/dashboard remains to be built;
-the existing Home controller redirects.
+## NAG-012 — air quality provider and view
+
+All four tasks are implemented: validated Open-Meteo/CAMS integration, canonical
+public API, source/freshness-aware view and verification. Three backend tests and
+one real browser workflow passed. A separate live request confirmed the provider
+schema. See `NAG-012-air-quality.md`; readings are regional model estimates, not
+local sensor measurements. Provider outages remain truthful Unknown/Stale.
+
+NAG-013 / NAG-014 (noise and construction concerns) are next. A dedicated
+homepage/dashboard remains to be built; the existing Home controller redirects.

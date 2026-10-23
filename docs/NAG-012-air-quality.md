@@ -21,3 +21,21 @@ refresh retains the original reading/time labelled Stale for at most six hours.
 No reading or unusable data means Unknown, never zero/Good. Values older than
 90 minutes are also labelled Stale. Set `AirQuality:Enabled=false` to disable
 upstream calls. Provider access is subject to its usage terms and availability.
+
+## Run and demonstrate
+
+No new migration is required. Start the app and open `/air-quality`, choose a
+canonical zone, then Refresh estimate. The API is
+`GET /api/air-quality?zoneId=<id>`, publicly readable. Missing/invalid zone ID is
+400, absent zone is 404. An unavailable provider is a successful response with
+Unknown or an explicitly Stale retained reading; it is not a fabricated zero AQI.
+The UI retains the selected zone on network failure. The source link explains the
+provider product; no user/device coordinates are accepted or uploaded by this API.
+
+Verification: three backend tests passed for strict units/ranges/times, cache,
+failure timestamps/expiry and public API validation/privacy. A real Chrome UI
+case passed for provider estimate fields/timestamps, Unknown on a simulated
+upstream failure, network-offline input retention and successful retry. Browser
+tests use a deterministic provider fixture; separately, one real Dhaka provider
+request verified the live current_units/current schema. Automated tests do not
+assert a changing live AQI value or claim local measurement accuracy.

@@ -56,6 +56,8 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<MunicipalScheduleService>();
+        builder.Services.AddMemoryCache();builder.Services.Configure<AirQualityOptions>(_=>{});builder.Services.AddSingleton<AirQualityCache>();builder.Services.AddScoped<AirQualityService>();
+        builder.Services.AddSingleton<UiAirQualityProvider>();builder.Services.AddSingleton<IAirQualityProvider>(s=>s.GetRequiredService<UiAirQualityProvider>());
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -92,6 +94,27 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    private sealed class UiAirQualityProvider:IAirQualityProvider
+    {
+        public bool Fail;
+        public Task<AirQualityReading> FetchAsync(double latitude,double longitude,CancellationToken ct=default)
+        {if(Fail)throw new HttpRequestException("Fixture provider unavailable");return Task.FromResult(new AirQualityReading(133,60.1,63.8,DateTime.UtcNow,DateTime.UtcNow));}
+    }
+    [Fact]
+    public void AirQualityShowsProviderEstimateUnknownAndNetworkRetryWithoutLosingZone()
+    {
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument("--window-size=1280,1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        browser.Navigate().GoToUrl(url+"/air-quality");new SelectElement(browser.FindElement(By.Id("air-zone"))).SelectByValue("1");wait.Until(d=>d.FindElement(By.Id("air-reading")).Displayed);
+        Assert.Contains("US AQI 133",browser.FindElement(By.Id("air-reading")).Text);Assert.Contains("Source:",browser.FindElement(By.Id("air-reading")).Text);Assert.Contains("Model time:",browser.FindElement(By.Id("air-reading")).Text);
+        app.Services.GetRequiredService<UiAirQualityProvider>().Fail=true;new SelectElement(browser.FindElement(By.Id("air-zone"))).SelectByValue("3");wait.Until(d=>d.FindElement(By.Id("air-status")).Text.Contains("Unknown"));Assert.False(browser.FindElement(By.Id("air-reading")).Displayed);
+        browser.ExecuteCdpCommand("Network.enable",new Dictionary<string,object?>());browser.ExecuteCdpCommand("Network.emulateNetworkConditions",new Dictionary<string,object?>{{"offline",true},{"latency",0},{"downloadThroughput",0},{"uploadThroughput",0}});
+        new SelectElement(browser.FindElement(By.Id("air-zone"))).SelectByValue("2");wait.Until(d=>d.FindElement(By.Id("air-status")).Text.Contains("zone is kept"));Assert.Equal("2",browser.FindElement(By.Id("air-zone")).GetAttribute("value"));
+        browser.ExecuteCdpCommand("Network.emulateNetworkConditions",new Dictionary<string,object?>{{"offline",false},{"latency",0},{"downloadThroughput",-1},{"uploadThroughput",-1}});app.Services.GetRequiredService<UiAirQualityProvider>().Fail=false;
+        browser.FindElement(By.Id("air-refresh")).Click();wait.Until(d=>d.FindElement(By.Id("air-reading")).Displayed);Assert.Contains("Model estimate",browser.FindElement(By.Id("air-status")).Text);
     }
 
     [Theory]
