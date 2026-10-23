@@ -75,6 +75,22 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task WasteScheduleApiKeepsDraftsPrivateAndRejectsWaterOfficials()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+        {var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();var user=TestDb.AddUser(db);user.Role="Official";await db.SaveChangesAsync();}
+        var today=DateOnly.FromDateTime(DhakaTime.ToLocal(DateTime.UtcNow));var input=new{zoneId=1,fromDate=today,toDate=today.AddDays(6),daysMask=127,startMinute=480,endMinute=600,source="Waste pickup bulletin fixture",notes="Use covered bins"};
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/services/waste")).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-Role","Official");var token=await client.GetFromJsonAsync<JsonElement>("/api/official/services/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        var create=await client.PostAsJsonAsync("/api/official/services/waste/drafts",input);Assert.Equal(HttpStatusCode.OK,create.StatusCode);var row=await create.Content.ReadFromJsonAsync<JsonElement>();var id=row.GetProperty("id").GetInt32();
+        Assert.DoesNotContain(input.source,await client.GetStringAsync("/api/services/waste?zoneId=1"));
+        Assert.Equal(HttpStatusCode.OK,(await client.PostAsJsonAsync($"/api/official/services/waste/{id}/publish",new{expectedRevision=1,confirm=true})).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");Assert.Contains(input.source,await client.GetStringAsync("/api/services/waste?zoneId=1"));
+        await using(var scope=app.Services.CreateAsyncScope()){var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();(await db.Users.SingleAsync(x=>x.Id==1)).Role="UtilityOfficial";await db.SaveChangesAsync();}
+        client.DefaultRequestHeaders.Add("X-Test-Role","UtilityOfficial");Assert.Equal(HttpStatusCode.Forbidden,(await client.GetAsync("/api/official/services/waste")).StatusCode);
+    }
+
+    [Fact]
     public async Task WaterScheduleApiSeparatesDraftsFromPublicPlanAndRequiresOfficialCsrf()
     {
         await using(var scope=app.Services.CreateAsyncScope())
