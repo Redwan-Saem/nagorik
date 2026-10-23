@@ -48,6 +48,8 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddSingleton<ICrewTaskNotifier, NullCrewTaskNotifier>();
         builder.Services.AddSingleton(ResidentNotificationTestHelper.Create());
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<LoadsheddingRotationEngine>();
+        builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -103,6 +105,34 @@ public class MapApiTests : IAsyncLifetime
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
         foreach (var path in new[] { "/api/official/loadshedding/zones", "/api/official/loadshedding/security-token" })
             Assert.Equal(expected, (await client.GetAsync(path)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ScheduleDraftApiRequiresCsrfPersistsInputsAndRejectsStaleEdit()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Role", "UtilityOfficial");
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = TestDb.AddUser(db); user.Role = "UtilityOfficial"; await db.SaveChangesAsync();
+        }
+        var payload = new { startDate = "2026-10-23", endDate = "2026-10-23", availableCapacityMw = 10,
+            slotMinutes = 120, zones = new[] { new { zoneId = 1, demandMw = 10 } } };
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/official/loadshedding", payload)).StatusCode);
+        var token = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/security-token");
+        client.DefaultRequestHeaders.Add("RequestVerificationToken", token.GetProperty("requestToken").GetString());
+        var generated = await client.PostAsJsonAsync("/api/official/loadshedding", payload);
+        Assert.Equal(HttpStatusCode.OK, generated.StatusCode);
+        var json = await generated.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Draft", json.GetProperty("state").GetString());
+        Assert.Equal(1, json.GetProperty("revision").GetInt32());
+        Assert.Empty(json.GetProperty("slots").EnumerateArray());
+        var edit = new { expectedRevision = 1, slotId = 0, zoneId = 1, date = "2026-10-23", startMinute = 0, endMinute = 120 };
+        Assert.Equal(HttpStatusCode.OK, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", edit)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PatchAsJsonAsync("/api/official/loadshedding/1/slots", edit)).StatusCode);
+        var saved = await client.GetFromJsonAsync<JsonElement>("/api/official/loadshedding/1");
+        Assert.Equal(2, saved.GetProperty("revision").GetInt32());
+        Assert.Single(saved.GetProperty("slots").EnumerateArray());
     }
 
     [Fact]
