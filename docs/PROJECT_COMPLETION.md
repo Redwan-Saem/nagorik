@@ -66,5 +66,12 @@ read and resident submission API, occupancy screen, and verification. Three back
 tests and one mobile Chrome workflow passed, including CSRF, privacy and expiry.
 See `NAG-019-bus-occupancy.md`. Reports describe segments, not tracked buses.
 
-NAG-010 / NAG-011 (water and waste scheduling) are next. A dedicated
-homepage/dashboard remains to be built; the existing Home controller redirects.
+## NAG-010 — managed water schedules
+
+All four tasks are implemented: shared validated schedule model/migration, public
+and official APIs, public weekly view and draft/edit/publish/retire forms. Four
+shared service tests, one water HTTP test and a complete water browser workflow
+passed. See `NAG-010-011-service-schedules.md` for roles, source limitations and demo.
+
+NAG-011 (waste scheduling) is next. A dedicated homepage/dashboard remains to be
+built; the existing Home controller redirects.

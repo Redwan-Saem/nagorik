@@ -55,6 +55,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<BusOccupancyService>();
+        builder.Services.AddScoped<MunicipalScheduleService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -91,6 +92,32 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Theory]
+    [InlineData("water","UtilityOfficial")]
+    public async Task MunicipalScheduleDraftPublishEditAndRetireWorkInBrowser(string kind,string role)
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();db.Users.Add(new(){Email="scheduler@fixture.invalid",Role=role,Name="Schedule official",PasswordHash=BCrypt.Net.BCrypt.HashPassword(Password,4)});await db.SaveChangesAsync();
+        }
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument("--window-size=1280,1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
+        browser.Navigate().GoToUrl(url+"/services/"+kind+"?zoneId=1");Assert.Equal(7,browser.FindElements(By.CssSelector(".service-day")).Count);Assert.Contains("Unknown",browser.FindElement(By.TagName("body")).Text);
+        browser.Navigate().GoToUrl(url+"/login.html?returnUrl="+Uri.EscapeDataString("/official/services/"+kind));browser.FindElement(By.Id("email")).SendKeys("scheduler@fixture.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
+        wait.Until(d=>d.FindElements(By.Id("service-draft")).Count==1);new SelectElement(browser.FindElement(By.Id("Input_ZoneId"))).SelectByValue("1");browser.FindElement(By.Id("Input_Source")).SendKeys("Browser district bulletin fixture");browser.FindElement(By.Id("Input_Notes")).SendKeys("Browser schedule note");Click(By.CssSelector("#service-draft button"));
+        wait.Until(d=>d.FindElements(By.CssSelector(".service-record")).Count==1);Assert.Contains("Draft",browser.FindElement(By.CssSelector(".service-record")).Text);
+        Click(By.CssSelector(".service-record a"));wait.Until(d=>d.Url.Contains("?id="));browser.FindElement(By.Id("Input_Notes")).Clear();browser.FindElement(By.Id("Input_Notes")).SendKeys("Updated browser schedule note");Click(By.CssSelector("#service-draft button"));
+        wait.Until(d=>d.FindElement(By.CssSelector(".service-record")).Text.Contains("Updated browser schedule note"));
+        browser.Navigate().GoToUrl(url+"/services/"+kind+"?zoneId=1");Assert.DoesNotContain("Updated browser",browser.FindElement(By.TagName("body")).Text);
+        browser.Navigate().GoToUrl(url+"/official/services/"+kind);Click(By.CssSelector(".service-record input[name=confirm]"));Click(By.CssSelector(".service-record button"));wait.Until(d=>d.FindElement(By.CssSelector(".service-record h3")).Text.Contains("Published"));
+        browser.Manage().Cookies.DeleteCookieNamed("auth_token");browser.Navigate().GoToUrl(url+"/services/"+kind+"?zoneId=1");Assert.Equal(7,browser.FindElements(By.CssSelector(".service-day")).Count);Assert.Contains("08:00–10:00",browser.FindElement(By.TagName("body")).Text);Assert.Contains("Updated browser schedule note",browser.FindElement(By.TagName("body")).Text);
+        browser.Navigate().GoToUrl(url+"/login.html?returnUrl="+Uri.EscapeDataString("/official/services/"+kind));browser.FindElement(By.Id("email")).SendKeys("scheduler@fixture.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));wait.Until(d=>d.FindElements(By.CssSelector(".service-record")).Count==1);
+        Click(By.CssSelector(".service-record input[name=confirm]"));Click(By.CssSelector(".service-record button"));wait.Until(d=>d.FindElement(By.CssSelector(".service-record h3")).Text.Contains("Retired"));
+        browser.Navigate().GoToUrl(url+"/services/"+kind+"?zoneId=1");Assert.Contains("Unknown",browser.FindElement(By.TagName("body")).Text);
     }
 
     [Fact]
