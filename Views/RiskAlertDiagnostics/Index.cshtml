@@ -1,0 +1,9 @@
+@model IReadOnlyList<Nagorik.Api.Models.RiskAlertDelivery>
+@{ViewData["Title"]="Risk alert delivery diagnostics";}
+<h1>Risk alert delivery diagnostics</h1>
+<p>Latest 100 receipts. Sent means at least one push endpoint accepted delivery; it does not prove that a person read it. Failed receipts retry only up to the configured attempt limit. Suppressed receipts are not retried.</p>
+<a href="/admin/risk-alert-deliveries">Refresh receipts</a>
+<table><thead><tr><th>Receipt/event</th><th>Resident/zone</th><th>State</th><th>Attempts</th><th>Sent UTC</th><th>Next retry UTC</th><th>Detail</th></tr></thead><tbody>
+@foreach(var row in Model){<tr><td>@row.Id / @row.EventId</td><td>@row.ResidentId / @row.ZoneId</td><td>@row.State</td><td>@row.Attempts</td><td>@row.SentAtUtc?.ToString("u")</td><td>@row.NextAttemptAtUtc?.ToString("u")</td><td>@row.LastError</td></tr>}
+</tbody></table>
+@if(Model.Count==0){<p>No risk alert receipts yet.</p>}

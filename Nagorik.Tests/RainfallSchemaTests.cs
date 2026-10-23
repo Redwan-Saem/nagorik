@@ -28,7 +28,9 @@ public class RainfallSchemaTests
         Assert.Equal(reading.TimestampUtc, saved[0].TimestampUtc);
         await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM Zones"));
         await db.GetService<IMigrator>().MigrateAsync("20261022135042_AddDrainagePoints");
-        Assert.Single(await db.Zones.ToListAsync()); await db.Database.MigrateAsync(); Assert.Empty(await db.RainfallReadings.ToListAsync());
+        // The rollback predates vulnerability fields; keep the assertion on the old schema.
+        Assert.Equal("Z1", await db.Zones.Select(z => z.Code).SingleAsync());
+        await db.Database.MigrateAsync(); Assert.Empty(await db.RainfallReadings.ToListAsync());
     }
 
     [Fact]
