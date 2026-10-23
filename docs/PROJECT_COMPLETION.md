@@ -59,5 +59,12 @@ and two desktop/mobile browser scenarios passed. See `NAG-018-transport.md` for
 exact bounds, demo/API steps and limitations. Development catalog routes/fares
 are explicitly synthetic, and the local provider does not geocode arbitrary streets.
 
-NAG-019 (recent bus occupancy) is next. A dedicated homepage/dashboard remains
-to be built; the existing Home controller redirects.
+## NAG-019 — recent community bus occupancy
+
+All four tasks are implemented: atomic cooldown/current-report schema, safe public
+read and resident submission API, occupancy screen, and verification. Three backend
+tests and one mobile Chrome workflow passed, including CSRF, privacy and expiry.
+See `NAG-019-bus-occupancy.md`. Reports describe segments, not tracked buses.
+
+NAG-010 / NAG-011 (water and waste scheduling) are next. A dedicated
+homepage/dashboard remains to be built; the existing Home controller redirects.

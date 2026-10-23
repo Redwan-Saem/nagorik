@@ -54,6 +54,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<TransportSearchService>();
+        builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -90,6 +91,26 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Fact]
+    public async Task BusOccupancyIsPublicButOnlyResidentsReportAndStaleReportsExpire()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())await DevelopmentTransportSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(),app.Environment,new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build());
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument("--window-size=390,1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride",new Dictionary<string,object?>{{"width",390},{"height",844},{"deviceScaleFactor",1},{"mobile",true}});
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
+        browser.Navigate().GoToUrl(url+"/transport/occupancy");wait.Until(d=>d.FindElement(By.Id("occupancy-summary")).Text.Contains("Unknown"));Assert.Empty(browser.FindElements(By.Id("occupancy-report")));
+        browser.Navigate().GoToUrl(url+"/login.html?returnUrl=%2Ftransport%2Foccupancy");browser.FindElement(By.Id("email")).SendKeys("resident@map.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
+        wait.Until(d=>d.FindElements(By.Id("occupancy-report")).Count==1&&d.FindElements(By.CssSelector("#occupancy-segment option")).Count>0);
+        new SelectElement(browser.FindElement(By.Id("occupancy-level"))).SelectByValue("Full");Click(By.Id("occupancy-submit"));wait.Until(d=>d.FindElement(By.Id("occupancy-report-status")).Text.Contains("Observation saved"));
+        wait.Until(d=>d.FindElement(By.Id("occupancy-summary")).Text.Contains("1 recent reporters"));Click(By.Id("occupancy-submit"));wait.Until(d=>d.FindElement(By.Id("occupancy-report-status")).Text.Contains("five minutes"));
+        browser.Manage().Cookies.DeleteCookieNamed("auth_token");browser.Navigate().Refresh();wait.Until(d=>d.FindElement(By.Id("occupancy-summary")).Text.Contains("Full"));Assert.Empty(browser.FindElements(By.Id("occupancy-report")));
+        await using(var scope=app.Services.CreateAsyncScope())await scope.ServiceProvider.GetRequiredService<AppDbContext>().BusOccupancyReports.ExecuteUpdateAsync(s=>s.SetProperty(x=>x.ObservedAtUtc,DateTime.UtcNow.AddMinutes(-16)));
+        Click(By.Id("occupancy-refresh"));wait.Until(d=>d.FindElement(By.Id("occupancy-summary")).Text.Contains("Unknown"));Assert.DoesNotContain("resident@map.invalid",browser.FindElement(By.TagName("body")).Text);
+        Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);
     }
 
     [Theory]
