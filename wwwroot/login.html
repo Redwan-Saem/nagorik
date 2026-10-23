@@ -31,7 +31,8 @@
         // The server sets the auth_token cookie automatically.
         // Just redirect to where the user was going (or home).
         const params = new URLSearchParams(window.location.search);
-        const returnUrl = params.get("returnUrl") || "/";
+        const candidate = params.get("returnUrl") || "/";
+        const returnUrl = candidate.startsWith("/") && !candidate.startsWith("//") && !candidate.includes("\\") ? candidate : "/";
         window.location.href = returnUrl;
       } else {
         errorEl.innerText = "Invalid email or password.";
