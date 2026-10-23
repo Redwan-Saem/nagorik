@@ -6,7 +6,8 @@ namespace Nagorik.Api.Services;
 public sealed record MapPointGeometry(string Type, double[] Coordinates);
 public sealed record MapPointFeature<T>(string Type, int Id, MapPointGeometry Geometry, T Properties);
 public sealed record MapPointCollection<T>(string Type, IReadOnlyList<MapPointFeature<T>> Features, int OmittedCount);
-public sealed record DrainageMapProperties(int ZoneId, string ZoneCode, string ZoneName, string Status);
+public sealed record DrainageMapProperties(int ZoneId, string ZoneCode, string ZoneName, string Status,
+    string RiskLevel = "Unknown", bool IsFlagged = false);
 public sealed record ReportMapProperties(string Reference, string Title, string Location, string Category, string Status, string? PhotoUrl, DateTime CreatedAtUtc);
 
 public sealed class MapFeatureQueryService(AppDbContext db)
@@ -19,9 +20,12 @@ public sealed class MapFeatureQueryService(AppDbContext db)
     {
         var total = await db.DrainagePoints.CountAsync(ct);
         var points = await db.DrainagePoints.AsNoTracking().OrderBy(p => p.Id).Take(FeatureLimit)
-            .Select(p => new { p.Id, p.Latitude, p.Longitude, p.ZoneId, p.Zone.Code, p.Zone.Name, p.Status }).ToListAsync(ct);
+            .Select(p => new { p.Id, p.Latitude, p.Longitude, p.ZoneId, p.Zone.Code, p.Zone.Name, p.Status, p.Zone.RiskLevel, p.Zone.LastComputedAtUtc }).ToListAsync(ct);
+        var now = DateTime.UtcNow;
         var features = points.Select(p => new MapPointFeature<DrainageMapProperties>("Feature", p.Id,
-            new("Point", [p.Longitude, p.Latitude]), new(p.ZoneId, p.Code, p.Name, p.Status.ToString()))).ToList();
+            new("Point", [p.Longitude, p.Latitude]), new(p.ZoneId, p.Code, p.Name, p.Status.ToString(), p.RiskLevel.ToString(),
+                p.RiskLevel is Nagorik.Api.Models.ZoneRiskLevel.High or Nagorik.Api.Models.ZoneRiskLevel.Severe &&
+                p.LastComputedAtUtc >= now.AddMinutes(-15) && p.LastComputedAtUtc <= now.AddMinutes(1)))).ToList();
         return new("FeatureCollection", features, Math.Max(0, total - features.Count));
     }
 
