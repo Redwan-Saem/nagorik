@@ -69,6 +69,26 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task LegacyRiskRoutesUseCanonicalZonesAndNeverExposeLegacySeededRisk()
+    {
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.WaterloggingRisks.Add(new WaterloggingRisk { ZoneId = "Z1", ZoneName = "Obsolete seed", RiskLevel = "Low" });
+            await db.SaveChangesAsync();
+        }
+        var risk = await client.GetStringAsync("/api/zones/Z1/risk");
+        Assert.Contains("Sample zone", risk);
+        Assert.Contains("High", risk);
+        Assert.DoesNotContain("Obsolete seed", risk);
+        var map = await client.GetStringAsync("/api/zones/map");
+        Assert.Contains("FeatureCollection", map);
+        Assert.DoesNotContain("Obsolete seed", map);
+        Assert.DoesNotContain("factors", map, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/zones/missing/risk")).StatusCode);
+    }
+
+    [Fact]
     public async Task DispatcherGetsGeoJsonContentTypePropertiesAndCoordinates()
     {
         client.DefaultRequestHeaders.Add("X-Test-Role", "Dispatcher");
