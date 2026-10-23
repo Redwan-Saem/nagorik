@@ -57,3 +57,23 @@ Verification includes four initial shared cases (both concern types), the noise
 HTTP privacy/idempotency/CSRF/review case and a real Chrome resident/official
 investigation-to-resolution workflow. A fifth service case checks hourly allowance
 and replay behavior. GPS hardware and optional decibel accuracy are not claimed.
+
+## Construction demonstration and verification
+
+Residents open `/resident/concerns/construction` and choose a suspected concern
+such as SafetyHazard, Dust, Noise or ObstructedFootpath, then submit the observed
+location, time and description. CC references have private detail/history pages.
+City officials use `/official/concerns/construction`. The same review progression
+applies. Reference text does not verify a construction permit or establish a legal
+breach. No automated compliance inference or inspection result is invented.
+
+Resident API routes mirror noise at `/api/resident/concerns/construction`; city
+routes mirror review at `/api/official/concerns/construction`. Use the shared
+security-token endpoints, current UTC observations, new GUIDs for new concerns,
+and latest revisions. Construction submissions reject noise-only decibel metadata.
+
+The construction HTTP test passed for CSRF, type validation, safe CC references,
+wrong-kind lookup isolation and other-resident privacy. Both Noise and Construction
+Chrome workflows passed on the final run, including resident submission, city
+investigation/disposition and resident review history. The shared migration is
+AddCivicConcerns; there is no separate construction migration.

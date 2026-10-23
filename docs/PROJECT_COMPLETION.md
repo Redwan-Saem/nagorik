@@ -96,5 +96,13 @@ backend cases and one real resident/official browser workflow passed. Review not
 and state changes are retained; optional decibels are unverified, not inferred.
 See `NAG-013-014-civic-concerns.md` for API/demo and privacy boundaries.
 
-NAG-014 (construction concerns) is next. A dedicated homepage/dashboard remains
-to be built; the existing Home controller redirects.
+## NAG-014 — construction concerns and inspection review
+
+All three tasks are implemented using the private concern engine, construction
+types and dedicated resident/city routes. Construction HTTP validation/privacy
+passed; both Noise and Construction browser review workflows passed on the final
+run. Reports remain suspected concerns and references remain unverified.
+
+Geographic management/provenance, the homepage, older SOS fixes and final
+regression/integration remain. External GPS/push and calibration evidence require
+real hardware/configuration/data and must not be claimed from browser fixtures.

@@ -99,6 +99,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
 
     [Theory]
     [InlineData("noise")]
+    [InlineData("construction")]
     public async Task CivicConcernsSubmitTrackAndReceiveRecordedOfficialReview(string kind)
     {
         await using(var scope=app.Services.CreateAsyncScope())
