@@ -17,6 +17,13 @@ namespace Nagorik.Api
         public DbSet<ZoneMapData> ZoneMapData { get; set; }
 
         public DbSet<Zone> Zones => Set<Zone>();
+        public DbSet<TransportStop> TransportStops => Set<TransportStop>();
+        public DbSet<TransportLink> TransportLinks => Set<TransportLink>();
+        public DbSet<TransportFareRule> TransportFareRules => Set<TransportFareRule>();
+        public DbSet<BusOccupancyReport> BusOccupancyReports => Set<BusOccupancyReport>();
+        public DbSet<MunicipalSchedule> MunicipalSchedules => Set<MunicipalSchedule>();
+        public DbSet<CivicCase> CivicCases => Set<CivicCase>();
+        public DbSet<CivicCaseReview> CivicCaseReviews => Set<CivicCaseReview>();
         public DbSet<LoadsheddingSchedule> LoadsheddingSchedules => Set<LoadsheddingSchedule>();
         public DbSet<ScheduleZoneDemand> ScheduleZoneDemands => Set<ScheduleZoneDemand>();
         public DbSet<LoadsheddingSlot> LoadsheddingSlots => Set<LoadsheddingSlot>();
@@ -58,6 +65,17 @@ namespace Nagorik.Api
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            Data.TransportModelConfiguration.Configure(builder);
+            Data.MunicipalScheduleConfiguration.Configure(builder);
+            Data.CivicCaseConfiguration.Configure(builder);
+            builder.Entity<BusOccupancyReport>(e=>
+            {
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<TransportLink>().WithMany().HasForeignKey(x=>x.LinkId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x=>new{x.ResidentId,x.LinkId}).IsUnique();e.HasIndex(x=>new{x.LinkId,x.ObservedAtUtc});
+                e.Property(x=>x.Level).IsRequired().HasMaxLength(30);
+                e.ToTable("BusOccupancyReports",t=>t.HasCheckConstraint("CK_BusOccupancy_Level","Level IN ('SeatsAvailable','Standing','Full')"));
+            });
             Data.LoadsheddingModelConfiguration.Configure(builder);
             Data.SosModelConfiguration.Configure(builder);
             Data.ReportFilterModelConfiguration.Configure(builder);
