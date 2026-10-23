@@ -30,10 +30,16 @@ public sealed class RiskComputationService(AppDbContext db, WeatherReadingQueryS
             ct.ThrowIfCancellationRequested();
             snapshots.TryGetValue(zone.Id, out var snapshot);
             var result = predictor.Predict(zone, snapshot, settings);
+            var previousLevel = zone.RiskLevel;
             zone.RiskLevel = result.Level;
             zone.LastComputedAtUtc = now;
             zone.RiskFactorsJson = JsonSerializer.Serialize(new RiskComputationDetails(result, zone.ElevationMeters,
                 zone.DrainageDensityKmPerSqKm, zone.HistoryScore, snapshot?.Past, snapshot?.Forecast, settings));
+            var history = new RiskHistory { ZoneId = zone.Id, ComputedAtUtc = now,
+                PreviousLevel = previousLevel, Level = result.Level, FactorsJson = zone.RiskFactorsJson };
+            db.RiskHistories.Add(history);
+            if (previousLevel != result.Level && result.Level is ZoneRiskLevel.High or ZoneRiskLevel.Severe)
+                db.RiskAlertEvents.Add(new RiskAlertEvent { RiskHistory = history, CreatedAtUtc = now });
         }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
