@@ -1,0 +1,22 @@
+@model IReadOnlyList<Nagorik.Api.Models.Report>
+@{ ViewData["Title"] = "Verify public report markers"; }
+<h1>Verify public report markers</h1>
+<p>Latest 100 reports. Verification publishes the report's coordinates, generated reference, category and workflow status on the public map. Names, free-text details, address and private photos remain private. Verification does not approve or complete a work task.</p>
+@if (TempData["VerificationMessage"] is string message) { <p role="status">@message</p> }
+@foreach (var report in Model)
+{
+    <section class="card">
+        <h2>R-@report.Id.ToString("D6") — @report.Title</h2>
+        <p>@report.Description</p><p>Address: @report.Location</p>
+        <p>Coordinates: @report.Latitude, @report.Longitude · Status: @report.Status</p>
+        <p>Public marker: @(report.IsPubliclyVerified ? "Verified" : "Not published") · Revision @report.PublicVerificationRevision</p>
+        <p>Last review: @(report.PublicVerifiedAtUtc?.ToString("u") ?? "None") · Reviewer: @(report.PublicVerifiedByUserId?.ToString() ?? "None")</p>
+        <a href="/Dispatch/Report/@report.Id">Open dispatcher report</a>
+        <form method="post" action="/dispatcher/report-verification/@report.Id">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="ExpectedRevision" value="@report.PublicVerificationRevision" />
+            <button name="Publish" value="@(report.IsPubliclyVerified ? "false" : "true")" type="submit">@(report.IsPubliclyVerified ? "Unverify and hide marker" : "Verify and publish marker")</button>
+        </form>
+    </section>
+}
+@if (Model.Count == 0) { <p>No reports to review.</p> }
