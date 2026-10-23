@@ -105,6 +105,15 @@ public class MapApiTests : IAsyncLifetime
         if (role != null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
         foreach (var path in new[] { "/api/official/loadshedding/zones", "/api/official/loadshedding/security-token" })
             Assert.Equal(expected, (await client.GetAsync(path)).StatusCode);
+        var page = await client.GetAsync("/official/loadshedding");
+        Assert.Equal(expected, page.StatusCode);
+        if (expected == HttpStatusCode.OK)
+        {
+            var html = await page.Content.ReadAsStringAsync();
+            Assert.Contains("schedule-generate", html);
+            Assert.Contains("Sample zone", html);
+            Assert.Contains("__RequestVerificationToken", html);
+        }
     }
 
     [Fact]
