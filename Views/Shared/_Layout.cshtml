@@ -13,6 +13,7 @@
         <span class="brand">Nagorik</span>
         <nav>
             <ul>
+                <li><a href="/map">Area risk map</a></li>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                     <li class="nav-item">
@@ -21,6 +22,7 @@
                 }
                 @if (User.IsInRole("Resident"))
                 {
+                    <li><a href="/resident/areas">My areas</a></li>
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="Reports" asp-action="UtilityCreate">Report utility anomaly</a>
                     </li>
@@ -60,7 +62,15 @@
                 {
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="DispatcherMap" asp-action="Index">Dispatcher risk map</a>
+                        <a class="nav-link" href="/dispatcher/flagged-drainage">Flagged drainage</a>
+                        <a class="nav-link" href="/dispatcher/report-verification">Verify public markers</a>
                     </li>
+                }
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <li><a href="/admin/risk-thresholds">Risk thresholds</a></li>
+                    <li><a href="/admin/risk-alert-deliveries">Risk alert delivery diagnostics</a></li>
                 }
 
                 @if (User.IsInRole("Crew"))
@@ -77,6 +87,7 @@
                                 class="btn btn-sm btn-outline-light">
                             Enable notifications
                         </button>
+                        <span id="push-status" role="status" aria-live="polite"></span>
                     </li>
                 }
             </ul>

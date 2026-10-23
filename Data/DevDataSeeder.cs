@@ -28,6 +28,7 @@ public static class DevDataSeeder
         await Add("Resident Two", "resident2@test.com", "Resident");
         await Add("City Official One", "official1@test.com", "Official");
         await Add("Dispatcher One", "dispatcher1@test.com", "Dispatcher");
+        await Add("Risk Admin", "admin1@test.com", "Admin");
         await Add("Crew One", "crew1@test.com", "Crew");
         await Add("Crew Two", "crew2@test.com", "Crew");
 
