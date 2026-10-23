@@ -22,6 +22,8 @@ namespace Nagorik.Api
         public DbSet<TransportFareRule> TransportFareRules => Set<TransportFareRule>();
         public DbSet<BusOccupancyReport> BusOccupancyReports => Set<BusOccupancyReport>();
         public DbSet<MunicipalSchedule> MunicipalSchedules => Set<MunicipalSchedule>();
+        public DbSet<CivicCase> CivicCases => Set<CivicCase>();
+        public DbSet<CivicCaseReview> CivicCaseReviews => Set<CivicCaseReview>();
         public DbSet<LoadsheddingSchedule> LoadsheddingSchedules => Set<LoadsheddingSchedule>();
         public DbSet<ScheduleZoneDemand> ScheduleZoneDemands => Set<ScheduleZoneDemand>();
         public DbSet<LoadsheddingSlot> LoadsheddingSlots => Set<LoadsheddingSlot>();
@@ -65,6 +67,7 @@ namespace Nagorik.Api
             base.OnModelCreating(builder);
             Data.TransportModelConfiguration.Configure(builder);
             Data.MunicipalScheduleConfiguration.Configure(builder);
+            Data.CivicCaseConfiguration.Configure(builder);
             builder.Entity<BusOccupancyReport>(e=>
             {
                 e.HasOne<User>().WithMany().HasForeignKey(x=>x.ResidentId).OnDelete(DeleteBehavior.Restrict);
