@@ -1,0 +1,20 @@
+@{ ViewData["Title"] = "My areas"; }
+<h1>My areas</h1>
+<p>Choose areas for future High/Severe rule-based risk-change alerts. Adding an area does not send an immediate alert or enable global notifications.</p>
+@Html.AntiForgeryToken()
+<p id="areas-global-status" role="status"></p>
+<p><a href="/Notifications/Settings">Manage global alerts and device push permission</a> · <a href="/map">View area risk map</a></p>
+<form id="area-subscribe">
+    <label for="area-zone">Zone</label><select id="area-zone" required><option value="">Loading zones…</option></select>
+    <label><input id="area-alerts" type="checkbox" checked /> Enable alerts for this area</label>
+    <button id="area-save" type="submit">Add or update area</button>
+</form>
+<button id="area-locate" type="button">Use my location to suggest an area</button>
+<p>Location matching happens in this page. A suggestion is not saved until you choose Add or update area.</p>
+<p id="areas-status" role="status" aria-live="polite"></p>
+<h2>Saved areas</h2><ul id="areas-list"></ul>
+<noscript>Enable JavaScript to manage area subscriptions.</noscript>
+@section Scripts {
+    <script src="~/js/zone-locator.js" asp-append-version="true"></script>
+    <script src="~/js/my-areas.js" asp-append-version="true"></script>
+}
