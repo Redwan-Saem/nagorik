@@ -5,6 +5,13 @@ public class CivicCaseTests
 {
     sealed class Clock:TimeProvider{public override DateTimeOffset GetUtcNow()=>new(2026,10,23,16,0,0,TimeSpan.Zero);}
     internal static CivicCaseInput Input(string kind)=>new(){Subtype=kind=="Noise"?"Commercial":"Dust",Description="A persistent observed disturbance near the landmark.",Address="Dhanmondi fixture landmark",Latitude=23.75,Longitude=90.37,ObservedAtUtc=new Clock().GetUtcNow().UtcDateTime,SubmissionToken=Guid.NewGuid().ToString()};
+    [Fact]public async Task ReplayingExistingSubmissionDoesNotConsumeHourlyAllowance()
+    {
+        var(db,c)=TestDb.Create();await using var d=db;await using var connection=c;TestDb.AddUser(db);var service=new CivicCaseService(db,new Clock());var first=Input("Noise");
+        var row=await service.SubmitAsync("Noise",first,1);for(var i=0;i<9;i++)await service.SubmitAsync("Noise",Input("Noise"),1);
+        Assert.Equal(row.Id,(await service.SubmitAsync("Noise",first,1)).Id);Assert.Equal(429,(await Assert.ThrowsAsync<TransportProblem>(()=>service.SubmitAsync("Noise",Input("Noise"),1))).Status);
+        Assert.Equal(10,await db.CivicCases.CountAsync());
+    }
     [Theory][InlineData("Noise")][InlineData("Construction")]
     public async Task IdempotentPrivateConcernsHaveRevisionCheckedReviewHistory(string kind)
     {

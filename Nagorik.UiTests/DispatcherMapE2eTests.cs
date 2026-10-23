@@ -56,6 +56,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<MunicipalScheduleService>();
+        builder.Services.AddScoped<CivicCaseService>();
         builder.Services.AddMemoryCache();builder.Services.Configure<AirQualityOptions>(_=>{});builder.Services.AddSingleton<AirQualityCache>();builder.Services.AddScoped<AirQualityService>();
         builder.Services.AddSingleton<UiAirQualityProvider>();builder.Services.AddSingleton<IAirQualityProvider>(s=>s.GetRequiredService<UiAirQualityProvider>());
         builder.Services.AddSingleton<RiskPredictionService>();
@@ -94,6 +95,27 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Theory]
+    [InlineData("noise")]
+    public async Task CivicConcernsSubmitTrackAndReceiveRecordedOfficialReview(string kind)
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+        {var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();db.Users.Add(new(){Email="reviewer@fixture.invalid",Name="Review fixture",Role="Official",PasswordHash=BCrypt.Net.BCrypt.HashPassword(Password,4)});await db.SaveChangesAsync();}
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument("--window-size=1280,1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
+        void Login(string email,string path){browser.Manage().Cookies.DeleteCookieNamed("auth_token");browser.Navigate().GoToUrl(url+"/login.html?returnUrl="+Uri.EscapeDataString(path));browser.FindElement(By.Id("email")).SendKeys(email);browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));wait.Until(d=>!d.Url.Contains("login.html"));}
+        Login("resident@map.invalid","/resident/concerns/"+kind);wait.Until(d=>d.FindElements(By.Id("civic-submit")).Count==1);
+        browser.FindElement(By.Id("Input_Description")).SendKeys("Persistent disturbance observed near the fixture landmark.");browser.FindElement(By.Id("Input_Address")).SendKeys("Dhanmondi fixture landmark");browser.FindElement(By.Id("Input_Latitude")).SendKeys("23.75");browser.FindElement(By.Id("Input_Longitude")).SendKeys("90.37");Click(By.CssSelector("#civic-submit button[type=submit]"));
+        wait.Until(d=>d.FindElements(By.Id("civic-state")).Count==1);Assert.Contains("Pending",browser.FindElement(By.Id("civic-state")).Text);var id=int.Parse(new Uri(browser.Url).Segments.Last());
+        Login("reviewer@fixture.invalid","/official/concerns/"+kind);wait.Until(d=>d.FindElements(By.CssSelector($"a[href='/official/concerns/{kind}/{id}']")).Count==1);Click(By.CssSelector($"a[href='/official/concerns/{kind}/{id}']"));
+        wait.Until(d=>d.FindElements(By.Id("civic-review")).Count==1);browser.FindElement(By.Id("Note")).SendKeys("Investigation opened; an inspector will review this concern.");Click(By.CssSelector("#civic-review button"));wait.Until(d=>d.FindElement(By.Id("civic-state")).Text.Contains("UnderReview"));
+        browser.FindElement(By.Id("Note")).SendKeys("Inspection completed and official disposition recorded.");Click(By.CssSelector("#civic-review button"));wait.Until(d=>d.FindElement(By.Id("civic-state")).Text.Contains("Resolved"));
+        Login("resident@map.invalid",$"/resident/concerns/{kind}/{id}");wait.Until(d=>d.FindElement(By.Id("civic-state")).Text.Contains("Resolved"));Assert.Contains("Inspection completed",browser.FindElement(By.TagName("body")).Text);
+        await using var finalScope=app.Services.CreateAsyncScope();Assert.Equal(2,await finalScope.ServiceProvider.GetRequiredService<AppDbContext>().CivicCaseReviews.CountAsync());
     }
 
     private sealed class UiAirQualityProvider:IAirQualityProvider

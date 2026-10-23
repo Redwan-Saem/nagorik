@@ -88,5 +88,13 @@ one real browser workflow passed. A separate live request confirmed the provider
 schema. See `NAG-012-air-quality.md`; readings are regional model estimates, not
 local sensor measurements. Provider outages remain truthful Unknown/Stale.
 
-NAG-013 / NAG-014 (noise and construction concerns) are next. A dedicated
-homepage/dashboard remains to be built; the existing Home controller redirects.
+## NAG-013 — noise concerns and city review
+
+All four tasks are implemented: private structured concerns, idempotent/transactional
+submission, safe resident/official APIs and tracking/review pages. Six concern
+backend cases and one real resident/official browser workflow passed. Review notes
+and state changes are retained; optional decibels are unverified, not inferred.
+See `NAG-013-014-civic-concerns.md` for API/demo and privacy boundaries.
+
+NAG-014 (construction concerns) is next. A dedicated homepage/dashboard remains
+to be built; the existing Home controller redirects.

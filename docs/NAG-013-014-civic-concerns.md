@@ -25,3 +25,35 @@ compliance/legal conclusion is claimed.
 | T-014.1 | Redwan | Construction concern API and city review boundaries with dedicated types. |
 | T-014.2 | Rajiya | Construction submission/tracking/inspection review navigation. |
 | T-014.3 | Labiba | Construction-specific validation, privacy and end-to-end acceptance. |
+
+## Noise demonstration and API
+
+After `dotnet ef database update`, start the app. As `resident1@test.com` (initial
+`Test@12345`), open `/resident/concerns/noise`, choose a source type, describe the
+observation, add a landmark and a recent Dhaka local time. Optional GPS fills
+coordinates; manual fixture coordinates `23.75, 90.37` work for a clearly labelled
+demo concern. Leave decibels blank unless measured. Submit to obtain NC reference
+and tracking detail. Your latest 50 concerns appear on the submission page.
+
+As `official1@test.com`, open `/official/concerns/noise`, select the concern, add
+an investigation note, then record a resolved/rejected disposition. The resident
+detail shows the timestamped history. Do not present these demo notes as an actual
+inspection. Existing account passwords are not reset.
+
+Resident JSON clients use `/api/resident/concerns/security-token` with their cookie
+jar, then `RequestVerificationToken` for POST `/api/resident/concerns/noise`:
+`{"subtype":"Commercial","description":"Observed amplified sound near the landmark.","address":"Demo landmark","latitude":23.75,"longitude":90.37,"observedAtUtc":"2026-10-23T16:00:00Z","submissionToken":"<new GUID>"}`.
+Use a current observation time and retain the same GUID/content when retrying.
+GET the list or `/{id}` on the resident route. City clients use
+`/api/official/concerns/security-token`, then POST
+`/api/official/concerns/noise/{id}/review` with
+`{"expectedRevision":1,"state":"UnderReview","note":"Investigation opened by the city."}`.
+Use the latest revision for the next transition. Anonymous access is 401, wrong
+roles 403, other residents' IDs 404, invalid input/CSRF 400 and stale reviews or
+changed-content retries 409. The hourly allowance returns 429; a replay of a saved
+submission still succeeds. The rate check and insert share a database transaction.
+
+Verification includes four initial shared cases (both concern types), the noise
+HTTP privacy/idempotency/CSRF/review case and a real Chrome resident/official
+investigation-to-resolution workflow. A fifth service case checks hourly allowance
+and replay behavior. GPS hardware and optional decibel accuracy are not claimed.
