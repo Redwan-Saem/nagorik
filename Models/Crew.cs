@@ -9,4 +9,7 @@ public class Crew
     public int UserId { get; set; }
 
     public User? User { get; set; }
+    public double? LastLatitude { get; set; }
+    public double? LastLongitude { get; set; }
+    public DateTime? LastSeenAtUtc { get; set; }
 }

@@ -33,4 +33,5 @@ public sealed class Zone
     public double? ElevationMeters { get; set; }
     public double? DrainageDensityKmPerSqKm { get; set; }
     public double? HistoryScore { get; set; }
+    public string? RiskFactorsJson { get; set; }
 }
