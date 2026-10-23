@@ -29,7 +29,8 @@ public class DrainagePointSchemaTests
         Assert.Equal(DrainageStatus.Blocked, (await db.DrainagePoints.SingleAsync()).Status);
         await Assert.ThrowsAsync<SqliteException>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM Zones"));
         await db.GetService<IMigrator>().MigrateAsync("20261022125900_AddZones");
-        Assert.Single(await db.Zones.ToListAsync());
+        // Query only columns present in the historical migration being tested.
+        Assert.Equal("TEST", await db.Zones.Select(z => z.Code).SingleAsync());
         await db.Database.MigrateAsync();
         Assert.Empty(await db.DrainagePoints.ToListAsync());
     }

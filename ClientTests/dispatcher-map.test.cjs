@@ -23,6 +23,18 @@ function setup(fetcher) {
 }
 const payload = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { riskLevel: 'High' } }] };
 
+test('computed factors are visible as safe text in popup and accessible details', async () => {
+    const data = { ...payload, features: [{ properties: { riskLevel: 'High', factors: {
+        assessment: { explanation: '<script>bad()</script>', score: 20, intensityMmPerHour: 10, vulnerability: 2 },
+        elevationMeters: 5, drainageDensityKmPerSqKm: 3, historyScore: .1,
+        thresholds: { mediumThreshold: 5, highThreshold: 15, severeThreshold: 30 }
+    } } }] };
+    const state = setup(async () => ({ ok: true, json: async () => data })); await state.ui.ready;
+    assert.match(state.zoneLayers[0].popup.children[3].textContent, /Score: 20.00/);
+    assert.match(state.zoneLayers[0].popup.children[3].textContent, /<script>/);
+    state.zoneLayers[0].click(); assert.match(state.get('map-zone-details').textContent, /rainfall intensity: 10.00/);
+});
+
 test('loads GeoJSON with cookies and colors the zones by stored risk', async () => {
     const state = setup(async () => ({ ok: true, json: async () => payload })); await state.ui.ready;
     assert.equal(state.requests[0].url, '/api/map/risk-zones');
