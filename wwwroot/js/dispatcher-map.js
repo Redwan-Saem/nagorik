@@ -27,8 +27,20 @@
                 ? `Last computed: ${computed.toLocaleString()} (${computed.toISOString()})`
                 : 'Not computed yet; any displayed sample level is not a live prediction.';
             popup.appendChild(time);
+            const factors = document.createElement('p');
+            const details = properties.factors, assessment = details?.assessment;
+            const number = value => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : 'Unknown';
+            factors.textContent = assessment
+                ? `${assessment.explanation} Score: ${number(assessment.score)}; rainfall intensity: ${number(assessment.intensityMmPerHour)} mm/h; vulnerability: ${number(assessment.vulnerability)}. Elevation: ${number(details.elevationMeters)} m; drainage density: ${number(details.drainageDensityKmPerSqKm)} km/km²; history: ${number(details.historyScore)}. Thresholds M/H/S: ${number(details.thresholds?.mediumThreshold)}/${number(details.thresholds?.highThreshold)}/${number(details.thresholds?.severeThreshold)}.`
+                : 'Contributing factors are unavailable until a risk evaluation runs.';
+            popup.appendChild(factors);
+            if (details?.past?.timestampUtc) {
+                const source = document.createElement('p');
+                source.textContent = `Rainfall window: ${details.past.timestampUtc}; fetched: ${details.past.fetchedAtUtc}. This is a saved evaluation; refresh to check for newer results.`;
+                popup.appendChild(source);
+            }
             zoneLayer.bindPopup(popup);
-            zoneLayer.on('click', () => { get('map-zone-details').textContent = `${title.textContent}. ${risk.textContent}. ${time.textContent}`; });
+            zoneLayer.on('click', () => { get('map-zone-details').textContent = popup.children ? Array.from(popup.children).map(p => p.textContent).join(' ') : `${title.textContent}. ${risk.textContent}. ${time.textContent}. ${factors.textContent}`; });
         }
         async function load() {
             if (busy) return;
@@ -67,6 +79,7 @@
         });
         const ready = load();
         const pointLayers = globalThis.DispatcherMapLayers?.mount({ map, document, leaflet, fetcher });
+        globalThis.DispatcherCrews?.mount({ map, document, leaflet, fetcher });
         return { map, ready, reload: load, pointLayers };
     }
     globalThis.DispatcherRiskMap = { colors, colorForRisk, mount };

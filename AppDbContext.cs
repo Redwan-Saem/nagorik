@@ -19,6 +19,12 @@ namespace Nagorik.Api
         public DbSet<Zone> Zones => Set<Zone>();
         public DbSet<DrainagePoint> DrainagePoints => Set<DrainagePoint>();
         public DbSet<RainfallReading> RainfallReadings => Set<RainfallReading>();
+        public DbSet<RiskHistory> RiskHistories => Set<RiskHistory>();
+        public DbSet<RiskAlertEvent> RiskAlertEvents => Set<RiskAlertEvent>();
+        public DbSet<ResidentZoneSubscription> ResidentZoneSubscriptions => Set<ResidentZoneSubscription>();
+        public DbSet<RiskAlertDelivery> RiskAlertDeliveries => Set<RiskAlertDelivery>();
+        public DbSet<RiskAlertProcessorLease> RiskAlertProcessorLeases => Set<RiskAlertProcessorLease>();
+        public DbSet<RiskThresholdSettings> RiskThresholdSettings => Set<RiskThresholdSettings>();
 
         public DbSet<Report> Reports => Set<Report>();
         public DbSet<ReportArea> ReportAreas => Set<ReportArea>();
@@ -54,6 +60,60 @@ namespace Nagorik.Api
             Data.ZoneModelConfiguration.Configure(builder);
             Data.DrainagePointModelConfiguration.Configure(builder);
             Data.RainfallModelConfiguration.Configure(builder);
+            builder.Entity<RiskAlertDelivery>(e =>
+            {
+                e.HasOne(x=>x.Event).WithMany().HasForeignKey(x=>x.EventId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x=>x.Resident).WithMany().HasForeignKey(x=>x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x=>x.Zone).WithMany().HasForeignKey(x=>x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x=>new{x.EventId,x.ResidentId}).IsUnique();
+                e.HasIndex(x=>new{x.ResidentId,x.ZoneId,x.SentAtUtc});
+                e.HasIndex(x=>new{x.State,x.NextAttemptAtUtc});
+                e.Property(x=>x.State).HasConversion<string>();
+                e.Property(x=>x.ClaimToken).HasMaxLength(40); e.Property(x=>x.LastError).HasMaxLength(500);
+                e.ToTable("RiskAlertDeliveries",t=>t.HasCheckConstraint("CK_RiskAlertDeliveries_State",
+                    "\"Attempts\" BETWEEN 0 AND 100 AND \"State\" IN ('Pending','Sending','Sent','Failed','Suppressed') AND (\"State\" <> 'Sent' OR \"SentAtUtc\" IS NOT NULL)"));
+            });
+            builder.Entity<RiskAlertProcessorLease>(e =>
+            {
+                e.Property(x=>x.Token).IsRequired().HasMaxLength(40);
+                e.ToTable("RiskAlertProcessorLeases",t=>t.HasCheckConstraint("CK_RiskAlertProcessorLeases_Singleton","\"Id\" = 1"));
+            });
+            builder.Entity<ResidentZoneSubscription>(e =>
+            {
+                e.HasIndex(x => new { x.ResidentId, x.ZoneId }).IsUnique();
+                e.HasOne(x => x.Resident).WithMany().HasForeignKey(x => x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+            });
+            builder.Entity<RiskAlertEvent>(e =>
+            {
+                e.HasOne(x => x.RiskHistory).WithMany().HasForeignKey(x => x.RiskHistoryId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.RiskHistoryId).IsUnique();
+                e.HasIndex(x => new { x.ProcessedAtUtc, x.Id });
+            });
+            builder.Entity<RiskThresholdSettings>(e =>
+            {
+                e.Property(x => x.Revision).IsConcurrencyToken();
+                e.Property(x => x.UpdatedByUserId).IsRequired().HasMaxLength(100);
+                e.ToTable("RiskThresholdSettings", table =>
+                {
+                    table.HasCheckConstraint("CK_RiskThresholdSettings_Singleton", "\"Id\" = 1 AND \"Revision\" > 0");
+                    table.HasCheckConstraint("CK_RiskThresholdSettings_Order", "\"MediumThreshold\" > 0 AND \"MediumThreshold\" < \"HighThreshold\" AND \"HighThreshold\" < \"SevereThreshold\" AND \"SevereThreshold\" <= 10000");
+                });
+            });
+            builder.Entity<RiskHistory>(e =>
+            {
+                e.HasOne(x => x.Zone).WithMany().HasForeignKey(x => x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x => x.PreviousLevel).HasConversion<string>();
+                e.Property(x => x.Level).HasConversion<string>();
+                e.Property(x => x.RuleVersion).IsRequired().HasMaxLength(40);
+                e.Property(x => x.FactorsJson).IsRequired();
+                e.HasIndex(x => new { x.ZoneId, x.ComputedAtUtc });
+                e.ToTable("RiskHistories", table =>
+                {
+                    table.HasCheckConstraint("CK_RiskHistory_Levels", "\"Level\" IN ('Unknown','Low','Medium','High','Severe') AND \"PreviousLevel\" IN ('Unknown','Low','Medium','High','Severe')");
+                    table.HasCheckConstraint("CK_RiskHistory_Factors", "json_valid(\"FactorsJson\")");
+                });
+            });
 
             builder.Entity<ReportStatusHistory>(entity =>
             {
@@ -81,6 +141,11 @@ namespace Nagorik.Api
             // Report configuration
             builder.Entity<Report>(e =>
             {
+                e.Property(r => r.PublicVerificationRevision).IsConcurrencyToken();
+                e.HasOne<User>().WithMany().HasForeignKey(r => r.PublicVerifiedByUserId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(r => new { r.IsPubliclyVerified, r.CreatedAt });
+                e.ToTable("Reports", table => table.HasCheckConstraint("CK_Reports_PublicVerification",
+                    "\"PublicVerificationRevision\" >= 0 AND (\"IsPubliclyVerified\" = 0 OR (\"PublicVerifiedByUserId\" IS NOT NULL AND \"PublicVerifiedAtUtc\" IS NOT NULL))"));
                 e.HasKey(r => r.Id);
 
                 e.Property(r => r.Title)
@@ -141,6 +206,8 @@ namespace Nagorik.Api
 
 
             // T-004.1 Crew
+            builder.Entity<Crew>().ToTable("Crews", table => table.HasCheckConstraint("CK_Crews_Location",
+                "(\"LastLatitude\" IS NULL AND \"LastLongitude\" IS NULL AND \"LastSeenAtUtc\" IS NULL) OR (\"LastLatitude\" IS NOT NULL AND \"LastLongitude\" IS NOT NULL AND \"LastSeenAtUtc\" IS NOT NULL AND \"LastLatitude\" BETWEEN -90 AND 90 AND \"LastLongitude\" BETWEEN -180 AND 180)"));
             builder.Entity<Crew>()
                 .HasIndex(c => c.UserId)
                 .IsUnique();
