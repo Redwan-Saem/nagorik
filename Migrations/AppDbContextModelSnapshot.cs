@@ -39,6 +39,39 @@ namespace Nagorik.Api.Migrations
                     b.ToTable("AreaSubscriptions");
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.BusOccupancyReport", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("LinkId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ObservedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResidentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LinkId", "ObservedAtUtc");
+
+                    b.HasIndex("ResidentId", "LinkId")
+                        .IsUnique();
+
+                    b.ToTable("BusOccupancyReports", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_BusOccupancy_Level", "Level IN ('SeatsAvailable','Standing','Full')");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.Crew", b =>
                 {
                     b.Property<int>("Id")
@@ -1556,6 +1589,21 @@ namespace Nagorik.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ZoneMapData");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.BusOccupancyReport", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.TransportLink", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("ResidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.Crew", b =>
