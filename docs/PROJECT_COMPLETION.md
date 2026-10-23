@@ -32,3 +32,12 @@ Verification: 51 focused API/navigation tests passed. No existing legacy tables
 were deleted. Old prediction links open the canonical map without mapping legacy
 numeric IDs to unrelated canonical zones. Generated workbook outputs are excluded
 from application compilation/content discovery.
+
+## NAG-016 — official loadshedding workflow
+
+All eight planned tasks are implemented. Official generation, revision-checked
+editing, validation warnings, confirmed publication, partial supersession and
+audit are covered by 738 passing backend regressions and desktop/mobile browser
+scenarios. See `NAG-016-loadshedding.md` for acceptance, routes, account and caveats.
+NAG-015 (resident seven-day view) remains the next separate story. A dedicated
+homepage/dashboard remains to be built; the existing Home controller redirects.
