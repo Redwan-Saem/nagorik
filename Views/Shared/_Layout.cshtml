@@ -11,7 +11,8 @@
     <a class="skip-link" href="#main">Skip to content</a>
     <header>
         <a class="brand" href="/">Nagorik</a>
-        <nav>
+        <button id="site-menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" hidden>Menu</button>
+        <nav id="site-navigation" aria-label="Main navigation">
             <ul>
                 @if(User.Identity?.IsAuthenticated==true){<li><form action="/session/logout" method="post">@Html.AntiForgeryToken()<button type="submit">Sign out</button></form></li>}
                 else{<li><a href="/login.html?returnUrl=%2F">Sign in</a></li>}
@@ -129,6 +130,7 @@
     {
         <script src="~/js/push-subscribe.js"></script>
     }
+    <script src="~/js/site-navigation.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

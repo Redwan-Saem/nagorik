@@ -98,6 +98,26 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
     }
 
+    [Theory]
+    [InlineData(1280)]
+    [InlineData(390)]
+    public void HomepageShowsPublicAndResidentWorkspacesAndSignsOut(int width)
+    {
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument($"--window-size={width},1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));
+        if(width<600)browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride",new Dictionary<string,object?>{{"width",width},{"height",844},{"deviceScaleFactor",1},{"mobile",true}});
+        var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
+        browser.Navigate().GoToUrl(url+"/");Assert.Equal(6,browser.FindElements(By.CssSelector("#dashboard-public .dashboard-card")).Count);Assert.Empty(browser.FindElements(By.Id("dashboard-work")));
+        Click(By.CssSelector(".dashboard-actions a[href^='/login.html']"));browser.FindElement(By.Id("email")).SendKeys("resident@map.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
+        wait.Until(d=>d.FindElements(By.CssSelector("#dashboard-work .dashboard-card")).Count==9);Assert.Empty(browser.FindElements(By.CssSelector("#dashboard-work a[href^='/admin/']")));Assert.Contains("Noise concerns",browser.FindElement(By.Id("dashboard-work")).Text);
+        Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);
+        var capture=Environment.GetEnvironmentVariable("NAGORIK_SCREENSHOT_DIR");if(!string.IsNullOrWhiteSpace(capture)){Directory.CreateDirectory(capture);browser.GetScreenshot().SaveAsFile(Path.Combine(capture,$"homepage-{width}.png"));}
+        Click(By.CssSelector("#dashboard-work a[href='/resident/loadshedding']"));wait.Until(d=>d.FindElements(By.CssSelector("#schedule-days .schedule-day")).Count==7);Click(By.CssSelector("header a.brand"));wait.Until(d=>d.FindElements(By.Id("dashboard-work")).Count==1);
+        if(width<760)Click(By.Id("site-menu-toggle"));
+        Click(By.CssSelector("form[action='/session/logout'] button"));wait.Until(d=>d.FindElements(By.Id("dashboard-public")).Count==1&&d.FindElements(By.Id("dashboard-work")).Count==0);Assert.Null(browser.Manage().Cookies.GetCookieNamed("auth_token"));
+    }
+
     [Fact]
     public async Task AdminManagesSourcedGeographyAndImportsReviewedCatalogInBrowser()
     {

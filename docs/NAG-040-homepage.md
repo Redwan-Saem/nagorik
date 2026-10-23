@@ -12,3 +12,13 @@ also see actions appropriate to their claims; actual feature endpoints still enf
 authorization. No invented statistics, counts or live feed are shown. Sign out
 deletes the browser auth cookie through a CSRF-protected POST; it does not claim
 to revoke previously issued bearer tokens held elsewhere.
+
+The brand opens home on every Razor page. At phone widths, Menu reveals the
+navigation and Escape closes it; links remain available if JavaScript is disabled.
+Sign-in preserves a return URL and the homepage does not invent activity metrics.
+
+Verification: ten role-navigation cases passed. Desktop (1280px) and phone (390px)
+Chrome workflows passed for guest links, resident sign-in, authorized workspace
+cards, no admin cards, real loadshedding navigation, brand return and sign-out.
+Both cases passed again after the mobile menu adjustment. Captured desktop/mobile
+screenshots were inspected; no horizontal overflow was found.
