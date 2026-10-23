@@ -23,4 +23,7 @@ public static class DhakaTime
             Tz
         );
     }
+
+    public static DateTime ToUtc(DateTime local) => TimeZoneInfo.ConvertTimeToUtc(
+        DateTime.SpecifyKind(local, DateTimeKind.Unspecified), Tz);
 }

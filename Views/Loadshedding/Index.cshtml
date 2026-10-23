@@ -1,0 +1,25 @@
+@model IReadOnlyList<Nagorik.Api.Models.Zone>
+@{ ViewData["Title"] = "Loadshedding generator"; var today = DateOnly.FromDateTime(Nagorik.Api.Services.DhakaTime.ToLocal(DateTime.UtcNow)); }
+<h1>Loadshedding schedule generator</h1>
+<p>Enter reviewed demand and available capacity in MW. These are planning inputs, not live grid measurements. All schedule times use Asia/Dhaka.</p>
+<form id="schedule-generate">
+    @Html.AntiForgeryToken()
+    <p><label>Start date <input name="StartDate" type="date" value="@today.ToString("yyyy-MM-dd")" required /></label></p>
+    <p><label>End date <input name="EndDate" type="date" value="@today.AddDays(6).ToString("yyyy-MM-dd")" required /></label> Maximum 31 days.</p>
+    <p><label>Available capacity (MW) <input name="AvailableCapacityMw" type="number" min="0.000001" max="1000000" step="any" required /></label></p>
+    <p><label>Outage slot length <select name="SlotMinutes"><option value="60">1 hour</option><option value="120" selected>2 hours</option><option value="180">3 hours</option><option value="240">4 hours</option><option value="360">6 hours</option></select></label></p>
+    <fieldset><legend>Select up to 100 zones and supply each zone's demand</legend>
+    @foreach (var zone in Model)
+    {
+        <p class="schedule-demand" data-zone-id="@zone.Id"><label><input type="checkbox" class="zone-included" /> @zone.Name (@zone.Code)</label>
+        <label for="demand-@zone.Id">Demand (MW)</label><input id="demand-@zone.Id" class="zone-demand" type="number" min="0.000001" max="1000000" step="any" /></p>
+    }
+    @if (Model.Count == 0) { <p>No canonical zones are available. Ask the administrator to add reviewed zone boundaries.</p> }
+    </fieldset>
+    <button type="submit" disabled="@(Model.Count == 0)">Generate draft</button>
+</form>
+<p id="schedule-status" role="status" aria-live="polite"></p>
+<h2>Recent schedules</h2><p>Latest 100 versions. Drafts are private to utility officials.</p><ul id="schedule-versions"></ul>
+<noscript>JavaScript is required to generate and review schedules.</noscript>
+@section Scripts { <script src="~/js/loadshedding-generator.js" asp-append-version="true"></script> }
+@section Styles { <link rel="stylesheet" href="~/css/loadshedding.css" asp-append-version="true" /> }
