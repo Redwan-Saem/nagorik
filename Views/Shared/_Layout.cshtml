@@ -58,6 +58,11 @@
                     </li>
                 }
 
+                @if (Nagorik.Api.Authorization.UtilityScheduleAccess.IsOfficial(User))
+                {
+                    <li><a href="/official/loadshedding">Loadshedding schedules</a></li>
+                }
+
                 @if (User.IsInRole("Dispatcher"))
                 {
                     <li class="nav-item">
