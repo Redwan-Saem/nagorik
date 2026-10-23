@@ -20,6 +20,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 builder.Services.AddSingleton<LoadsheddingRotationEngine>();
 builder.Services.AddScoped<LoadsheddingScheduleService>();
+builder.Services.AddScoped<ResidentScheduleQueryService>();
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
@@ -127,6 +128,7 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     await DevDataSeeder.SeedAsync(scope.ServiceProvider);
+    await Nagorik.Api.Data.DevelopmentTransportSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
     await Nagorik.Api.Data.DevelopmentMapSeeder.SeedAsync(
         scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
     await Nagorik.Api.Data.DevelopmentReportSeeder.SeedAsync(
