@@ -30,7 +30,7 @@ public sealed class UtilityAnomalyE2eTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         Directory.CreateDirectory(root);
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = root, WebRootPath = Path.Combine(repo, "wwwroot") });
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = root, WebRootPath = Path.Combine(repo, "wwwroot"), EnvironmentName = "Development" });
         builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Configuration["Jwt:Key"] = Key;
         builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlite($"Data Source={Path.Combine(root, "isolated.db")};Pooling=False"));
