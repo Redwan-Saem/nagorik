@@ -18,6 +18,8 @@ builder.Services.AddScoped<IPhotoStorage, LocalPhotoStorage>();
 builder.Services.AddScoped<UtilityPhotoUploadService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
+builder.Services.AddSingleton<LoadsheddingRotationEngine>();
+builder.Services.AddScoped<LoadsheddingScheduleService>();
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
