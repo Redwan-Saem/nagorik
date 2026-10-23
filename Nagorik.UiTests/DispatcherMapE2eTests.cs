@@ -39,6 +39,16 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddControllersWithViews().AddApplicationPart(typeof(DispatcherMapController).Assembly);
         builder.Services.AddScoped<RiskZoneQueryService>();
         builder.Services.AddScoped<MapFeatureQueryService>();
+        builder.Services.AddScoped<CrewMapQueryService>();
+        builder.Services.AddScoped<PublicMapQueryService>();
+        builder.Services.AddScoped<FlaggedDrainageQueryService>();
+        builder.Services.AddScoped<CrewAssignmentService>();
+        builder.Services.AddScoped<DrainageDispatchService>();
+        builder.Services.AddSingleton<ICrewTaskNotifier,NullCrewTaskNotifier>();
+        builder.Services.AddSingleton<INotificationService>(new UiNotifications());
+        builder.Services.AddScoped<ResidentReportStatusNotifier>();
+        builder.Services.AddScoped<DispatcherTaskStatusNotifier>();
+        builder.Services.AddScoped<ReportStatusWorkflowService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
@@ -53,6 +63,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         });
         builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build(); app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+        app.MapControllerRoute("default","{controller=Home}/{action=Index}/{id?}");
         await using (var scope = app.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>(); await db.Database.MigrateAsync();
@@ -60,7 +71,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
             db.Users.Add(new User { Email = "admin@map.invalid", Name = "Admin fixture", Role = "Admin", PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password, 4) });
             await db.SaveChangesAsync();
             await DevelopmentMapSeeder.SeedAsync(db, app.Environment, builder.Configuration);
-            var owner = new User { Email = "resident@map.invalid", Name = "Fixture resident", Role = "Resident", PasswordHash = "not-a-login-fixture" };
+            var owner = new User { Email = "resident@map.invalid", Name = "Fixture resident", Role = "Resident", PasswordHash = BCrypt.Net.BCrypt.HashPassword(Password,4) };
             db.Users.Add(owner); await db.SaveChangesAsync();
             var storage = scope.ServiceProvider.GetRequiredService<IPhotoStorage>();
             await using var photo = new MemoryStream(Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4YkAAAAASUVORK5CYII="));
@@ -72,6 +83,83 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         await app.StartAsync(); url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
     }
 
+    private sealed class UiNotifications:INotificationService
+    {
+        public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
+    }
+
+    [Fact]
+    public async Task NonMlCrewDispatchVerificationResidentGpsAndAreasWorkAcrossRealPages()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var crewUser=new User{Email="crew@map.invalid",Role="Crew",PasswordHash=BCrypt.Net.BCrypt.HashPassword(Password,4)};
+            var secondUser=new User{Email="crew2@map.invalid",Role="Crew",PasswordHash=BCrypt.Net.BCrypt.HashPassword(Password,4)};
+            var busy=new Crew{Name="Busy fixture crew",User=crewUser};
+            var free=new Crew{Name="Free fixture crew",User=secondUser,LastLatitude=23.75,LastLongitude=90.38,LastSeenAtUtc=DateTime.UtcNow};
+            db.Crews.AddRange(busy,free);var report=await db.Reports.SingleAsync(r=>r.Id==1);report.Status=ReportStatus.Assigned;report.AssignedCrew=busy;
+            var zone=await db.Zones.SingleAsync(z=>z.Id==1);zone.RiskLevel=ZoneRiskLevel.High;zone.LastComputedAtUtc=DateTime.UtcNow;
+            var resident=await db.Users.SingleAsync(u=>u.Email=="resident@map.invalid");
+            db.NotificationPreferences.Add(new(){UserId=resident.Id.ToString(),NotificationsEnabled=true});await db.SaveChangesAsync();
+        }
+        var options=new ChromeOptions();options.AddArgument("--headless=new");options.AddArgument("--window-size=1280,1000");options.PageLoadStrategy=PageLoadStrategy.Eager;
+        var service=ChromeDriverService.CreateDefaultService();service.HideCommandPromptWindow=true;
+        browser=new ChromeDriver(service,options,TimeSpan.FromSeconds(90));var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(30));
+        browser.ExecuteCdpCommand("Browser.grantPermissions",new Dictionary<string,object?>{{"origin",url},{"permissions",new[]{"geolocation"}}});
+        browser.ExecuteCdpCommand("Emulation.setGeolocationOverride",new Dictionary<string,object?>{{"latitude",23.7461},{"longitude",90.3742},{"accuracy",10}});
+        wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
+        void Click(By selector)=>wait.Until(d=>
+        {
+            try{var element=d.FindElement(selector);if(!element.Displayed || !element.Enabled)return false;
+                browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",element);element.Click();return true;}
+            catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}
+        });
+        void Login(string email,string destination)
+        {
+            browser.Navigate().GoToUrl(url+"/login.html?returnUrl="+Uri.EscapeDataString(destination));
+            browser.FindElement(By.Id("email")).SendKeys(email);browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
+            wait.Until(d=>!d.Url.Contains("login.html"));
+        }
+        Login("crew@map.invalid","/crew/tasks/1");Click(By.Id("crew-location-capture"));
+        wait.Until(d=>d.FindElement(By.Id("crew-location-status")).Text.Contains("Location ready"));Click(By.Id("update-task-status"));
+        wait.Until(d=>d.FindElement(By.Id("task-status")).Text.Contains("In Progress"));
+        Login("dispatcher@map.invalid","/dispatcher/map");
+        wait.Until(d=>d.FindElement(By.Id("map-crews-status")).Text.Contains("2 crew locations loaded"));
+        Assert.Single(browser.FindElements(By.CssSelector(".crew-busy")));Assert.Single(browser.FindElements(By.CssSelector(".crew-free")));
+        browser.Navigate().GoToUrl(url+"/dispatcher/flagged-drainage");
+        new SelectElement(browser.FindElement(By.Id("crew-1"))).SelectByValue("2");Click(By.CssSelector("form[action$='/1/assign'] button"));
+        wait.Until(d=>d.Url.Contains("/Dispatch/Report/"));
+        Assert.Contains("Assigned",browser.FindElement(By.TagName("body")).Text);
+        browser.Navigate().GoToUrl(url+"/dispatcher/flagged-drainage");new SelectElement(browser.FindElement(By.Id("crew-1"))).SelectByValue("2");
+        Click(By.CssSelector("form[action$='/1/assign'] button"));wait.Until(d=>d.FindElement(By.TagName("body")).Text.Contains("active task already exists"));
+        browser.Navigate().GoToUrl(url+"/dispatcher/report-verification");Click(By.CssSelector("form[action='/dispatcher/report-verification/1'] button"));
+        wait.Until(d=>d.FindElement(By.TagName("body")).Text.Contains("Marker verified and published"));
+        browser.Manage().Cookies.DeleteCookieNamed("auth_token");browser.Navigate().GoToUrl(url+"/map?zone=1");
+        wait.Until(d=>d.FindElement(By.Id("public-reports-status")).Text.Contains("1 reports loaded"));
+        var workerState=browser.ExecuteAsyncScript("const done=arguments[arguments.length-1]; navigator.serviceWorker.register('/sw.js').then(()=>navigator.serviceWorker.ready).then(r=>new Promise(resolve=>{const worker=r.active;if(worker?.state==='activated'){resolve('activated');return;}worker?.addEventListener('statechange',()=>{if(worker.state==='activated')resolve('activated');});})).then(done,e=>done('error:'+e.name));");
+        Assert.Equal("activated",workerState);
+        Click(By.Id("resident-locate"));wait.Until(d=>d.FindElement(By.Id("resident-location-status")).Text.Contains("Dhanmondi"));
+        Assert.Contains("High",browser.FindElement(By.Id("resident-location-status")).Text);
+        Login("resident@map.invalid","/resident/areas");
+        wait.Until(d=>d.FindElements(By.CssSelector("#area-zone option")).Count==4);
+        new SelectElement(browser.FindElement(By.Id("area-zone"))).SelectByValue("1");Click(By.Id("area-save"));
+        wait.Until(d=>d.FindElement(By.Id("areas-status")).Text.Contains("Area saved"));
+        browser.Navigate().GoToUrl(url+"/Notifications/Settings");wait.Until(d=>d.FindElement(By.Id("save-settings")).Enabled);
+        Click(By.Id("notifications-enabled"));Click(By.Id("save-settings"));wait.Until(d=>d.FindElement(By.Id("settings-status")).Text.Contains("preference saved"));
+        browser.Navigate().GoToUrl(url+"/resident/areas");wait.Until(d=>d.FindElement(By.Id("areas-global-status")).Text.Contains("OFF"));
+        Assert.Single(browser.FindElements(By.CssSelector("button[data-area-toggle='1']")));
+        browser.Navigate().GoToUrl(url+"/Notifications/Settings");wait.Until(d=>d.FindElement(By.Id("save-settings")).Enabled);
+        Click(By.Id("notifications-enabled"));Click(By.Id("save-settings"));wait.Until(d=>d.FindElement(By.Id("settings-status")).Text.Contains("preference saved"));
+        browser.Navigate().GoToUrl(url+"/resident/areas");wait.Until(d=>d.FindElement(By.Id("areas-global-status")).Text.Contains("Global notifications are enabled"));
+        Click(By.CssSelector("button[data-area-toggle='1']"));
+        wait.Until(d=>d.FindElement(By.Id("areas-list")).Text.Contains("alerts off"));Click(By.CssSelector("button[data-area-remove='1']"));
+        wait.Until(d=>d.FindElement(By.Id("areas-status")).Text.Contains("Area removed"));
+        await using var finalScope=app.Services.CreateAsyncScope();var finalDb=finalScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(4,await finalDb.Reports.CountAsync());Assert.True((await finalDb.Reports.SingleAsync(r=>r.Id==1)).IsPubliclyVerified);
+        Assert.Equal(23.7461,(await finalDb.Crews.SingleAsync(c=>c.Id==1)).LastLatitude);Assert.Empty(await finalDb.ResidentZoneSubscriptions.ToListAsync());
+    }
+
     [Fact]
     public async Task AdminEditsThresholdsAndVulnerabilityThenEvaluatesInBrowser()
     {
@@ -79,20 +167,26 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         var service = ChromeDriverService.CreateDefaultService(); service.HideCommandPromptWindow = true;
         browser = new ChromeDriver(service, options, TimeSpan.FromSeconds(90));
         var wait = new WebDriverWait(browser, TimeSpan.FromSeconds(25));
+        void Click(By selector)=>wait.Until(d=>
+        {
+            try{var element=d.FindElement(selector);if(!element.Displayed || !element.Enabled)return false;
+                browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",element);element.Click();return true;}
+            catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}
+        });
         browser.Navigate().GoToUrl(url + "/login.html?returnUrl=%2Fadmin%2Frisk-thresholds");
         browser.FindElement(By.Id("email")).SendKeys("admin@map.invalid");
         browser.FindElement(By.Id("password")).SendKeys(Password);
-        browser.FindElement(By.CssSelector("button")).Click();
+        Click(By.CssSelector("button"));
         wait.Until(d => d.FindElements(By.Id("Thresholds_MediumThreshold")).Count == 1);
         void Set(string id, string value) { var input = browser.FindElement(By.Id(id)); input.Clear(); input.SendKeys(value); }
         Set("Thresholds_MediumThreshold", "20");
-        browser.FindElement(By.CssSelector("form[action='/admin/risk-thresholds'] button")).Click();
+        Click(By.CssSelector("form[action='/admin/risk-thresholds'] button"));
         wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("strictly increasing (medium"));
         Set("Thresholds_MediumThreshold", "5");
-        browser.FindElement(By.CssSelector("form[action='/admin/risk-thresholds'] button")).Click();
+        Click(By.CssSelector("form[action='/admin/risk-thresholds'] button"));
         wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Thresholds saved."));
         Set("elevation-1", "0"); Set("density-1", "0"); Set("history-1", "1");
-        browser.FindElement(By.CssSelector("form[action$='/zones/1/vulnerability'] button")).Click();
+        Click(By.CssSelector("form[action$='/zones/1/vulnerability'] button"));
         wait.Until(d => d.FindElement(By.TagName("body")).Text.Contains("Vulnerability saved."));
         await using (var scope = app.Services.CreateAsyncScope())
         {
