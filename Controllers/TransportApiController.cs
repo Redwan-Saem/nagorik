@@ -21,4 +21,16 @@ public sealed class TransportApiController(AppDbContext db,TransportSearchServic
         try{return Ok(await search.SearchAsync(input,ct));}
         catch(TransportProblem e){return StatusCode(e.Status,new{message=e.Message});}
     }
+    [HttpGet("routes/{id}")]
+    public async Task<IActionResult> Detail(string id,[FromQuery]RouteSearchInput input,CancellationToken ct)
+    {
+        if(id.Length!=20||!id.All(Uri.IsHexDigit))return BadRequest(new{message="Invalid route identifier."});
+        try
+        {
+            var result=await search.SearchAsync(input,ct);
+            var route=result.Options.SingleOrDefault(x=>x.Id==id);
+            return route==null?NotFound(new{message="Route is no longer available. Search again."}):Ok(route);
+        }
+        catch(TransportProblem e){return StatusCode(e.Status,new{message=e.Message});}
+    }
 }
