@@ -11,7 +11,7 @@ namespace Nagorik.Api.Controllers;
 [Route("admin/risk-thresholds")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class RiskAdminController(AppDbContext db, RiskThresholdProvider thresholds,
-    RiskComputationService computation, TimeProvider clock) : Controller
+    RiskComputationService computation, TimeProvider clock, GeographicDataService geography) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct)
@@ -47,15 +47,8 @@ public sealed class RiskAdminController(AppDbContext db, RiskThresholdProvider t
     public async Task<IActionResult> Vulnerability(int id, ZoneVulnerabilityInput input, CancellationToken ct)
     {
         if (!ModelState.IsValid) return BadRequest(ModelState);
-        // Clear the displayed prediction until it is recomputed with these new inputs.
-        var changed = await db.Zones.Where(z => z.Id == id).ExecuteUpdateAsync(update => update
-            .SetProperty(z => z.ElevationMeters, input.ElevationMeters)
-            .SetProperty(z => z.DrainageDensityKmPerSqKm, input.DrainageDensityKmPerSqKm)
-            .SetProperty(z => z.HistoryScore, input.HistoryScore)
-            .SetProperty(z => z.RiskLevel, ZoneRiskLevel.Unknown)
-            .SetProperty(z => z.LastComputedAtUtc, (DateTime?)null)
-            .SetProperty(z => z.RiskFactorsJson, (string?)null), ct);
-        if (changed == 0) return NotFound();
+        try { await geography.UpdateVulnerabilityAsync(id,input,User.FindFirstValue(ClaimTypes.NameIdentifier)??"unknown",ct); }
+        catch(TransportProblem e){return StatusCode(e.Status,e.Message);}
         TempData["RiskMessage"] = "Vulnerability saved. Run evaluation to calculate a new level.";
         return RedirectToAction(nameof(Index));
     }
