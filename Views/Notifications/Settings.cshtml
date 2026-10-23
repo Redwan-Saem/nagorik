@@ -1,4 +1,6 @@
-<h2>Waterlogging alerts</h2>
+<h1>Area risk alerts</h1>
+@Html.AntiForgeryToken()
+<p>Enable area-risk alerts, choose saved areas in <a href="/resident/areas">My areas</a>, and enable push on this device.</p>
 
 <div class="form-check form-switch mb-3">
     <input class="form-check-input"
@@ -7,11 +9,12 @@
 
     <label class="form-check-label"
            for="notifications-enabled">
-        Send me alerts
+        Enable area-risk alerts
     </label>
 </div>
 
-<div id="zone-list" class="mb-3"></div>
+<button id="enable-push" type="button">Enable push on this device</button>
+<p id="push-status" role="status" aria-live="polite"></p>
 
 <button id="save-settings"
         class="btn btn-primary">

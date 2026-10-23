@@ -10,4 +10,6 @@ public sealed class DrainagePoint
     public DrainageStatus Status { get; set; } = DrainageStatus.Unknown;
     public int ZoneId { get; set; }
     public Zone Zone { get; set; } = null!;
+    public int? LastWorkReportId { get; set; }
+    public Report? LastWorkReport { get; set; }
 }

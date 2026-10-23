@@ -52,3 +52,29 @@ role boundaries, stale edits and duplicate prevention, JavaScript tests for GPS 
 UI failures, and headless browser smoke coverage where practical. Preserve the
 working demo database and unrelated local edits. Commit and push each task to its
 own `feature/T-xxx.x-*` branch, with both author and committer set to its owner.
+
+## Implementation and verification record
+
+All 17 included tasks are implemented. NAG-034 remains excluded; no included
+story depends on ML. Local verification: 678 backend tests passed, 139 client
+tests passed, and all six isolated headless browser scenarios were verified across
+the serial regression run and targeted rerun. The final targeted run passed 3/3,
+including the complete new workflow and both utility viewport cases. Earlier
+browser failures were corrected in the harness (serial execution, stale-element
+handling, conventional routes and waiting for actual worker activation); one
+mobile CDP transport timeout was resolved on the isolated rerun.
+
+| Story | Main evidence |
+|---|---|
+| NAG-031 | CrewLocationSchemaTests, CrewLocationWorkflowTests, CrewTasksApiTests, crew GeoJSON HTTP tests, crew-location/dispatcher-crews client tests and real crew GPS/status/busy/free browser flow. |
+| NAG-032 | RiskComputationTests, ZoneRiskAlertTests, flagged-point HTTP tests, DrainageDispatchTests, protected panel tests and real assignment/duplicate-work browser flow. |
+| NAG-033 | Anonymous/privacy and verification HTTP tests, resident-map and zone-locator client tests, real public publication/GPS browser flow. |
+| NAG-035 | ResidentZoneSubscriptionSchemaTests, private/idempotent/CSRF subscription HTTP tests, ZoneRiskRecipientTests, RiskAlertDeliveryTests, message tests, client subscription/global/push tests and real area/global-preference browser flow. |
+| Cross-story | NonMlMigrationTests proves upgrade/rollback preserves existing crews and legacy opt-ins. EF reports no pending model changes. The real service worker activates on the isolated browser server. |
+
+Operational conditions remain explicit: real GPS depends on browser/OS permission
+and availability; real push needs valid VAPID keys, device permission and a saved
+endpoint. Browser tests mock successful notification transport rather than sending
+real external push messages. Rule coefficients are experimental, and cached or
+missing inputs are never presented as verified flood forecasts. See
+`NON_ML_RUNBOOK.md` for setup, routes and demonstration steps.
