@@ -1,0 +1,41 @@
+@model int
+@{ ViewData["Title"] = $"Review schedule #{Model}"; }
+<section id="schedule-review" data-schedule-id="@Model">
+<h1>Review loadshedding schedule #@Model</h1>
+<p><a href="/official/loadshedding">Back to generator and versions</a></p>
+<p>All dates and outage times use Asia/Dhaka. This plan uses the stored official demand inputs, not a live grid feed.</p>
+@Html.AntiForgeryToken()
+<p id="review-status" role="status" aria-live="polite">Loading schedule…</p>
+<button type="button" id="review-reload">Reload latest version</button>
+<p id="review-summary"></p>
+<h2>Validation</h2><ul id="review-errors" role="alert"></ul><ul id="review-warnings"></ul>
+<h2>Demand input snapshots</h2><ul id="review-demands"></ul>
+<h2>Outage slots</h2>
+<p><label>Zone <select id="review-zone"><option value="">All included zones</option></select></label>
+<label>Date <input id="review-date" type="date" /></label></p>
+<p id="review-count"></p>
+<div class="schedule-table-wrap"><table><thead><tr><th>Zone</th><th>Date</th><th>Start</th><th>End</th><th>Action</th></tr></thead><tbody id="review-slots"></tbody></table></div>
+<p><button type="button" id="review-previous" disabled>Previous 100</button> <button type="button" id="review-next" disabled>Next 100</button></p>
+<form id="schedule-edit" hidden>
+    <h2>Edit draft slot</h2>
+    <p>Draft edits are saved with a revision check. Capacity errors may remain while you edit, but must be resolved before publishing.</p>
+    <input name="SlotId" type="hidden" value="0" />
+    <p><label>Zone <select name="ZoneId" required></select></label></p>
+    <p><label>Date <input name="Date" type="date" required /></label></p>
+    <p><label>Outage start <select name="StartMinute" required></select></label> <span id="edit-end-time"></span></p>
+    <button type="submit">Save slot</button>
+    <button type="button" id="edit-remove" disabled>Remove selected slot</button>
+    <button type="button" id="edit-new">Start a new slot</button>
+</form>
+<form id="schedule-publish" hidden>
+    <h2>Publish draft</h2>
+    <p>Publishing replaces the current plan for these zones and dates. Unaffected zone/days retain their existing publication.</p>
+    <p><label><input type="checkbox" name="Confirm" required /> I confirm publication of this version.</label></p>
+    <p><label><input type="checkbox" name="AcknowledgeWarnings" /> I have reviewed and accept the displayed planning warnings.</label></p>
+    <button type="submit">Publish reviewed schedule</button>
+</form>
+<h2>Audit history</h2><ul id="review-audit"></ul>
+</section>
+<noscript>JavaScript is required for draft review and publication.</noscript>
+@section Styles { <link rel="stylesheet" href="~/css/loadshedding.css" asp-append-version="true" /> }
+@section Scripts { <script src="~/js/loadshedding-review.js" asp-append-version="true"></script> }

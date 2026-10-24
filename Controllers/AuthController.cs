@@ -13,11 +13,13 @@ namespace Nagorik.Api.Controllers
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
+        private readonly IHostEnvironment? _environment;
 
-        public AuthController(AppDbContext db, IConfiguration config)
+        public AuthController(AppDbContext db, IConfiguration config, IHostEnvironment? environment = null)
         {
             _db = db;
             _config = config;
+            _environment = environment;
         }
 
         [HttpPost("register")]
@@ -56,7 +58,7 @@ namespace Nagorik.Api.Controllers
                  new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                  new Claim(ClaimTypes.Role, user.Role)
                  },
-                expires: DateTime.Now.AddDays(7),
+                expires: DateTime.UtcNow.AddDays(7),
                 signingCredentials: creds
             );
             var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
@@ -66,9 +68,9 @@ namespace Nagorik.Api.Controllers
             Response.Cookies.Append("auth_token", tokenString, new CookieOptions
             {
                 HttpOnly = true,       // not readable by JS (XSS protection)
-                Secure = false,        // set to true in production (HTTPS only)
+                Secure = Request.IsHttps || (_environment != null && !_environment.IsDevelopment()),
                 SameSite = SameSiteMode.Lax,
-                Expires = DateTimeOffset.Now.AddDays(7)
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
             return Ok(new { token = tokenString, role = user.Role });

@@ -32,16 +32,16 @@ public class LocalPhotoStorage : IPhotoStorage
             throw new InvalidOperationException("Private photo storage must be outside the web root.");
     }
 
-    public async Task<string> SaveAsync(Stream data, string extension)
+    public Task<string> SaveAsync(Stream data, string extension) => SavePrivateAsync(data, extension);
+
+    public const string LegacyUrlPrefix = "/uploads/reports/";
+    public static bool IsLegacyUrl(string url)
     {
-        var name = $"{Guid.NewGuid():N}{extension}";
-
-        await using var fs = File.Create(
-            Path.Combine(_root, name));
-
-        await data.CopyToAsync(fs);
-
-        return $"/uploads/reports/{name}";
+        if (!url.StartsWith(LegacyUrlPrefix, StringComparison.Ordinal)) return false;
+        var name = url[LegacyUrlPrefix.Length..];
+        var extension = Path.GetExtension(name);
+        return (extension is ".jpg" or ".jpeg" or ".png") && name.Length == 32 + extension.Length
+            && Guid.TryParseExact(name[..32], "N", out _);
     }
 
     public static bool IsPrivateUrl(string url)
@@ -78,10 +78,12 @@ public class LocalPhotoStorage : IPhotoStorage
     public Task<StoredReportPhoto?> OpenPrivateAsync(string url, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!IsPrivateUrl(url)) return Task.FromResult<StoredReportPhoto?>(null);
+        var isPrivate = IsPrivateUrl(url);
+        if (!isPrivate && !IsLegacyUrl(url)) return Task.FromResult<StoredReportPhoto?>(null);
         try
         {
-            Stream stream = new FileStream(Path.Combine(_privateRoot, url[PrivateUrlPrefix.Length..]), FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
+            var path = isPrivate ? Path.Combine(_privateRoot, url[PrivateUrlPrefix.Length..]) : Path.Combine(_root, url[LegacyUrlPrefix.Length..]);
+            Stream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
             return Task.FromResult<StoredReportPhoto?>(new(stream, url.EndsWith(".png", StringComparison.Ordinal) ? "image/png" : "image/jpeg"));
         }
         catch (FileNotFoundException) { return Task.FromResult<StoredReportPhoto?>(null); }

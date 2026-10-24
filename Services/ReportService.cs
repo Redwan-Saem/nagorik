@@ -42,6 +42,9 @@ public class ReportService : IReportService
         if (request.Category == ReportCategory.UtilityAnomaly)
             return ReportResult.Fail(new() { [nameof(request.Category)] = "Use the utility anomaly submission endpoint for this category." });
 
+        if (!int.TryParse(userId, out var userIdValue) || userIdValue <= 0)
+            return ReportResult.Fail(new() { ["User"] = "Invalid user ID." });
+
         if (!ReportValidator.IsInDhaka(
                 request.Latitude!.Value,
                 request.Longitude!.Value))
@@ -86,19 +89,10 @@ public class ReportService : IReportService
 
         await using (var stream = request.Photo.OpenReadStream())
         {
-            imageUrl = await _storage.SaveAsync(
+            imageUrl = await _storage.SavePrivateAsync(
                 stream,
                 Path.GetExtension(request.Photo.FileName)
                     .ToLowerInvariant());
-        }
-
-
-        if (!int.TryParse(userId, out var userIdValue))
-        {
-            return ReportResult.Fail(new Dictionary<string, string>
-            {
-                ["User"] = "Invalid user ID."
-            });
         }
 
 
@@ -143,7 +137,12 @@ public class ReportService : IReportService
 
         _db.Reports.Add(report);
 
-        await _db.SaveChangesAsync();
+        try { await _db.SaveChangesAsync(); }
+        catch
+        {
+            await _storage.DeletePrivateAsync(imageUrl);
+            throw;
+        }
 
         return ReportResult.Ok(report.Id);
     }
