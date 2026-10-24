@@ -289,10 +289,18 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         browser.FindElement(By.Id("email")).SendKeys("resident@map.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
         wait.Until(d=>d.FindElements(By.CssSelector("#schedule-days .schedule-day")).Count==7);
         Assert.Contains("not yet published",browser.FindElement(By.Id("schedule-publication-summary")).Text);
+        // Polling deliberately pauses in hidden tabs. Keep this real browser page
+        // foregrounded while checking the automatic publication update.
+        browser.ExecuteCdpCommand("Page.bringToFront", new Dictionary<string,object?>());
+        Assert.False(browser.ExecuteScript("return document.hidden") is true);
         await using(var scope=app.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<LoadsheddingScheduleService>().PublishAsync(planId,new(){ExpectedRevision=1,Confirm=true,AcknowledgeWarnings=true},actorId);
         // Do not click Refresh: the real 30-second publication poll must pick it up.
-        wait.Until(d=>d.FindElement(By.Id("schedule-publication-summary")).Text.Contains("Published seven-day"));
+        try { wait.Until(d=>d.FindElement(By.Id("schedule-publication-summary")).Text.Contains("Published seven-day")); }
+        catch(WebDriverTimeoutException e)
+        {
+            throw new Xunit.Sdk.XunitException($"Automatic publication refresh failed: summary={browser.FindElement(By.Id("schedule-publication-summary")).Text}; status={browser.FindElement(By.Id("resident-schedule-status")).Text}; hidden={browser.ExecuteScript("return document.hidden")}. {e.Message}");
+        }
         Assert.Single(browser.FindElements(By.CssSelector(".schedule-today")));
         Assert.DoesNotContain("Not published",browser.FindElement(By.Id("schedule-last-updated")).Text);
         Click(By.Id("schedule-locate"));wait.Until(d=>d.FindElement(By.Id("schedule-location-status")).Text.Contains("Detected area"));
@@ -508,7 +516,9 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         wait.Until(d => d.FindElements(By.Id("map-status")).Count == 1 && d.FindElement(By.Id("map-status")).Text.Contains("3 risk zones loaded"));
         Assert.Equal(3, browser.FindElements(By.CssSelector("#risk-zone-map path.leaflet-interactive")).Count);
         Assert.Contains("uncalibrated rule baseline", browser.FindElement(By.TagName("body")).Text);
+        if(width<760)browser.FindElement(By.Id("site-menu-toggle")).Click();
         Assert.True(browser.FindElements(By.LinkText("Dispatcher risk map")).Count > 0);
+        if(width<760)browser.FindElement(By.Id("site-menu-toggle")).Click();
         wait.Until(d => d.FindElement(By.Id("map-drainage-status")).Text.Contains("6 drainage points loaded"));
         Assert.Equal(3, browser.FindElements(By.CssSelector(".drainage-blocked")).Count);
         Assert.Equal(3, browser.FindElements(By.CssSelector(".drainage-clear")).Count);
@@ -520,8 +530,14 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", cluster);
         cluster.Click();
         wait.Until(d => d.FindElements(By.CssSelector(".report-marker")).Count == 3);
-        var reportMarker = browser.FindElement(By.CssSelector(".report-marker"));
-        reportMarker.Click();
+        // Cluster expansion animates the map; retry a real click until the marker
+        // reaches its final position instead of bypassing browser hit testing.
+        wait.Until(d =>
+        {
+            try { d.FindElement(By.CssSelector(".report-marker")).Click(); return true; }
+            catch (ElementClickInterceptedException) { return false; }
+            catch (StaleElementReferenceException) { return false; }
+        });
         wait.Until(d => d.FindElements(By.CssSelector(".map-report-photo")).Any(img => browser.ExecuteScript("return arguments[0].naturalWidth > 0", img) is true));
         Assert.Contains("Status: Pending", browser.FindElement(By.CssSelector(".map-report-popup")).Text);
         var reportToggle = browser.FindElement(By.Id("map-reports-toggle"));

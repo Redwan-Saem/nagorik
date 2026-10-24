@@ -119,6 +119,16 @@ and mobile navigation, cookie sign-out and verification. Ten role checks and two
 desktop/mobile browser cases passed, including real feature navigation and logout.
 Screenshots were inspected. See `NAG-040-homepage.md`. Home no longer redirects.
 
-Older SOS fixes and final regression/integration remain. External GPS/push and
-calibration evidence require real hardware/configuration/data and must not be
-claimed from browser fixtures.
+## Final integration
+
+The older SOS browser-fetch receiver error is corrected with regression coverage.
+Login cookies use Secure outside local HTTP Development. Civic report photos now
+use private storage, and legacy photo links require report ownership or authorized
+staff access. See `NAG-039-integration.md` and `NAG-039-photo-privacy.md`.
+
+`RUN_PROJECT.md` contains setup, seeded accounts, page URLs, API examples and demo
+checks. `FINAL_VERIFICATION.md` records the final regression results and limits.
+External GPS/push and calibration evidence still require real hardware,
+configuration and data; the acceptance protocol is in
+`NAG-038-external-acceptance.md`. NAG-034 ML and its dependent work remain excluded
+as requested. Software implementation is distinct from external acceptance.
