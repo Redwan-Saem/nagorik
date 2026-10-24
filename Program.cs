@@ -148,7 +148,10 @@ if (app.Environment.IsDevelopment())
 
 // HTTPS redirect must come first, before auth middleware
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Nagorik.Api.Services.ReportPhotoStaticFiles(app.Environment.WebRootFileProvider, app.Environment.WebRootPath)
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
