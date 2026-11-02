@@ -24,6 +24,11 @@ builder.Services.AddScoped<ResidentScheduleQueryService>();
 builder.Services.AddScoped<TransportSearchService>();
 builder.Services.AddScoped<BusOccupancyService>();
 builder.Services.AddScoped<MunicipalScheduleService>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<AirQualityOptions>(builder.Configuration.GetSection("AirQuality"));
+builder.Services.AddSingleton<AirQualityCache>();
+builder.Services.AddScoped<AirQualityService>();
+builder.Services.AddHttpClient<IAirQualityProvider,OpenMeteoAirQualityProvider>(client=>{client.Timeout=TimeSpan.FromSeconds(6);client.MaxResponseContentBufferSize=128*1024;});
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
