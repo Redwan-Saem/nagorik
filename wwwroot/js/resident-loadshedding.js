@@ -100,5 +100,8 @@
         window.setInterval(() => { if (!document.hidden) load(true); }, interval);
         document.addEventListener('visibilitychange', () => { if (!document.hidden) load(true); });
     }
+    if (navigator.serviceWorker) navigator.serviceWorker.register('/sw.js', { updateViaCache:'none' }).catch(() => {
+        // The open page can still use its data cache without offline navigation.
+    });
     initialize();
 })();
