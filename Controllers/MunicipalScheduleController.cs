@@ -12,6 +12,8 @@ public sealed class MunicipalScheduleController(AppDbContext db,MunicipalSchedul
     private Task<List<ServiceZone>> Zones(CancellationToken ct)=>db.Zones.AsNoTracking().OrderBy(x=>x.Code).Select(x=>new ServiceZone(x.Id,x.Name)).ToListAsync(ct);
     [HttpGet("/services/water")]
     public Task<IActionResult> Water(int? zoneId,CancellationToken ct)=>Public("Water",zoneId,ct);
+    [HttpGet("/services/waste")]
+    public Task<IActionResult> Waste(int? zoneId,CancellationToken ct)=>Public("Waste",zoneId,ct);
     private async Task<IActionResult> Public(string kind,int? zoneId,CancellationToken ct)
     {
         try{return View("Public",new MunicipalPublicView(kind,await Zones(ct),zoneId,zoneId.HasValue?await service.WeekAsync(kind,zoneId.Value,ct):null));}
