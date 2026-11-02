@@ -20,6 +20,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 builder.Services.AddSingleton<LoadsheddingRotationEngine>();
 builder.Services.AddScoped<LoadsheddingScheduleService>();
+builder.Services.AddScoped<ResidentScheduleQueryService>();
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
