@@ -1,6 +1,6 @@
 (() => {
     class SosLiveLocation {
-        constructor({ geolocation = navigator.geolocation, fetcher = fetch, now = Date.now,
+        constructor({ geolocation = navigator.geolocation, fetcher = (...args) => globalThis.fetch(...args), now = Date.now,
             onStatus = () => {}, onError = () => {}, onAlert = () => {}, onLocation = () => {},
             intervalMs = 10000, distanceMeters = 25 } = {}) {
             Object.assign(this, { geolocation, fetcher, now, onStatus, onError, onAlert, onLocation, intervalMs, distanceMeters });

@@ -7,6 +7,26 @@ const script = readFileSync(join(__dirname, '../wwwroot/js/sos-submission.js'), 
 const requestId = '11111111-1111-4111-8111-111111111111';
 const response = (status, data) => ({ status, ok: status >= 200 && status < 300, json: async () => data });
 
+test('default browser fetch keeps its global receiver during lookup and creation', async () => {
+    const calls = [];
+    const context = {
+        browserGlobal: true, AbortController, DOMException, setTimeout, clearTimeout,
+        fetch: async function (url, options) {
+            assert.equal(this.browserGlobal, true, 'native fetch must not receive SosSubmission as its receiver');
+            calls.push({ url, options });
+            return options.method === 'POST' ? response(201, { id: 7, status: 'Active' }) : response(404);
+        }
+    };
+    runInNewContext(script, context);
+    const submission = new context.SosSubmission({
+        storage: { getItem: () => null, setItem() {}, removeItem() {} },
+        uuid: () => requestId, online: () => true, attempts: 1
+    });
+    assert.equal((await submission.submit({ addressText: 'Bosila' })).id, 7);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[1].options.method, 'POST');
+});
+
 function setup(handler, options = {}) {
     const context = { AbortController, DOMException, setTimeout, clearTimeout };
     runInNewContext(script, context);
