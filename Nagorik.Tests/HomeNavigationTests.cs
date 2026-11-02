@@ -14,6 +14,9 @@ public sealed class HomeNavigationTests
     [InlineData("Official", "/official/reports")]
     [InlineData("CityOfficial", "/official/reports")]
     [InlineData("Resident", "/map")]
+    [InlineData("UtilityOfficial", "/official/loadshedding")]
+    [InlineData("DPDCOfficial", "/official/loadshedding")]
+    [InlineData("DESCOOfficial", "/official/loadshedding")]
     [InlineData(null, "/map")]
     public void HomeHasLocalDestinationForEveryRole(string? role, string expected)
     {
