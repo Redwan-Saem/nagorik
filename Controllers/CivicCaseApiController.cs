@@ -23,6 +23,12 @@ public sealed class CivicCaseApiController(AppDbContext db,CivicCaseService serv
     public Task<IActionResult> NoiseDetail(int id,CancellationToken ct)=>Detail("Noise",id,false,ct);
     [HttpPost("/api/resident/concerns/noise"),Authorize(Roles="Resident"),ValidateAntiForgeryToken]
     public Task<IActionResult> NoiseSubmit(CivicCaseInput input,CancellationToken ct)=>Submit("Noise",input,ct);
+    [HttpGet("/api/resident/concerns/construction"),Authorize(Roles="Resident")]
+    public Task<IActionResult> ConstructionList(CancellationToken ct)=>ResidentList("Construction",ct);
+    [HttpGet("/api/resident/concerns/construction/{id:int}"),Authorize(Roles="Resident")]
+    public Task<IActionResult> ConstructionDetail(int id,CancellationToken ct)=>Detail("Construction",id,false,ct);
+    [HttpPost("/api/resident/concerns/construction"),Authorize(Roles="Resident"),ValidateAntiForgeryToken]
+    public Task<IActionResult> ConstructionSubmit(CivicCaseInput input,CancellationToken ct)=>Submit("Construction",input,ct);
     private Task<IActionResult> ResidentList(string kind,CancellationToken ct)=>Run(async()=>
     {var rows=await db.CivicCases.AsNoTracking().Where(x=>x.ResidentId==Actor&&x.Kind==kind).OrderByDescending(x=>x.Id).Take(50).ToListAsync(ct);return Ok(rows.Select(Safe));});
     private Task<IActionResult> Submit(string kind,CivicCaseInput input,CancellationToken ct)=>Run(async()=>Ok(Safe(await service.SubmitAsync(kind,input,Actor,ct))));

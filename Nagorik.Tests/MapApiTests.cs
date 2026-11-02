@@ -78,6 +78,20 @@ public class MapApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ConstructionApiRejectsNoiseMetadataAndKeepsCaseKindsSeparate()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())TestDb.AddUser(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");var input=new CivicCaseInput{Subtype="SafetyHazard",Description="Unprotected excavation observed beside a footpath.",Address="Dhanmondi fixture site",Latitude=23.75,Longitude=90.37,ObservedAtUtc=DateTime.UtcNow,SubmissionToken=Guid.NewGuid().ToString(),ReportedDecibels=80};
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/resident/concerns/construction",input)).StatusCode);
+        var token=await client.GetFromJsonAsync<JsonElement>("/api/resident/concerns/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/resident/concerns/construction",input)).StatusCode);input.ReportedDecibels=null;
+        var response=await client.PostAsJsonAsync("/api/resident/concerns/construction",input);Assert.Equal(HttpStatusCode.OK,response.StatusCode);var row=await response.Content.ReadFromJsonAsync<JsonElement>();var id=row.GetProperty("id").GetInt32();
+        Assert.Equal("Construction",row.GetProperty("kind").GetString());Assert.StartsWith("CC-",row.GetProperty("referenceCode").GetString());Assert.DoesNotContain("residentId",row.ToString());
+        Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync($"/api/resident/concerns/noise/{id}")).StatusCode);Assert.Equal(HttpStatusCode.OK,(await client.GetAsync($"/api/resident/concerns/construction/{id}")).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-User","2");Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync($"/api/resident/concerns/construction/{id}")).StatusCode);
+    }
+
+    [Fact]
     public async Task NoiseConcernApiEnforcesPrivacyCsrfAndOfficialReview()
     {
         await using(var scope=app.Services.CreateAsyncScope())TestDb.AddUser(scope.ServiceProvider.GetRequiredService<AppDbContext>());
