@@ -208,6 +208,12 @@ public class MapApiTests : IAsyncLifetime
         if(role!=null)client.DefaultRequestHeaders.Add("X-Test-Role",role);
         foreach(var path in new[]{"/api/resident/loadshedding?zoneId=1","/api/resident/loadshedding/zones"})
             Assert.Equal(expected,(await client.GetAsync(path)).StatusCode);
+        var page=await client.GetAsync("/resident/loadshedding");Assert.Equal(expected,page.StatusCode);
+        if(expected==HttpStatusCode.OK)
+        {
+            var html=await page.Content.ReadAsStringAsync();Assert.Contains("resident-schedule",html);
+            Assert.Contains("schedule-zone",html);Assert.Contains("schedule-locate",html);Assert.Contains("Asia/Dhaka",html);
+        }
     }
 
     [Fact]

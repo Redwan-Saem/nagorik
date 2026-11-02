@@ -6,3 +6,9 @@
 #review-errors:not(:empty) { color:#ffb5aa; }
 .schedule-demand { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; }
 @media(max-width:600px) { .schedule-demand { display:block; } #schedule-review button { margin-block:.3rem; } }
+#schedule-days { padding-inline-start:1.4rem; }
+.schedule-day { margin-block:1rem; padding:1rem; border:1px solid #567078; border-radius:.6rem; }
+.schedule-today { border:2px solid #72d8da; background:#102c34; }
+#schedule-cache-notice { border:1px solid #d7ad54; padding:.8rem; }
+#resident-schedule select { max-width:100%; }
+#resident-schedule p,#resident-schedule li { overflow-wrap:anywhere; }
