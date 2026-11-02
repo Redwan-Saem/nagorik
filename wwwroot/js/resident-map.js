@@ -24,7 +24,9 @@
                     onEachFeature: (feature, marker) => {
                         const p = feature.properties || {}, popup = document.createElement('div');
                         const texts = kind === 'zones' ? [p.name || p.code, `Risk: ${p.riskLevel || 'Unknown'}`,
-                            `Evaluated: ${p.lastComputedAtUtc || 'Not computed; displayed sample level is not a live assessment'}`] :
+                            `Evaluated: ${p.lastComputedAtUtc || 'Not computed; displayed sample level is not a live assessment'}`,
+                            `Boundary: ${p.boundaryIsSample === true ? 'Sample' : p.boundaryIsSample === false ? 'User-supplied' : 'Unknown provenance'}; ${p.boundarySource || 'Source unrecorded'}`,
+                            `Metrics: ${p.inputIsSample === true ? 'Sample' : p.inputIsSample === false ? 'User-supplied' : 'Unknown provenance'}; ${p.inputSource || 'Source unrecorded'}`] :
                             kind === 'reports' ? [p.reference, `Category: ${p.category}`, `Status: ${p.status}`] : ['Blocked drainage point', `Zone #${p.zoneId}`];
                         for (const text of texts) { const node = document.createElement('p'); node.textContent = text || ''; popup.appendChild(node); }
                         marker.bindPopup(popup);
