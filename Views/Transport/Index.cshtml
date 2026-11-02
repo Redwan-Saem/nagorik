@@ -1,0 +1,35 @@
+@{ViewData["Title"]="Transport routes and fares";}
+@section Styles {
+    <link rel="stylesheet" href="~/lib/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="~/css/transport.css" asp-append-version="true" />
+}
+<h1>Plan a Dhaka journey</h1>
+<p>Compare catalog routes and estimated fares in BDT. Development routes are labelled demonstration data. Confirm operator services and prices before travelling.</p>
+<p>Search supported landmarks, use an optional GPS origin, or select map pins. The local catalog does not geocode arbitrary street addresses. Coordinates are sent to Nagorik only when you search; they are not saved as a location history.</p>
+<form id="transport-form" novalidate>
+    <label for="transport-origin">Origin</label>
+    <input id="transport-origin" list="transport-places" maxlength="160" placeholder="Dhanmondi 27" autocomplete="off" required />
+    <button id="transport-gps" type="button">Use current location as origin</button>
+    <label for="transport-destination">Destination</label>
+    <input id="transport-destination" list="transport-places" maxlength="160" placeholder="Motijheel" autocomplete="off" required />
+    <datalist id="transport-places"></datalist>
+    <label for="transport-sort">Sort options</label>
+    <select id="transport-sort"><option value="fastest">Fastest</option><option value="cheapest">Cheapest estimated fare</option><option value="transfers">Fewest transfers</option></select>
+    <button type="submit" id="transport-search">Find routes</button>
+    <button type="button" id="transport-retry">Retry search</button>
+    <p id="transport-validation" role="alert"></p>
+</form>
+<p id="transport-status" role="status" aria-live="polite"></p>
+<label for="transport-pin-target">Map click sets</label>
+<select id="transport-pin-target"><option value="origin">Origin</option><option value="destination">Destination</option></select>
+<p id="transport-map-status" role="status">Map lines are schematic connections between catalog stops, not road navigation.</p>
+<div id="transport-map" tabindex="0" aria-label="Journey map"></div>
+<section aria-label="Route options"><h2>Route options</h2><div id="transport-options"></div></section>
+<section id="transport-detail" aria-label="Selected route" hidden><h2>Journey details</h2><div id="transport-legs"></div></section>
+<noscript>JavaScript is required for interactive transport search. The public API is available at /api/transport/places and /api/transport/routes.</noscript>
+@section Scripts {
+    <script src="~/lib/leaflet/leaflet.js"></script>
+    <script src="~/js/transport-locations.js" asp-append-version="true"></script>
+    <script src="~/js/transport-form.js" asp-append-version="true"></script>
+    <script src="~/js/transport-results.js" asp-append-version="true"></script>
+}

@@ -16,7 +16,7 @@ public sealed class RouteSearchInput
 }
 public sealed record RoutePoint(string Name,double Latitude,double Longitude);
 public sealed record RouteFare(double MinimumBdt,double MaximumBdt,bool Estimated,string Source);
-public sealed record RouteLeg(string Mode,string Line,RoutePoint From,RoutePoint To,double DistanceKm,int Minutes,string Direction,bool IsSample,string Source,RouteFare? Fare=null);
+public sealed record RouteLeg(string Mode,string Line,RoutePoint From,RoutePoint To,double DistanceKm,int Minutes,string Direction,bool IsSample,string Source,RouteFare? Fare=null,IReadOnlyList<RoutePoint>? Geometry=null);
 public sealed record TransportOption(string Id,IReadOnlyList<RouteLeg> Legs,int Transfers,int Minutes,double DistanceKm,bool IsSample,RouteFare? Fare=null);
 public sealed record RouteSearchResult(IReadOnlyList<TransportOption> Options,string Message,bool Truncated=false);
 public sealed class TransportProblem(int status,string message):Exception(message){ public int Status{get;}=status; }
@@ -67,8 +67,8 @@ public sealed partial class TransportSearchService(AppDbContext db)
                         {
                             var from=Point(byId[l.FromStopId]);var to=Point(byId[l.ToStopId]);
                             if(legs.LastOrDefault() is {} previous && previous.Mode==l.Mode&&previous.Line==l.Line&&previous.To==from)
-                                legs[^1]=previous with{To=to,DistanceKm=previous.DistanceKm+l.DistanceKm,Minutes=previous.Minutes+l.Minutes,IsSample=previous.IsSample||l.IsSample,Source=previous.Source==l.Source?l.Source:"Multiple catalog sources",Direction=$"Take {l.Mode} {l.Line} from {previous.From.Name} to {to.Name}."};
-                            else legs.Add(new(l.Mode,l.Line,from,to,l.DistanceKm,l.Minutes,$"Take {l.Mode} {l.Line} from {from.Name} to {to.Name}.",l.IsSample,l.Source));
+                                legs[^1]=previous with{To=to,DistanceKm=previous.DistanceKm+l.DistanceKm,Minutes=previous.Minutes+l.Minutes,IsSample=previous.IsSample||l.IsSample,Source=previous.Source==l.Source?l.Source:"Multiple catalog sources",Direction=$"Take {l.Mode} {l.Line} from {previous.From.Name} to {to.Name}.",Geometry=[..(previous.Geometry??[previous.From,previous.To]),to]};
+                            else legs.Add(new(l.Mode,l.Line,from,to,l.DistanceKm,l.Minutes,$"Take {l.Mode} {l.Line} from {from.Name} to {to.Name}.",l.IsSample,l.Source,Geometry:[from,to]));
                         }
                         if(finalWalk.DistanceKm>.005)legs.Add(finalWalk);
                         var boardings=legs.Count(x=>x.Mode!="Walk");
@@ -92,6 +92,12 @@ public sealed partial class TransportSearchService(AppDbContext db)
         // Transfer waiting time is explicit in totals; fares are added separately.
         var rules=await db.TransportFareRules.AsNoTracking().ToDictionaryAsync(x=>x.Mode,ct);
         found=found.Select(x=>TransportFareService.Price(x with{Minutes=x.Minutes+x.Transfers*5},rules)).ToList();
-        return new(found.OrderBy(x=>x.Minutes).ThenBy(x=>x.Id).ToArray(),found.Count==0?"No routes found for these locations":"Options use catalog estimates; verify services before travel.",truncated);
+        return new(Sort(found,input.Sort).Take(12).ToArray(),found.Count==0?"No routes found for these locations":"Options use catalog estimates; verify services before travel.",truncated);
     }
+    public static IOrderedEnumerable<TransportOption> Sort(IEnumerable<TransportOption> options,string sort)=>sort switch
+    {
+        "cheapest"=>options.OrderBy(x=>x.Fare==null).ThenBy(x=>x.Fare?.MinimumBdt??double.MaxValue).ThenBy(x=>x.Minutes).ThenBy(x=>x.Id),
+        "transfers"=>options.OrderBy(x=>x.Transfers).ThenBy(x=>x.Minutes).ThenBy(x=>x.Id),
+        _=>options.OrderBy(x=>x.Minutes).ThenBy(x=>x.Transfers).ThenBy(x=>x.Id)
+    };
 }
