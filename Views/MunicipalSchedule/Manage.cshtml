@@ -1,0 +1,31 @@
+@model Nagorik.Api.Models.MunicipalManageView
+@{ViewData["Title"]="Manage "+Model.Kind+" schedules";var kind=Model.Kind.ToLowerInvariant();}
+<h1>Manage @Model.Kind schedules</h1>
+<p>Only published windows are shown publicly. Verify the source before publication. Retire a published window before replacing it with an overlapping one.</p>
+@if(TempData["ServiceMessage"] is string message){<p role="status">@message</p>}
+<div asp-validation-summary="All" role="alert"></div>
+<h2>@(Model.EditingId.HasValue?"Edit draft":"New draft")</h2>
+<form method="post" action="/official/services/@kind/draft" id="service-draft">
+    @Html.AntiForgeryToken()<input type="hidden" name="id" value="@Model.EditingId" /><input asp-for="Input.ExpectedRevision" type="hidden" />
+    <label asp-for="Input.ZoneId">Zone</label><select asp-for="Input.ZoneId" required><option value="">Choose a zone</option>@foreach(var zone in Model.Zones){<option value="@zone.Id">@zone.Name</option>}</select>
+    <label asp-for="Input.FromDate">Effective from</label><input asp-for="Input.FromDate" type="date" required />
+    <label asp-for="Input.ToDate">Effective through</label><input asp-for="Input.ToDate" type="date" required />
+    <fieldset><legend>Service weekdays</legend>@for(var i=0;i<7;i++){var bit=1<<i;<label><input type="checkbox" name="days" value="@bit" checked="@((Model.Input.DaysMask&bit)!=0)" />@((DayOfWeek)i)</label>}</fieldset>
+    <label for="startTime">Starts at (Asia/Dhaka)</label><input id="startTime" name="startTime" type="time" value="@TimeOnly.MinValue.AddMinutes(Model.Input.StartMinute).ToString("HH:mm")" required />
+    <label for="endTime">Ends at (Asia/Dhaka)</label><input id="endTime" name="endTime" type="time" value="@TimeOnly.MinValue.AddMinutes(Model.Input.EndMinute%1440).ToString("HH:mm")" required />
+    <p>An end time of 00:00 means midnight at the end of the day. Split overnight service into two windows.</p>
+    <label asp-for="Input.Source">Source / bulletin reference</label><input asp-for="Input.Source" maxlength="300" required />
+    <label asp-for="Input.Notes">Resident notes / pickup point</label><textarea asp-for="Input.Notes" maxlength="1000"></textarea>
+    <button type="submit">Save draft</button>
+</form>
+<h2>Latest 100 schedules</h2>
+@foreach(var row in Model.Items)
+{
+    <article class="card service-record"><h3>Schedule @row.Id · @row.State</h3><p>Zone @row.ZoneId · @row.FromDate through @row.ToDate · @TimeOnly.MinValue.AddMinutes(row.StartMinute).ToString("HH:mm")–@(row.EndMinute==1440?"24:00":TimeOnly.MinValue.AddMinutes(row.EndMinute).ToString("HH:mm"))</p><p>Weekdays: @string.Join(", ",Enumerable.Range(0,7).Where(i=>(row.DaysMask&(1<<i))!=0).Select(i=>((DayOfWeek)i).ToString()))</p><p>Source: @row.Source</p><p>@row.Notes</p>
+    @if(row.State=="Draft"){<a href="/official/services/@kind?id=@row.Id">Edit draft</a>}
+    @if(row.State=="Draft"||row.State=="Published")
+    {
+        <form method="post" action="/official/services/@kind/@row.Id/state">@Html.AntiForgeryToken()<input type="hidden" name="expectedRevision" value="@row.Revision" /><input type="hidden" name="publish" value="@(row.State=="Draft"?"true":"false")" /><label><input type="checkbox" name="confirm" value="true" required /> Confirm @(row.State=="Draft"?"publication":"retirement") after checking this window</label><button type="submit">@(row.State=="Draft"?"Publish":"Retire")</button></form>
+    }</article>
+}
+<p><a href="/official/services/@kind">Create another draft</a> · <a href="/services/@kind">Open public schedule</a></p>
