@@ -51,6 +51,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddSingleton<LoadsheddingRotationEngine>();
         builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddScoped<ResidentScheduleQueryService>();
+        builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -69,6 +70,28 @@ public class MapApiTests : IAsyncLifetime
         }
         await app.StartAsync();
         client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    }
+
+    [Fact]
+    public async Task TransportEndpointsValidateSortAndReturnActualLegDetail()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();await TransportSearchTests.Seed(db);
+            db.TransportFareRules.AddRange(new TransportFareRule{Mode="Bus",PerKmBdt=3,MinimumBdt=10,UpperMultiplier=1.4,Source="Test"},new TransportFareRule{Mode="CNG",BaseBdt=40,PerKmBdt=20,MinimumBdt=60,UpperMultiplier=1.4,Source="Test"});await db.SaveChangesAsync();
+        }
+        const string query="?originLat=23.75&originLon=90.37&destinationLat=23.74&destinationLon=90.42";
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/transport/routes")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/transport/routes"+query+"&sort=wrong")).StatusCode);
+        var fastest=await client.GetFromJsonAsync<JsonElement>("/api/transport/routes"+query);
+        var options=fastest.GetProperty("options").EnumerateArray().ToArray();Assert.True(options.Length>=2);
+        Assert.Equal("CNG",options[0].GetProperty("legs")[0].GetProperty("mode").GetString());
+        var cheap=await client.GetFromJsonAsync<JsonElement>("/api/transport/routes"+query+"&sort=cheapest");
+        Assert.Equal("Bus",cheap.GetProperty("options")[0].GetProperty("legs")[0].GetProperty("mode").GetString());
+        var id=options[0].GetProperty("id").GetString();var detail=await client.GetFromJsonAsync<JsonElement>("/api/transport/routes/"+id+query);
+        Assert.Equal(3,detail.GetProperty("legs")[0].GetProperty("geometry").GetArrayLength());Assert.True(detail.GetProperty("fare").GetProperty("estimated").GetBoolean());
+        Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync("/api/transport/routes/00000000000000000000"+query)).StatusCode);
+        var places=await client.GetStringAsync("/api/transport/places?q=A");Assert.Contains("Fixture",places);Assert.DoesNotContain("password",places,StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
