@@ -10,9 +10,11 @@
 <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <header>
-        <span class="brand">Nagorik</span>
+        <a class="brand" href="/">Nagorik</a>
         <nav>
             <ul>
+                @if(User.Identity?.IsAuthenticated==true){<li><form action="/session/logout" method="post">@Html.AntiForgeryToken()<button type="submit">Sign out</button></form></li>}
+                else{<li><a href="/login.html?returnUrl=%2F">Sign in</a></li>}
                 <li><a href="/map">Area risk map</a></li>
                 <li><a href="/transport">Transport routes</a></li>
                 <li><a href="/transport/occupancy">Bus occupancy</a></li>
