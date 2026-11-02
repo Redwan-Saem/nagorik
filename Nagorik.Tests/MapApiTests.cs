@@ -54,6 +54,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<MunicipalScheduleService>();
+        builder.Services.AddScoped<CivicCaseService>();
         builder.Services.AddMemoryCache();builder.Services.Configure<AirQualityOptions>(_=>{});
         builder.Services.AddSingleton<AirQualityCache>();builder.Services.AddScoped<AirQualityService>();builder.Services.AddSingleton<IAirQualityProvider,FixtureAirQualityProvider>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
@@ -74,6 +75,26 @@ public class MapApiTests : IAsyncLifetime
         }
         await app.StartAsync();
         client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    }
+
+    [Fact]
+    public async Task NoiseConcernApiEnforcesPrivacyCsrfAndOfficialReview()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())TestDb.AddUser(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        var input=new CivicCaseInput{Subtype="Commercial",Description="Amplified speakers observed after dark.",Address="Dhanmondi fixture landmark",Latitude=23.75,Longitude=90.37,ObservedAtUtc=DateTime.UtcNow,SubmissionToken=Guid.NewGuid().ToString()};
+        Assert.Equal(HttpStatusCode.Unauthorized,(await client.PostAsJsonAsync("/api/resident/concerns/noise",input)).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/resident/concerns/noise",input)).StatusCode);
+        var token=await client.GetFromJsonAsync<JsonElement>("/api/resident/concerns/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        var response=await client.PostAsJsonAsync("/api/resident/concerns/noise",input);Assert.Equal(HttpStatusCode.OK,response.StatusCode);var row=await response.Content.ReadFromJsonAsync<JsonElement>();var id=row.GetProperty("id").GetInt32();
+        Assert.DoesNotContain("fingerprint",row.ToString());Assert.DoesNotContain("residentId",row.ToString());Assert.DoesNotContain("submissionToken",row.ToString());
+        var repeated=await (await client.PostAsJsonAsync("/api/resident/concerns/noise",input)).Content.ReadFromJsonAsync<JsonElement>();Assert.Equal(id,repeated.GetProperty("id").GetInt32());
+        client.DefaultRequestHeaders.Add("X-Test-User","2");Assert.Equal(HttpStatusCode.NotFound,(await client.GetAsync($"/api/resident/concerns/noise/{id}")).StatusCode);client.DefaultRequestHeaders.Remove("X-Test-User");
+        Assert.Equal(HttpStatusCode.Forbidden,(await client.GetAsync("/api/official/concerns/noise")).StatusCode);
+        await using(var scope=app.Services.CreateAsyncScope()){var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();(await db.Users.SingleAsync(x=>x.Id==1)).Role="Official";await db.SaveChangesAsync();}
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","Official");client.DefaultRequestHeaders.Remove("RequestVerificationToken");
+        token=await client.GetFromJsonAsync<JsonElement>("/api/official/concerns/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        Assert.Equal(HttpStatusCode.OK,(await client.PostAsJsonAsync($"/api/official/concerns/noise/{id}/review",new{expectedRevision=1,state="UnderReview",note="Investigation opened by the city."})).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,(await client.PostAsJsonAsync($"/api/official/concerns/noise/{id}/review",new{expectedRevision=1,state="Resolved",note="Inspection concluded by the city."})).StatusCode);
     }
 
     private sealed class FixtureAirQualityProvider:IAirQualityProvider
@@ -786,7 +807,8 @@ public class MapApiTests : IAsyncLifetime
         {
             var role = Request.Headers["X-Test-Role"].ToString();
             if (string.IsNullOrEmpty(role)) return Task.FromResult(AuthenticateResult.NoResult());
-            var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, "1"), new Claim(ClaimTypes.Role, role) }, Scheme.Name);
+            var testUser=Request.Headers["X-Test-User"].ToString();
+            var identity = new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier,string.IsNullOrEmpty(testUser)?"1":testUser), new Claim(ClaimTypes.Role, role) }, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name)));
         }
     }

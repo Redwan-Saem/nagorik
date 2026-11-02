@@ -1,0 +1,17 @@
+@model Nagorik.Api.Models.CivicDetailView
+@{var row=Model.Detail.Case;var kind=row.Kind.ToLowerInvariant();ViewData["Title"]="Concern "+row.Id;}
+<h1>@(row.Kind=="Noise"?"NC":"CC")-@row.Id.ToString("000000")</h1>
+<p id="civic-state">Status: @row.State</p><p>@row.Kind · @row.Subtype</p><p>@row.Description</p><p>@row.Address · @row.Latitude, @row.Longitude</p>
+<p>Observed: @Nagorik.Api.Services.DhakaTime.ToLocal(row.ObservedAtUtc).ToString("yyyy-MM-dd HH:mm") (Asia/Dhaka)</p>
+@if(row.Kind=="Noise"){<p>Resident-reported decibels: @(row.ReportedDecibels.HasValue?row.ReportedDecibels.Value.ToString():"Not supplied") (unverified).</p>}
+@if(!string.IsNullOrWhiteSpace(row.Reference)){<p>Resident-supplied reference: @row.Reference (unverified).</p>}
+<h2>Review history</h2>
+@if(Model.Detail.Reviews.Count==0){<p>Awaiting official review.</p>}
+@foreach(var review in Model.Detail.Reviews){<article class="card"><p>@review.State · @Nagorik.Api.Services.DhakaTime.ToLocal(review.AtUtc).ToString("yyyy-MM-dd HH:mm") (Asia/Dhaka)</p><p>@review.Note</p></article>}
+@if(Model.Official&&row.State is "Pending" or "UnderReview")
+{
+<div asp-validation-summary="All" role="alert"></div><form method="post" action="/official/concerns/@kind/@row.Id/review" id="civic-review">@Html.AntiForgeryToken()<input type="hidden" name="expectedRevision" value="@row.Revision" />
+<label for="State">Review outcome</label><select id="State" name="State">@if(row.State=="Pending"){<option value="UnderReview">Start investigation</option>}else{<option value="Resolved">Record resolved disposition</option>}<option value="Rejected">Reject with explanation</option></select>
+<label for="Note">Review note visible to the resident</label><textarea id="Note" name="Note" minlength="10" maxlength="1000" required></textarea><button type="submit">Save review</button></form>
+}
+<p><a href="/@(Model.Official?"official":"resident")/concerns/@kind">Back to concerns</a></p>
