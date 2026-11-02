@@ -24,6 +24,7 @@ public static class DevelopmentMapSeeder
             var zone = new Zone
             {
                 Code = code, Name = name + " (sample boundary)", RiskLevel = risk,
+                BoundarySource = "Synthetic Development rectangle; not a surveyed boundary", BoundaryIsSample = true,
                 // Closed counter-clockwise rectangle, standard GeoJSON lon/lat order.
                 BoundaryGeoJson = System.Text.Json.JsonSerializer.Serialize(new
                 {

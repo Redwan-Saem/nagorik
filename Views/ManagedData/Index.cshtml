@@ -1,0 +1,25 @@
+@model Nagorik.Api.Models.ManagedDataView
+@{ViewData["Title"]="Managed geographic and transport data";}
+<h1>Managed geographic and transport data</h1>
+<p>Admin data tools. Record a public source/reference and mark demonstrations as samples. User-supplied sources are not independent verification. Rule risk remains uncalibrated until real validation evidence exists.</p>
+@if(TempData["DataMessage"] is string message){<p role="status">@message</p>}
+<div asp-validation-summary="All" role="alert"></div>
+<h2>@(Model.EditingId.HasValue?"Edit zone":"Create zone")</h2>
+<form method="post" action="/admin/data/zone" id="managed-zone">@Html.AntiForgeryToken()<input name="id" type="hidden" value="@Model.EditingId" /><input asp-for="Input.ExpectedRevision" type="hidden" />
+<label asp-for="Input.Code">Stable zone code</label><input asp-for="Input.Code" maxlength="40" required readonly="@Model.EditingId.HasValue" />
+<label asp-for="Input.Name">Zone name</label><input asp-for="Input.Name" maxlength="100" required />
+<label asp-for="Input.BoundaryGeoJson">GeoJSON boundary geometry</label><textarea asp-for="Input.BoundaryGeoJson" rows="8" maxlength="100000" required spellcheck="false"></textarea>
+<p>Polygon/MultiPolygon or a Feature containing one; longitude then latitude. Closed non-crossing rings within Dhaka. Up to 500 points per ring / 2,000 total. Have GIS staff review multipart topology and source accuracy.</p>
+<label asp-for="Input.ElevationMeters">Elevation (metres, optional)</label><input asp-for="Input.ElevationMeters" type="number" min="-500" max="9000" step="any" />
+<label asp-for="Input.DrainageDensityKmPerSqKm">Drainage density (km/km², optional)</label><input asp-for="Input.DrainageDensityKmPerSqKm" type="number" min="0" max="100" step="any" />
+<label asp-for="Input.HistoryScore">Waterlogging history score (0–1, optional)</label><input asp-for="Input.HistoryScore" type="number" min="0" max="1" step="any" />
+<label asp-for="Input.Source">Public source/reference for this boundary and entered metrics</label><input asp-for="Input.Source" maxlength="300" required /><p>Do not include secrets or personal contact information. This reference can appear on the public map. If the sources differ, update metrics separately on Risk thresholds.</p>
+<label><input asp-for="Input.IsSample" /> Demonstration/sample data</label><button type="submit">Save zone with provenance</button></form>
+<p><a href="/admin/data">Create another zone</a> · <a href="/admin/risk-thresholds">Manage vulnerability/thresholds and evaluate</a> · <a href="/map">Inspect public map</a></p>
+<h2>Canonical zones</h2>
+@foreach(var zone in Model.Zones){<article class="card"><h3><a href="/admin/data?id=@zone.Id">@zone.Code — @zone.Name</a></h3><p>Revision @zone.GeoRevision · Boundary: @(zone.BoundaryIsSample==true?"Sample":zone.BoundaryIsSample==false?"User-supplied":"Unknown provenance") · @(zone.BoundarySource??"Source unrecorded")</p><p>Metrics: @(zone.InputIsSample==true?"Sample":zone.InputIsSample==false?"User-supplied":"Unknown provenance") · @(zone.InputSource??"Source unrecorded")</p></article>}
+<h2>Transport catalog export/import</h2>
+<p>For curated data administration. <a href="/admin/data/transport/export">Export the current catalog JSON</a>, edit it with your source references and retain its expectedRevision. Include every stop/link you want enabled; omitted rows are disabled. Keep IDs stable. Rows marked sample remain labelled in commuter results. Empty/missing fare rules show Fare unavailable.</p>
+<form method="post" action="/admin/data/transport/import" id="managed-catalog">@Html.AntiForgeryToken()<label for="catalogJson">Reviewed full catalog JSON</label><textarea id="catalogJson" name="catalogJson" rows="10" maxlength="1800000" required spellcheck="false">@ViewData["CatalogJson"]</textarea><button type="submit">Import reviewed catalog</button></form>
+<h2>Latest 100 changes</h2>
+@foreach(var change in Model.Changes){<article class="card"><p>@change.Kind · Zone @(change.ZoneId?.ToString()??"Catalog") · @change.AtUtc.ToString("u") · Actor @change.ActorUserId</p><p>@change.Source · @(change.IsSample==true?"Sample":change.IsSample==false?"User-supplied":"Unknown quality")</p><a href="/api/admin/data/changes/@change.Id">Inspect audit snapshot</a></article>}

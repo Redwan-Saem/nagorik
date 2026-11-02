@@ -1,0 +1,5 @@
+@model Nagorik.Api.Models.CivicQueueView
+@{ViewData["Title"]="Review "+Model.Kind+" concerns";var kind=Model.Kind.ToLowerInvariant();}
+<h1>Review @Model.Kind concerns</h1><p>Latest 100 concerns. A resident report is an allegation requiring review; optional measurements and references are not independently verified.</p>
+@if(Model.Items.Count==0){<p>No concerns to review.</p>}
+@foreach(var row in Model.Items){<article class="card"><h2><a href="/official/concerns/@kind/@row.Id">@(Model.Kind=="Noise"?"NC":"CC")-@row.Id.ToString("000000")</a></h2><p>@row.State · @row.Subtype · @row.Address</p><p>@row.Description</p></article>}

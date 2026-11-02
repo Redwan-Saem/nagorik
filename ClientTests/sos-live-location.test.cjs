@@ -5,6 +5,31 @@ const { join } = require('node:path');
 const { runInNewContext } = require('node:vm');
 const script = readFileSync(join(__dirname, '../wwwroot/js/sos-live-location.js'), 'utf8');
 
+test('default browser fetch keeps its global receiver for ownership and GPS updates', async () => {
+    const requests = [];
+    let position;
+    const context = {
+        browserGlobal: true, AbortController, navigator: {},
+        setInterval: () => 1, clearInterval() {},
+        fetch: async function (url, options) {
+            assert.equal(this.browserGlobal, true, 'native fetch must not receive SosLiveLocation as its receiver');
+            requests.push({ url, options });
+            return { ok: true, status: 200, json: async () => ({ id: 5, status: 'Active', addressText: 'Bosila' }) };
+        }
+    };
+    runInNewContext(script, context);
+    const tracker = new context.SosLiveLocation({
+        geolocation: { watchPosition(callback) { position = callback; return 1; }, clearWatch() {} },
+        now: () => 10000
+    });
+    try {
+        assert.equal(await tracker.start(5), true);
+        await position({ coords: { latitude: 23.81, longitude: 90.41 } });
+        assert.equal(requests.length, 2);
+        assert.equal(requests[1].options.method, 'PATCH');
+    } finally { tracker.stop(); }
+});
+
 function setup({ status = 'Active', updateStatus = 200, unavailable = false } = {}) {
     let time = 0;
     let poll;

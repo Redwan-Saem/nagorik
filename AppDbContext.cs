@@ -17,6 +17,15 @@ namespace Nagorik.Api
         public DbSet<ZoneMapData> ZoneMapData { get; set; }
 
         public DbSet<Zone> Zones => Set<Zone>();
+        public DbSet<TransportStop> TransportStops => Set<TransportStop>();
+        public DbSet<TransportLink> TransportLinks => Set<TransportLink>();
+        public DbSet<TransportFareRule> TransportFareRules => Set<TransportFareRule>();
+        public DbSet<BusOccupancyReport> BusOccupancyReports => Set<BusOccupancyReport>();
+        public DbSet<MunicipalSchedule> MunicipalSchedules => Set<MunicipalSchedule>();
+        public DbSet<CivicCase> CivicCases => Set<CivicCase>();
+        public DbSet<CivicCaseReview> CivicCaseReviews => Set<CivicCaseReview>();
+        public DbSet<ManagedDataChange> ManagedDataChanges => Set<ManagedDataChange>();
+        public DbSet<TransportCatalogState> TransportCatalogStates => Set<TransportCatalogState>();
         public DbSet<LoadsheddingSchedule> LoadsheddingSchedules => Set<LoadsheddingSchedule>();
         public DbSet<ScheduleZoneDemand> ScheduleZoneDemands => Set<ScheduleZoneDemand>();
         public DbSet<LoadsheddingSlot> LoadsheddingSlots => Set<LoadsheddingSlot>();
@@ -58,6 +67,25 @@ namespace Nagorik.Api
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+            Data.TransportModelConfiguration.Configure(builder);
+            Data.MunicipalScheduleConfiguration.Configure(builder);
+            Data.CivicCaseConfiguration.Configure(builder);
+            builder.Entity<Zone>(e=>{e.Property(x=>x.GeoRevision).IsConcurrencyToken();e.Property(x=>x.BoundarySource).HasMaxLength(300);e.Property(x=>x.InputSource).HasMaxLength(300);});
+            builder.Entity<ManagedDataChange>(e=>
+            {
+                e.HasOne<Zone>().WithMany().HasForeignKey(x=>x.ZoneId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x=>x.ActorUserId).HasMaxLength(100);e.Property(x=>x.Source).HasMaxLength(300);e.Property(x=>x.Kind).HasMaxLength(30);e.HasIndex(x=>new{x.ZoneId,x.AtUtc});
+                e.ToTable("ManagedDataChanges",t=>t.HasCheckConstraint("CK_ManagedDataChange_Json","json_valid(PayloadJson)"));
+            });
+            builder.Entity<TransportCatalogState>(e=>{e.Property(x=>x.Revision).IsConcurrencyToken();e.ToTable("TransportCatalogStates",t=>t.HasCheckConstraint("CK_TransportCatalogState_Singleton","Id = 1 AND Revision > 0"));});
+            builder.Entity<BusOccupancyReport>(e=>
+            {
+                e.HasOne<User>().WithMany().HasForeignKey(x=>x.ResidentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne<TransportLink>().WithMany().HasForeignKey(x=>x.LinkId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x=>new{x.ResidentId,x.LinkId}).IsUnique();e.HasIndex(x=>new{x.LinkId,x.ObservedAtUtc});
+                e.Property(x=>x.Level).IsRequired().HasMaxLength(30);
+                e.ToTable("BusOccupancyReports",t=>t.HasCheckConstraint("CK_BusOccupancy_Level","Level IN ('SeatsAvailable','Standing','Full')"));
+            });
             Data.LoadsheddingModelConfiguration.Configure(builder);
             Data.SosModelConfiguration.Configure(builder);
             Data.ReportFilterModelConfiguration.Configure(builder);

@@ -40,7 +40,8 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o => o.TokenValidationParameters = new TokenValidationParameters
         { ValidateIssuer = false, ValidateAudience = false, ValidateLifetime = true, ValidateIssuerSigningKey = true, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Key)) });
         builder.Services.AddAuthorization(); app = builder.Build();
-        app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = new ReportPhotoStaticFiles(app.Environment.WebRootFileProvider, app.Environment.WebRootPath) });
+        app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
         await using (var scope = app.Services.CreateAsyncScope())
         {
@@ -84,6 +85,52 @@ public sealed class UtilityAnomalySubmissionApiTests : IAsyncLifetime
     {
         await using var scope = app.Services.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         Assert.Empty(await db.Reports.ToListAsync()); Assert.Empty(await db.ReportStatusHistories.ToListAsync()); Assert.Empty(Photos());
+    }
+
+    [Fact]
+    public async Task CivicSubmissionStoresPrivatePhotoAndEnforcesOwnership()
+    {
+        using var form = new MultipartFormDataContent();
+        foreach (var (key, value) in new[] { ("Category", "RoadDamage"), ("Description", "Damaged road near junction"),
+            ("Latitude", "23.8"), ("Longitude", "90.4"), ("AddressText", "Dhaka junction"), ("SubmissionToken", Guid.NewGuid().ToString("N")) })
+            form.Add(new StringContent(value), key);
+        form.Add(new ByteArrayContent([255,216,255,224,0,0,0,0]), "Photo", "road.jpg");
+        using var created = await Send(HttpMethod.Post, "/api/reports", form);
+        Assert.Equal(HttpStatusCode.OK, created.StatusCode);
+        await using var scope = app.Services.CreateAsyncScope();
+        var report = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Reports.SingleAsync();
+        Assert.True(LocalPhotoStorage.IsPrivateUrl(report.ImageUrl!));
+        Assert.Empty(Directory.GetFiles(Path.Combine(root, "wwwroot", "uploads", "reports")));
+        using var own = await Send(HttpMethod.Get, report.ImageUrl!); Assert.Equal(HttpStatusCode.OK, own.StatusCode);
+        using var other = await Send(HttpMethod.Get, report.ImageUrl!, id:"2"); Assert.Equal(HttpStatusCode.NotFound, other.StatusCode);
+        using var anonymous = await Send(HttpMethod.Get, report.ImageUrl!, role:null); Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null, "1", 401)]
+    [InlineData("Resident", "1", 200)]
+    [InlineData("Resident", "2", 404)]
+    [InlineData("Dispatcher", "3", 200)]
+    public async Task LegacyPhotoUrlsAreAuthorizedAndNeverServedAsStaticFiles(string? role, string id, int status)
+    {
+        var name = Guid.NewGuid().ToString("N") + ".jpeg";
+        var directory = Path.Combine(root, "wwwroot", "uploads", "reports"); Directory.CreateDirectory(directory);
+        await File.WriteAllBytesAsync(Path.Combine(directory, name), [255,216,255,224,0,0,0,0]);
+        var path = LocalPhotoStorage.LegacyUrlPrefix + name;
+        await using (var scope = app.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Reports.Add(new Report { UserId=1, Title="Legacy photo", ImageUrl=path }); await db.SaveChangesAsync();
+        }
+        using var response = await Send(HttpMethod.Get, path, role:role, id:id);
+        Assert.Equal(status, (int)response.StatusCode);
+        if(status==200) { Assert.True(response.Headers.CacheControl!.NoStore); Assert.Contains("nosniff",response.Headers.GetValues("X-Content-Type-Options")); }
+        foreach(var alias in new[] { "/uploads//reports/"+name, "/UPLOADS/REPORTS/"+name })
+        {
+            using var anonymous = await Send(HttpMethod.Get,alias,role:null);
+            Assert.NotEqual(HttpStatusCode.OK,anonymous.StatusCode);
+        }
+        Assert.True(File.Exists(Path.Combine(directory,name))); // No destructive migration.
     }
 
     [Theory]

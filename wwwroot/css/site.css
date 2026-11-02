@@ -518,3 +518,5 @@ a.card:hover { border-color: var(--river); box-shadow: var(--shadow-lift); }
 }
 .btn-outline-light { color: var(--bar-fg); background: transparent; border-color: rgb(255 255 255 / .45); }
 .btn-outline-light:hover { color: var(--bar-fg); background: rgb(255 255 255 / .14); }
+#site-menu-toggle[hidden],#site-navigation[hidden]{display:none!important}
+@media(max-width:760px){#site-menu-toggle{margin:.5rem 0}#site-navigation{width:100%}}

@@ -20,6 +20,18 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 builder.Services.AddSingleton<LoadsheddingRotationEngine>();
 builder.Services.AddScoped<LoadsheddingScheduleService>();
+builder.Services.AddScoped<ResidentScheduleQueryService>();
+builder.Services.AddScoped<TransportSearchService>();
+builder.Services.AddScoped<BusOccupancyService>();
+builder.Services.AddScoped<MunicipalScheduleService>();
+builder.Services.AddScoped<CivicCaseService>();
+builder.Services.AddScoped<GeographicDataService>();
+builder.Services.AddScoped<TransportCatalogService>();
+builder.Services.AddMemoryCache();
+builder.Services.Configure<AirQualityOptions>(builder.Configuration.GetSection("AirQuality"));
+builder.Services.AddSingleton<AirQualityCache>();
+builder.Services.AddScoped<AirQualityService>();
+builder.Services.AddHttpClient<IAirQualityProvider,OpenMeteoAirQualityProvider>(client=>{client.Timeout=TimeSpan.FromSeconds(6);client.MaxResponseContentBufferSize=128*1024;});
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
@@ -127,6 +139,7 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     await DevDataSeeder.SeedAsync(scope.ServiceProvider);
+    await Nagorik.Api.Data.DevelopmentTransportSeeder.SeedAsync(scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
     await Nagorik.Api.Data.DevelopmentMapSeeder.SeedAsync(
         scope.ServiceProvider.GetRequiredService<AppDbContext>(), app.Environment, app.Configuration);
     await Nagorik.Api.Data.DevelopmentReportSeeder.SeedAsync(
@@ -135,7 +148,10 @@ if (app.Environment.IsDevelopment())
 
 // HTTPS redirect must come first, before auth middleware
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Nagorik.Api.Services.ReportPhotoStaticFiles(app.Environment.WebRootFileProvider, app.Environment.WebRootPath)
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

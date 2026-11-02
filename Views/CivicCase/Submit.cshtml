@@ -1,0 +1,24 @@
+@model Nagorik.Api.Models.CivicSubmitView
+@{ViewData["Title"]=Model.Kind+" concerns";var kind=Model.Kind.ToLowerInvariant();}
+<h1>@Model.Kind concerns</h1>
+<p>Describe a recent observation for city officials to investigate. Reports are private to you and authorized reviewers. Suspected concerns are not verified violations.</p>
+<div asp-validation-summary="All" role="alert"></div>
+<form method="post" action="/resident/concerns/@kind" id="civic-submit">
+@Html.AntiForgeryToken()<input asp-for="Input.SubmissionToken" type="hidden" />
+<label asp-for="Input.Subtype">Concern type</label><select asp-for="Input.Subtype">@foreach(var subtype in Nagorik.Api.Services.CivicCaseService.Subtypes(Model.Kind)){<option value="@subtype">@subtype</option>}</select>
+<label asp-for="Input.Description">What did you observe?</label><textarea asp-for="Input.Description" minlength="10" maxlength="1500" required></textarea>
+<label asp-for="Input.Address">Address or landmark</label><input asp-for="Input.Address" maxlength="300" required />
+<label for="observedLocal">Observed at (Asia/Dhaka)</label><input id="observedLocal" name="observedLocal" type="datetime-local" value="@Model.ObservedLocal" required />
+<p>Use a time in the last 30 days. Do not submit future observations.</p>
+<button id="civic-gps" type="button">Use my current location</button><p id="civic-location-status" role="status"></p>
+<label asp-for="Input.Latitude">Latitude</label><input asp-for="Input.Latitude" type="number" min="23.65" max="23.95" step="any" required />
+<label asp-for="Input.Longitude">Longitude</label><input asp-for="Input.Longitude" type="number" min="90.30" max="90.55" step="any" required />
+<p>GPS is optional. Enter coordinates from a known location if it is unavailable. Coordinates are sent only when you submit.</p>
+@if(Model.Kind=="Noise"){<label asp-for="Input.ReportedDecibels">Reported decibels (optional, only if you measured them)</label><input asp-for="Input.ReportedDecibels" type="number" min="0" max="180" step="any" /><p>Resident-reported values are unverified; leaving this blank means no measurement supplied.</p>}
+<label asp-for="Input.Reference">Site or bulletin reference (optional)</label><input asp-for="Input.Reference" maxlength="100" />
+<button type="submit">Submit concern</button>
+</form>
+<h2>Your latest 50 @kind concerns</h2>
+@if(Model.Items.Count==0){<p>No concerns submitted yet.</p>}
+@foreach(var row in Model.Items){<article class="card"><a href="/resident/concerns/@kind/@row.Id">@(Model.Kind=="Noise"?"NC":"CC")-@row.Id.ToString("000000")</a><p>@row.State · @row.Address</p><p>@row.Description</p></article>}
+@section Scripts {<script src="~/js/civic-location.js" asp-append-version="true"></script>}
