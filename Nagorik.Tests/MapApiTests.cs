@@ -52,6 +52,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<TransportSearchService>();
+        builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -70,6 +71,28 @@ public class MapApiTests : IAsyncLifetime
         }
         await app.StartAsync();
         client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    }
+
+    [Fact]
+    public async Task BusOccupancyApiRequiresRealResidentCsrfAndDoesNotExposeIdentity()
+    {
+        int link;
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();TestDb.AddUser(db);await TransportSearchTests.Seed(db);
+            link=await db.TransportLinks.Where(x=>x.Mode=="Bus").Select(x=>x.Id).FirstAsync();
+        }
+        var body=new{linkId=link,level="Full"};
+        Assert.Equal(HttpStatusCode.Unauthorized,(await client.PostAsJsonAsync("/api/transport/occupancy",body)).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-Role","Dispatcher");Assert.Equal(HttpStatusCode.Forbidden,(await client.PostAsJsonAsync("/api/transport/occupancy",body)).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","Resident");
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/transport/occupancy",body)).StatusCode);
+        var token=await client.GetFromJsonAsync<JsonElement>("/api/transport/occupancy/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        Assert.Equal(HttpStatusCode.OK,(await client.PostAsJsonAsync("/api/transport/occupancy",body)).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests,(await client.PostAsJsonAsync("/api/transport/occupancy",body)).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");var json=await client.GetStringAsync("/api/transport/occupancy?linkId="+link);
+        Assert.Contains("Full",json);Assert.DoesNotContain("residentId",json);Assert.DoesNotContain("user1@test.com",json);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/transport/occupancy")).StatusCode);
     }
 
     [Fact]

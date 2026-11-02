@@ -1,0 +1,28 @@
+@{ViewData["Title"]="Recent bus occupancy";}
+@section Styles {<link rel="stylesheet" href="~/css/transport.css" asp-append-version="true" />}
+<h1>Recent bus occupancy</h1>
+<p>Community observations for a direction-specific bus segment, not a tracked vehicle. Reports expire after 15 minutes. Confirm conditions before boarding.</p>
+<label for="occupancy-segment">Bus segment</label><select id="occupancy-segment"></select>
+<button id="occupancy-refresh" type="button">Refresh observations</button>
+<p id="occupancy-source"></p>
+<p id="occupancy-status" role="status" aria-live="polite"></p>
+<div id="occupancy-summary"></div>
+@if(User.IsInRole("Resident"))
+{
+    <form id="occupancy-report">
+        @Html.AntiForgeryToken()
+        <h2>Report what you see now</h2>
+        <p>Only report a bus segment you are currently observing. One update per segment every five minutes; only your latest observation counts.</p>
+        <label for="occupancy-level">Observed crowding</label>
+        <select id="occupancy-level"><option value="SeatsAvailable">Seats available</option><option value="Standing">Standing passengers</option><option value="Full">Full</option></select>
+        <button id="occupancy-submit" type="submit">Submit observation</button>
+        <p id="occupancy-report-status" role="status" aria-live="polite"></p>
+    </form>
+}
+else
+{
+    <p><a href="/login.html?returnUrl=%2Ftransport%2Foccupancy">Sign in as a resident to report an observation</a>.</p>
+}
+<p>Summary: upper median category among recent distinct reporters. The distribution below shows disagreement; it is not a certainty or passenger count.</p>
+<a href="/transport">Plan a journey</a>
+@section Scripts {<script src="~/js/bus-occupancy.js" asp-append-version="true"></script>}
