@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Previously downloaded loadshedding schedule — Nagorik</title><link rel="stylesheet" href="/css/site.css"><link rel="stylesheet" href="/css/loadshedding.css"></head>
+<body><header><a href="/">Nagorik</a> · <a href="/login.html?returnUrl=%2Fresident%2Floadshedding">Sign in when connected</a></header>
+<main id="main"><section id="resident-schedule"><h1>Loadshedding schedule</h1>
+<p>The server could not be reached. This generic offline page can show only public plans previously downloaded on this browser. It cannot check your current sign-in or new publications. All dates and times use Asia/Dhaka.</p>
+<p><label for="schedule-zone">Zone</label> <select id="schedule-zone" disabled><option value="">Loading saved zones…</option></select><button type="button" id="schedule-refresh" disabled>Refresh schedule</button></p>
+<p><button type="button" id="schedule-locate" disabled>Use my location to find my zone</button><button type="button" id="schedule-location-clear">Clear location request</button></p>
+<p>GPS is optional and works only if area boundaries are available. Manual zone selection is always available for downloaded zones.</p>
+<p id="schedule-location-status" role="status" aria-live="polite"></p><p id="resident-schedule-status" role="status" aria-live="polite">Loading cached zones…</p>
+<p id="schedule-cache-notice" role="status" hidden></p><p><a id="schedule-sign-in" href="/login.html?returnUrl=%2Fresident%2Floadshedding" hidden>Sign in again</a></p>
+<h2 id="schedule-zone-name">Choose a zone</h2><p id="schedule-publication-summary"></p><p id="schedule-last-updated"></p>
+<h2>Next outage</h2><p id="schedule-next-outage">Choose a zone to see its downloaded plan.</p><h2>Seven-day plan</h2><ol id="schedule-days"></ol></section></main>
+<script src="/js/zone-locator.js"></script><script src="/js/resident-schedule-location.js"></script><script src="/js/resident-schedule-transport.js"></script><script src="/js/resident-loadshedding.js"></script>
+</body></html>
