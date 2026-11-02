@@ -1,0 +1,19 @@
+@model Nagorik.Api.Models.MunicipalPublicView
+@{ViewData["Title"]=Model.Kind+" schedule";}
+<h1>@Model.Kind schedule</h1>
+<p>Published planned service windows in Asia/Dhaka. A plan does not confirm actual delivery or collection. Check the source and publication time.</p>
+<form method="get"><label for="zoneId">Zone</label><select id="zoneId" name="zoneId" required><option value="">Choose a zone</option>
+@foreach(var zone in Model.Zones){<option value="@zone.Id" selected="@(zone.Id==Model.SelectedZone)">@zone.Name</option>}
+</select><button type="submit">Show seven-day schedule</button></form>
+@if(Model.Week!=null)
+{
+    <h2>@Model.Week.ZoneName</h2>
+    @foreach(var day in Model.Week.Days)
+    {
+        <article class="card service-day"><h3>@day.Date.ToString("dddd, dd MMM yyyy")</h3>
+        @if(!day.IsPublished){<p>Unknown — schedule not published for this day.</p>}
+        else if(day.Windows.Count==0){<p>No service scheduled in the published weekly plan.</p>}
+        else {foreach(var window in day.Windows){<p><strong>@(TimeOnly.MinValue.AddMinutes(window.StartMinute).ToString("HH:mm"))–@(window.EndMinute==1440?"24:00":TimeOnly.MinValue.AddMinutes(window.EndMinute).ToString("HH:mm"))</strong></p><p>@window.Notes</p><p>Source: @window.Source · Published: @Nagorik.Api.Services.DhakaTime.ToLocal(window.PublishedAtUtc).ToString("yyyy-MM-dd HH:mm") (Asia/Dhaka)</p>}}
+        </article>
+    }
+}

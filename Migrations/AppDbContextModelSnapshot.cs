@@ -261,6 +261,79 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.MunicipalSchedule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DaysMask")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("EndMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StartMinute")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UpdatedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("ZoneId");
+
+                    b.HasIndex("Kind", "ZoneId", "State", "FromDate", "ToDate");
+
+                    b.ToTable("MunicipalSchedules", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MunicipalSchedule_Publication", "State <> 'Published' OR PublishedAtUtc IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_MunicipalSchedule_Values", "Kind IN ('Water','Waste') AND State IN ('Draft','Published','Retired') AND Revision > 0 AND DaysMask BETWEEN 1 AND 127 AND StartMinute BETWEEN 0 AND 1439 AND EndMinute > StartMinute AND EndMinute <= 1440 AND ToDate >= FromDate");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.NotificationLog", b =>
                 {
                     b.Property<int>("Id")
@@ -1685,6 +1758,21 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("Schedule");
 
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.MunicipalSchedule", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Nagorik.Api.Models.Zone", null)
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.RainfallReading", b =>

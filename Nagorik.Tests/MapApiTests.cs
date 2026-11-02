@@ -53,6 +53,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<TransportSearchService>();
         builder.Services.AddScoped<BusOccupancyService>();
+        builder.Services.AddScoped<MunicipalScheduleService>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
         builder.Services.AddSingleton<RiskPredictionService>();
         builder.Services.AddScoped<RiskThresholdProvider, PersistentRiskThresholdProvider>();
@@ -71,6 +72,30 @@ public class MapApiTests : IAsyncLifetime
         }
         await app.StartAsync();
         client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    }
+
+    [Fact]
+    public async Task WaterScheduleApiSeparatesDraftsFromPublicPlanAndRequiresOfficialCsrf()
+    {
+        await using(var scope=app.Services.CreateAsyncScope())
+        {
+            var db=scope.ServiceProvider.GetRequiredService<AppDbContext>();var user=TestDb.AddUser(db);user.Role="UtilityOfficial";await db.SaveChangesAsync();
+        }
+        var today=DateOnly.FromDateTime(DhakaTime.ToLocal(DateTime.UtcNow));
+        var input=new{zoneId=1,fromDate=today,toDate=today.AddDays(6),daysMask=127,startMinute=480,endMinute=600,source="Approved water bulletin fixture",notes="Bring containers",expectedRevision=0};
+        Assert.Equal(HttpStatusCode.Unauthorized,(await client.PostAsJsonAsync("/api/official/services/water/drafts",input)).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-Role","Resident");Assert.Equal(HttpStatusCode.Forbidden,(await client.PostAsJsonAsync("/api/official/services/water/drafts",input)).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","UtilityOfficial");
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/official/services/water/drafts",input)).StatusCode);
+        var token=await client.GetFromJsonAsync<JsonElement>("/api/official/services/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        var response=await client.PostAsJsonAsync("/api/official/services/water/drafts",input);Assert.Equal(HttpStatusCode.OK,response.StatusCode);var row=await response.Content.ReadFromJsonAsync<JsonElement>();var id=row.GetProperty("id").GetInt32();
+        var draft=await client.GetStringAsync("/api/services/water?zoneId=1");Assert.DoesNotContain(input.source,draft);
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync($"/api/official/services/water/{id}/publish",new{expectedRevision=1,confirm=false})).StatusCode);
+        Assert.Equal(HttpStatusCode.OK,(await client.PostAsJsonAsync($"/api/official/services/water/{id}/publish",new{expectedRevision=1,confirm=true})).StatusCode);
+        var published=await client.GetStringAsync("/api/services/water?zoneId=1");Assert.Contains(input.source,published);Assert.DoesNotContain("updatedByUserId",published);
+        Assert.Equal(HttpStatusCode.Conflict,(await client.PostAsJsonAsync($"/api/official/services/water/{id}/retire",new{expectedRevision=1,confirm=true})).StatusCode);
+        Assert.Contains("service-day",await client.GetStringAsync("/services/water?zoneId=1"));
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.GetAsync("/api/services/water")).StatusCode);
     }
 
     [Fact]

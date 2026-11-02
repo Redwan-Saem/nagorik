@@ -23,6 +23,7 @@ builder.Services.AddScoped<LoadsheddingScheduleService>();
 builder.Services.AddScoped<ResidentScheduleQueryService>();
 builder.Services.AddScoped<TransportSearchService>();
 builder.Services.AddScoped<BusOccupancyService>();
+builder.Services.AddScoped<MunicipalScheduleService>();
 
 // T-004.2 Crew assignment services
 // T-004.3: real notifier replaces NullCrewTaskNotifier
