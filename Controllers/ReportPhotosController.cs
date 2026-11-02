@@ -15,12 +15,16 @@ namespace Nagorik.Api.Controllers;
 public sealed class ReportPhotosController(AppDbContext db, IPhotoStorage storage) : ControllerBase
 {
     [HttpGet("{fileName}")]
-    public async Task<IActionResult> Get(string fileName, CancellationToken ct)
+    public Task<IActionResult> Get(string fileName, CancellationToken ct) => GetPhoto(LocalPhotoStorage.PrivateUrlPrefix + fileName, ct);
+
+    [HttpGet("/uploads/reports/{fileName}")]
+    public Task<IActionResult> GetLegacy(string fileName, CancellationToken ct) => GetPhoto(LocalPhotoStorage.LegacyUrlPrefix + fileName, ct);
+
+    private async Task<IActionResult> GetPhoto(string url, CancellationToken ct)
     {
         if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var userId) || userId <= 0)
             return Unauthorized();
-        var url = LocalPhotoStorage.PrivateUrlPrefix + fileName;
-        if (!LocalPhotoStorage.IsPrivateUrl(url)) return NotFound();
+        if (!LocalPhotoStorage.IsPrivateUrl(url) && !LocalPhotoStorage.IsLegacyUrl(url)) return NotFound();
         var reports = db.Reports.AsNoTracking().Where(r => r.PhotoPaths.Contains(url) || r.ImageUrl == url);
         if (!OfficialAccess.IsOfficial(User) && !User.IsInRole("Dispatcher"))
             reports = reports.Where(r => (User.IsInRole("Resident") && r.UserId == userId) ||
