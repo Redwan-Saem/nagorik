@@ -55,6 +55,7 @@ public class MapApiTests : IAsyncLifetime
         builder.Services.AddScoped<BusOccupancyService>();
         builder.Services.AddScoped<MunicipalScheduleService>();
         builder.Services.AddScoped<CivicCaseService>();
+        builder.Services.AddScoped<GeographicDataService>();builder.Services.AddScoped<TransportCatalogService>();
         builder.Services.AddMemoryCache();builder.Services.Configure<AirQualityOptions>(_=>{});
         builder.Services.AddSingleton<AirQualityCache>();builder.Services.AddScoped<AirQualityService>();builder.Services.AddSingleton<IAirQualityProvider,FixtureAirQualityProvider>();
         builder.Services.AddScoped<WeatherReadingQueryService>();
@@ -75,6 +76,23 @@ public class MapApiTests : IAsyncLifetime
         }
         await app.StartAsync();
         client = new HttpClient { BaseAddress = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single()) };
+    }
+
+    [Fact]
+    public async Task ManagedDataRequiresAdminCsrfAndPublishesOnlySourceMetadata()
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized,(await client.GetAsync("/api/admin/data/zones")).StatusCode);client.DefaultRequestHeaders.Add("X-Test-Role","Resident");Assert.Equal(HttpStatusCode.Forbidden,(await client.GetAsync("/api/admin/data/transport")).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Test-Role");client.DefaultRequestHeaders.Add("X-Test-Role","Admin");
+        var input=new ZoneDataInput{Code="G2",Name="Managed fixture",BoundaryGeoJson=ManagedDataTests.Geometry,Source="Survey fixture — unverified",IsSample=true};
+        Assert.Equal(HttpStatusCode.BadRequest,(await client.PostAsJsonAsync("/api/admin/data/zones",input)).StatusCode);
+        var token=await client.GetFromJsonAsync<JsonElement>("/api/admin/data/security-token");client.DefaultRequestHeaders.Add("RequestVerificationToken",token.GetProperty("requestToken").GetString());
+        var response=await client.PostAsJsonAsync("/api/admin/data/zones",input);Assert.Equal(HttpStatusCode.OK,response.StatusCode);var row=await response.Content.ReadFromJsonAsync<JsonElement>();var id=row.GetProperty("id").GetInt32();
+        Assert.Equal(HttpStatusCode.Conflict,(await client.PutAsJsonAsync($"/api/admin/data/zones/{id}",input)).StatusCode);
+        var map=await client.GetStringAsync("/api/public/map/risk-zones");using var mapJson=JsonDocument.Parse(map);Assert.Contains(mapJson.RootElement.GetProperty("features").EnumerateArray(),x=>x.GetProperty("properties").GetProperty("boundarySource").GetString()==input.Source);Assert.Contains("boundaryIsSample",map);Assert.DoesNotContain("actorUserId",map);Assert.DoesNotContain("payloadJson",map);
+        var doc=new TransportCatalogDocument{Source="Curated operator fixture",Stops=[new(){Id=101,Name="Fixture stop",Latitude=23.75,Longitude=90.37,Source="Fixture"}]};
+        Assert.Equal(HttpStatusCode.OK,(await client.PostAsJsonAsync("/api/admin/data/transport",doc)).StatusCode);Assert.Equal(HttpStatusCode.Conflict,(await client.PostAsJsonAsync("/api/admin/data/transport",doc)).StatusCode);
+        var changes=await client.GetStringAsync("/api/admin/data/changes");Assert.DoesNotContain("payloadJson",changes);Assert.Contains("Curated operator fixture",changes);
+        Assert.Equal(HttpStatusCode.OK,(await client.GetAsync("/admin/data")).StatusCode);
     }
 
     [Fact]

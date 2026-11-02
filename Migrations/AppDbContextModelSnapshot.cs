@@ -377,6 +377,50 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.ManagedDataChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ActorUserId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("AtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool?>("IsSample")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ZoneId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ZoneId", "AtUtc");
+
+                    b.ToTable("ManagedDataChanges", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ManagedDataChange_Json", "json_valid(PayloadJson)");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.MunicipalSchedule", b =>
                 {
                     b.Property<int>("Id")
@@ -1185,6 +1229,24 @@ namespace Nagorik.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Nagorik.Api.Models.TransportCatalogState", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TransportCatalogStates", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TransportCatalogState_Singleton", "Id = 1 AND Revision > 0");
+                        });
+                });
+
             modelBuilder.Entity("Nagorik.Api.Models.TransportFareRule", b =>
                 {
                     b.Property<string>("Mode")
@@ -1694,6 +1756,13 @@ namespace Nagorik.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool?>("BoundaryIsSample")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BoundarySource")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -1706,8 +1775,22 @@ namespace Nagorik.Api.Migrations
                     b.Property<double?>("ElevationMeters")
                         .HasColumnType("REAL");
 
+                    b.Property<int>("GeoRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("GeoUpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<double?>("HistoryScore")
                         .HasColumnType("REAL");
+
+                    b.Property<bool?>("InputIsSample")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("InputSource")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastComputedAtUtc")
                         .HasColumnType("TEXT");
@@ -1898,6 +1981,14 @@ namespace Nagorik.Api.Migrations
                     b.Navigation("Schedule");
 
                     b.Navigation("Zone");
+                });
+
+            modelBuilder.Entity("Nagorik.Api.Models.ManagedDataChange", b =>
+                {
+                    b.HasOne("Nagorik.Api.Models.Zone", null)
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Nagorik.Api.Models.MunicipalSchedule", b =>

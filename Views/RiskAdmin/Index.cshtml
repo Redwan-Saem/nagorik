@@ -25,6 +25,10 @@
         <p>Current risk: @zone.RiskLevel · Evaluated: @(zone.LastComputedAtUtc?.ToString("u") ?? "Not evaluated")</p>
         <form method="post" action="/admin/risk-thresholds/zones/@zone.Id/vulnerability">
             @Html.AntiForgeryToken()
+            <input name="ExpectedRevision" type="hidden" value="@zone.GeoRevision" />
+            <label for="source-@zone.Id">Public input source/reference</label><input id="source-@zone.Id" name="Source" value="@zone.InputSource" maxlength="300" required />
+            <label><input id="sample-input-@zone.Id" type="checkbox" name="IsSample" value="true" checked="@(zone.InputIsSample==true)" /> Demonstration/sample metrics</label><input type="hidden" name="IsSample" value="false" />
+            <p>Sources are user-supplied, not independently verified. Unknown legacy provenance stays unknown until explicitly recorded. <a href="/admin/data?id=@zone.Id">Edit boundary and inspect provenance</a>.</p>
             <p><label for="elevation-@zone.Id">Elevation (m)</label>
             <input id="elevation-@zone.Id" name="ElevationMeters" value="@(zone.ElevationMeters?.ToString(System.Globalization.CultureInfo.InvariantCulture))" type="number" min="-500" max="9000" step="any" required /></p>
             <p><label for="density-@zone.Id">Drainage density (km/km²)</label>

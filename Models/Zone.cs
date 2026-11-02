@@ -22,6 +22,12 @@ public sealed class Zone
     // A GeoJSON Polygon/MultiPolygon geometry; positions use [longitude, latitude].
     // This is not a Leaflet [latitude, longitude] coordinate array.
     public string BoundaryGeoJson { get; set; } = "";
+    public string? BoundarySource { get; set; }
+    public bool? BoundaryIsSample { get; set; }
+    public string? InputSource { get; set; }
+    public bool? InputIsSample { get; set; }
+    public int GeoRevision { get; set; }
+    public DateTime? GeoUpdatedAtUtc { get; set; }
 
     public ZoneRiskLevel RiskLevel { get; set; } = ZoneRiskLevel.Unknown;
 

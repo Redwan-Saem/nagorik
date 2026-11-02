@@ -24,14 +24,15 @@ function setup(fetcher) {
 const payload = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { riskLevel: 'High' } }] };
 
 test('computed factors are visible as safe text in popup and accessible details', async () => {
-    const data = { ...payload, features: [{ properties: { riskLevel: 'High', factors: {
+    const data = { ...payload, features: [{ properties: { riskLevel: 'High', boundarySource:'<svg>source</svg>',boundaryIsSample:true,inputSource:'Unverified fixture',inputIsSample:false, factors: {
         assessment: { explanation: '<script>bad()</script>', score: 20, intensityMmPerHour: 10, vulnerability: 2 },
         elevationMeters: 5, drainageDensityKmPerSqKm: 3, historyScore: .1,
         thresholds: { mediumThreshold: 5, highThreshold: 15, severeThreshold: 30 }
     } } }] };
     const state = setup(async () => ({ ok: true, json: async () => data })); await state.ui.ready;
-    assert.match(state.zoneLayers[0].popup.children[3].textContent, /Score: 20.00/);
-    assert.match(state.zoneLayers[0].popup.children[3].textContent, /<script>/);
+    const popupText=state.zoneLayers[0].popup.children.map(node=>node.textContent).join(' ');
+    assert.match(popupText, /Score: 20.00/);assert.match(popupText, /<script>/);
+    assert.match(popupText,/Boundary: Sample; <svg>source<\/svg>/);assert.match(popupText,/Metrics: User-supplied; Unverified fixture/);
     state.zoneLayers[0].click(); assert.match(state.get('map-zone-details').textContent, /rainfall intensity: 10.00/);
 });
 
