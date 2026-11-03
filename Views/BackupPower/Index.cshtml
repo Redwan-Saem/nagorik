@@ -1,0 +1,53 @@
+@{ ViewData["Title"] = "Backup power planner"; }
+@section Styles { <link rel="stylesheet" href="~/css/backup-power.css" asp-append-version="true" /> }
+<section class="backup-intro">
+    <p class="backup-eyebrow">For market and building managers</p>
+    <h1>Backup power planner</h1>
+    <p>Plan which shops receive generator power during outages. Protect mandatory loads, respect the daily diesel budget and limit consecutive dark hours. This is a planning aid, not automatic generator control.</p>
+</section>
+<div class="backup-workbench">
+    <section class="card backup-controls" aria-labelledby="backup-input-heading">
+        <h2 id="backup-input-heading">1. Review your scenario</h2>
+        <p>Ten one-hour slots, 10:00–20:00 Asia/Dhaka; up to 12 shops. Input stays in this page unless you explicitly download it. The solver needs no external provider or ML.</p>
+        <button id="backup-example" type="button">Load worked example</button>
+        <label for="backup-file">Import scenario JSON (maximum 128 KB)</label>
+        <input id="backup-file" type="file" accept=".json,application/json" />
+        <label for="backup-input">Scenario JSON</label>
+        <textarea id="backup-input" rows="20" spellcheck="false" aria-describedby="backup-json-hint"></textarea>
+        <p id="backup-json-hint">grid_available: true means grid on; false means outage. Fuel is looked up once per hour from combined load. Grid hours reset dark runs and count no generator fuel or objective value.</p>
+        <div class="backup-actions"><button id="backup-run" type="button">Generate roster</button><button id="backup-input-download" type="button">Download input</button></div>
+        <p id="backup-status" role="status" aria-live="polite">Load the example or supply your own scenario.</p>
+        <ul id="backup-errors" role="alert"></ul>
+        <noscript><p>Enable JavaScript to use the planner. Its API is POST /api/roster.</p></noscript>
+    </section>
+    <aside class="card backup-import" aria-labelledby="backup-import-heading">
+        <h2 id="backup-import-heading">Optional: use a published outage plan</h2>
+        <p>DPDC/DESCO or utility officials publish the zone schedule. The market manager supplies the generator, fuel and shop requirements. Import changes only grid_available; it does not change a utility publication.</p>
+        @if (User.IsInRole("Resident") || Nagorik.Api.Authorization.UtilityScheduleAccess.IsOfficial(User))
+        {
+            <label for="backup-zone">Zone</label><select id="backup-zone"><option value="">Loading zones…</option></select>
+            <label for="backup-date">Plan date (Asia/Dhaka)</label><input id="backup-date" type="date" />
+            <button id="backup-import" type="button">Import published outage hours</button>
+            <p id="backup-source" role="status">Select a zone and a date in the current seven-day view.</p>
+        }
+        else
+        {
+            <p><a href="/login.html?returnUrl=%2Fbackup-power">Sign in as a resident or electricity official</a> to import published schedules. Manual JSON planning remains available without an account.</p>
+        }
+        <h3>Before operating the generator</h3>
+        <p>Have the responsible operator review actual loads, safety limits, fuel availability and the published roster. Values and mandatory designations are supplied by the manager, not measured or certified by Nagorik.</p>
+        <p>Re-import and regenerate if the outage schedule changes. A saved result is a snapshot, not a live update.</p>
+    </aside>
+</div>
+<section id="backup-results" hidden aria-labelledby="backup-results-heading">
+    <h2 id="backup-results-heading">2. Review the roster</h2>
+    <p id="backup-result-message"></p>
+    <div id="backup-summary" class="backup-summary"></div>
+    <div class="backup-table-wrap" role="region" tabindex="0" aria-label="Hourly power roster">
+        <table id="backup-board"><caption>10:00–20:00 Asia/Dhaka. Grid = grid supply; On = generator supply; Dark = no scheduled power. Mandatory shops are marked.</caption><thead></thead><tbody></tbody><tfoot></tfoot></table>
+    </div>
+    <h3>Why a shop is dark</h3><ul id="backup-reasons"></ul>
+    <p class="backup-print-note">Planning snapshot. Verify current outage hours and physical generator conditions before use.</p>
+    <div class="backup-actions"><button id="backup-output-download" type="button">Download output JSON</button><button id="backup-print" type="button">Print A4 roster</button></div>
+</section>
+@section Scripts { <script src="~/js/backup-power.js" asp-append-version="true"></script> }
