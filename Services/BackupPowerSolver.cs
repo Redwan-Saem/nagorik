@@ -6,6 +6,18 @@ namespace Nagorik.Api.Services;
 
 public sealed class BackupPowerSolver : IDisposable
 {
+    private static readonly Lazy<bool> NativeReady = new(() =>
+    {
+        // Load/JIT the native engine before listening for planner requests. Cold
+        // library initialization is application startup, not a user's search budget.
+        var warm = new CpModel(); var x = warm.NewBoolVar("startup"); warm.Maximize(x);
+        // This one-variable startup check has no search deadline: loading the
+        // native runtime on a busy host must not consume the request deadline.
+        var engine = new CpSolver { StringParameters = "num_search_workers:1 cp_model_presolve:false" };
+        if (engine.Solve(warm) != CpSolverStatus.Optimal) throw new InvalidOperationException("Backup-power solver startup check failed.");
+        return true;
+    });
+    public BackupPowerSolver() { _ = NativeReady.Value; }
     // Bound CPU consumption of the public, stateless endpoint. No user data is kept.
     private readonly SemaphoreSlim gate = new(2, 2);
     public BackupPowerResult Solve(BackupPowerInput input, CancellationToken ct = default)
@@ -79,7 +91,7 @@ public sealed class BackupPowerSolver : IDisposable
         model.Maximize(LinearExpr.WeightedSum(objectiveVars, objectiveCoefficients));
         var validation = model.Validate();
         if (validation.Length != 0) throw new InvalidOperationException("Invalid planner model: " + validation);
-        var solver = new CpSolver { StringParameters = "max_time_in_seconds:6 num_search_workers:2 random_seed:0" };
+        var solver = new CpSolver { StringParameters = "max_time_in_seconds:6 num_search_workers:1 random_seed:0" };
         using var cancel = ct.Register(solver.StopSearch);
         var status = solver.Solve(model);
         ct.ThrowIfCancellationRequested();

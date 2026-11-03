@@ -119,6 +119,14 @@ and mobile navigation, cookie sign-out and verification. Ten role checks and two
 desktop/mobile browser cases passed, including real feature navigation and logout.
 Screenshots were inspected. See `NAG-040-homepage.md`. Home no longer redirects.
 
+## NAG-041 — backup power planning
+
+The separate market/building planner is at `/backup-power`. It accepts generator,
+fuel and shop inputs and can import current published zone outage hours for a
+resident or electricity official. It does not replace utility publication or
+control electrical equipment. See `NAG-041-backup-power.md` for its contract,
+delivery tasks and verification status.
+
 ## Final integration
 
 The older SOS browser-fetch receiver error is corrected with regression coverage.

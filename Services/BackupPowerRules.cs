@@ -58,14 +58,15 @@ public static class BackupPowerRules
     {
         if (result.Status != "ok") throw new InvalidOperationException("Only a feasible roster can be verified.");
         var shops = input.Shops!;
+        var grid = input.GridAvailable!;
         var rows = result.Roster.ToDictionary(x => x.Slot);
         var runs = shops.ToDictionary(x => x.Id!, _ => 0);
         var darkHours = shops.ToDictionary(x => x.Id!, _ => 0);
         long fuel = 0, value = 0;
-        if (rows.Count != input.GridAvailable!.Count(x => !x)) throw new InvalidOperationException("Missing/extra outage hours.");
+        if (rows.Count != grid.Count(x => !x)) throw new InvalidOperationException("Missing/extra outage hours.");
         for (var slot = 0; slot < Slots; slot++)
         {
-            if (input.GridAvailable[slot])
+            if (grid[slot])
             {
                 if (rows.ContainsKey(slot)) throw new InvalidOperationException("Grid hour must not consume generator fuel.");
                 foreach (var shop in shops) runs[shop.Id!] = 0;

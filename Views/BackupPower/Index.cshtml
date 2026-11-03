@@ -8,7 +8,7 @@
 <div class="backup-workbench">
     <section class="card backup-controls" aria-labelledby="backup-input-heading">
         <h2 id="backup-input-heading">1. Review your scenario</h2>
-        <p>Ten one-hour slots, 10:00–20:00 Asia/Dhaka; up to 12 shops. Input stays in this page unless you explicitly download it. The solver needs no external provider or ML.</p>
+        <p>Ten one-hour slots, 10:00–20:00 Asia/Dhaka; up to 12 shops. Generate sends your input to the local solver; scenarios are not saved on the server. You can download a copy. No external provider or ML is needed.</p>
         <button id="backup-example" type="button">Load worked example</button>
         <label for="backup-file">Import scenario JSON (maximum 128 KB)</label>
         <input id="backup-file" type="file" accept=".json,application/json" />
@@ -46,7 +46,7 @@
     <div class="backup-table-wrap" role="region" tabindex="0" aria-label="Hourly power roster">
         <table id="backup-board"><caption>10:00–20:00 Asia/Dhaka. Grid = grid supply; On = generator supply; Dark = no scheduled power. Mandatory shops are marked.</caption><thead></thead><tbody></tbody><tfoot></tfoot></table>
     </div>
-    <h3>Why a shop is dark</h3><ul id="backup-reasons"></ul>
+    <h3 class="backup-reason-title">Why a shop is dark</h3><ul id="backup-reasons"></ul>
     <p class="backup-print-note">Planning snapshot. Verify current outage hours and physical generator conditions before use.</p>
     <div class="backup-actions"><button id="backup-output-download" type="button">Download output JSON</button><button id="backup-print" type="button">Print A4 roster</button></div>
 </section>

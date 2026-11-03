@@ -135,6 +135,7 @@ builder.Services.AddAuthorization(Nagorik.Api.Authorization.DispatcherMapAccess.
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<BackupPowerSolver>();
 
 if (app.Environment.IsDevelopment())
 {

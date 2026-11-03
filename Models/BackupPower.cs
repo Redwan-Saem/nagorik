@@ -10,7 +10,7 @@ public sealed class BackupPowerInput
     [JsonPropertyName("generator_capacity_kw")] public int? GeneratorCapacityKw { get; set; }
     [JsonPropertyName("fuel_budget_litres")] public decimal? FuelBudgetLitres { get; set; }
     [JsonPropertyName("fuel_table")] public List<GeneratorFuelBand>? FuelTable { get; set; }
-    [JsonPropertyName("max_consecutive_dark")] public int? MaxConsecutiveDark { get; set; }
+    [JsonPropertyName("max_consecutive_dark")] public int? MaxConsecutiveDark { get; set; } = 2;
     [JsonPropertyName("shops")] public List<BackupPowerShop>? Shops { get; set; }
 }
 
