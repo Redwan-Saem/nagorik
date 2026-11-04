@@ -70,9 +70,12 @@ search limit. The limit leaves headroom for validation, model construction and H
 serialization. Runtime targets must still be measured on the deployment hardware;
 heavy simultaneous application load can affect wall-clock time.
 
-Application startup eagerly loads the native engine using a one-variable model,
-before listening for HTTP requests. This startup check has no search deadline;
-native library loading is separate from the six-second per-request search limit.
+Application startup starts a background native warm-up using a one-variable model.
+Other Nagorik pages do not wait for this optional engine. Until it is ready (or if
+native initialization fails), nontrivial planner requests return HTTP 503 with an
+explicit starting/unavailable message. Trivial days and mandatory-capacity conflicts
+need no native engine. Library loading is separate from the six-second per-request
+search limit. Tests explicitly await readiness before measuring search behavior.
 
 Run the worked example independently of the UI (from the repository root):
 
@@ -150,3 +153,15 @@ infeasibility, changed outage input, malformed JSON and publication access/Unkno
 handling. Desktop/mobile browser journeys exercise actual HTTP solving and errors.
 Execution counts and measured results are recorded in the verification section
 after tests run, not inferred from the presence of these cases.
+
+## Verification status — 2026-11-04
+
+Tested snapshot: commit 078486b, exported into a temporary checkout.
+
+- Full backend run: 816 passed, 1 failed, 817 total. All 26 new BackupPower tests passed. The existing OfficialReportListPerformanceTests test exceeded its strict two-second budget (maximum 9.25 seconds). This is not a full-suite pass.
+- The worked example proved value 84 and fuel 8.00 L. The independent small-instance oracle, API validation/publication access checks and twelve-shop timing case passed.
+- All 163 existing client tests passed with Node's built-in runner from the repository root: node --test --test-concurrency=1 "ClientTests/*.test.cjs".
+- The browser-test project built with zero warnings/errors before the final background-readiness edit. Four desktop/mobile Selenium cases ran and all four failed on Chrome session creation or WebDriver navigation timeouts. No successful screenshot or A4/PDF-layout verification is claimed.
+- Reports: outputs/backup-power/tests/backend-final.trx and outputs/backup-power/tests/backup-ui.trx.
+- The latest local startup-isolation fix starts optional native warm-up in the background and makes tests explicitly await readiness. It is outside the tested snapshot and still requires a fresh build/run.
+- Five initial owner-attributed task commits are pushed on separate branches. Automatic approval review timed out twice while committing the final local startup-isolation edits. Those edits and this verification note remain local. No PR was merged automatically.

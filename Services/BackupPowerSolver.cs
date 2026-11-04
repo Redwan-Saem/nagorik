@@ -6,18 +6,18 @@ namespace Nagorik.Api.Services;
 
 public sealed class BackupPowerSolver : IDisposable
 {
-    private static readonly Lazy<bool> NativeReady = new(() =>
+    private static readonly Lazy<Task<bool>> NativeReady = new(() => Task.Run(() =>
     {
-        // Load/JIT the native engine before listening for planner requests. Cold
-        // library initialization is application startup, not a user's search budget.
+        // Warm this optional engine without delaying unrelated application pages.
         var warm = new CpModel(); var x = warm.NewBoolVar("startup"); warm.Maximize(x);
         // This one-variable startup check has no search deadline: loading the
         // native runtime on a busy host must not consume the request deadline.
         var engine = new CpSolver { StringParameters = "num_search_workers:1 cp_model_presolve:false" };
         if (engine.Solve(warm) != CpSolverStatus.Optimal) throw new InvalidOperationException("Backup-power solver startup check failed.");
         return true;
-    });
+    }));
     public BackupPowerSolver() { _ = NativeReady.Value; }
+    public static Task WarmUpAsync() => NativeReady.Value;
     // Bound CPU consumption of the public, stateless endpoint. No user data is kept.
     private readonly SemaphoreSlim gate = new(2, 2);
     public BackupPowerResult Solve(BackupPowerInput input, CancellationToken ct = default)
@@ -50,6 +50,9 @@ public sealed class BackupPowerSolver : IDisposable
         var mandatoryLoad = mandatory.Sum(s => s.Kw!.Value);
         if (mandatoryLoad > capacity)
             return Empty("infeasible", $"Mandatory shops [{string.Join(", ", mandatory.Select(s => s.Id))}] need {mandatoryLoad} kW in every outage; capacity is {capacity} kW.", "infeasible");
+
+        if (!NativeReady.Value.IsCompletedSuccessfully)
+            return Empty("not_solved", "The local optimization engine is starting or unavailable. Retry shortly; if this persists, check the server's native runtime installation. No infeasibility claim has been made.");
 
         var model = new CpModel();
         var on = new BoolVar[shops.Count, 10];

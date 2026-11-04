@@ -3,8 +3,10 @@ using System.Text.Json;
 using Nagorik.Api.Models;
 using Nagorik.Api.Services;
 
-public sealed class BackupPowerSolverTests
+public sealed class BackupPowerSolverTests : IAsyncLifetime
 {
+    public Task InitializeAsync() => BackupPowerSolver.WarmUpAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
     [Fact]
     public void OmittedDarkLimitDefaultsToTwoButExplicitNullIsInvalid()
     {

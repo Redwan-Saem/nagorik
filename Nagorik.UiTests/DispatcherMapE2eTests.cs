@@ -75,6 +75,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
         app = builder.Build();
         _ = app.Services.GetRequiredService<BackupPowerSolver>();
+        await BackupPowerSolver.WarmUpAsync();
         app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         app.MapControllerRoute("default","{controller=Home}/{action=Index}/{id?}");
         await using (var scope = app.Services.CreateAsyncScope())

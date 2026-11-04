@@ -35,6 +35,7 @@ public sealed class BackupPowerApiTests : IAsyncLifetime
         builder.Services.AddAuthentication("fixture").AddScheme<AuthenticationSchemeOptions, BackupFixtureAuth>("fixture", _ => { });
         builder.Services.AddAuthorization(); app = builder.Build();
         _ = app.Services.GetRequiredService<BackupPowerSolver>();
+        await BackupPowerSolver.WarmUpAsync();
         app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         await using (var scope = app.Services.CreateAsyncScope())
         {
