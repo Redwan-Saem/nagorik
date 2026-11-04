@@ -30,6 +30,7 @@ public static class DevDataSeeder
         await Add("Dispatcher One", "dispatcher1@test.com", "Dispatcher");
         await Add("Risk Admin", "admin1@test.com", "Admin");
         await Add("Utility Official", "utility1@test.com", "UtilityOfficial");
+        await Add("DPDC Official", "dpdc1@test.com", "DPDCOfficial");
         await Add("Crew One", "crew1@test.com", "Crew");
         await Add("Crew Two", "crew2@test.com", "Crew");
 
