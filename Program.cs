@@ -19,6 +19,7 @@ builder.Services.AddScoped<UtilityPhotoUploadService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<NotificationSettingsService>();
 builder.Services.AddSingleton<LoadsheddingRotationEngine>();
+builder.Services.AddSingleton<BackupPowerSolver>();
 builder.Services.AddScoped<LoadsheddingScheduleService>();
 builder.Services.AddScoped<ResidentScheduleQueryService>();
 builder.Services.AddScoped<TransportSearchService>();
@@ -134,6 +135,7 @@ builder.Services.AddAuthorization(Nagorik.Api.Authorization.DispatcherMapAccess.
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<BackupPowerSolver>();
 
 if (app.Environment.IsDevelopment())
 {

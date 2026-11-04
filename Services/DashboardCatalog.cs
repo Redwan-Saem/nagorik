@@ -36,6 +36,7 @@ public static class DashboardCatalog
             new("Review noise concerns","Inspect the city review queue.","/official/concerns/noise"),
             new("Review construction concerns","Inspect construction review history.","/official/concerns/construction")]);
         DashboardCard[] publicCards=[
+            new("Backup power planner","Allocate limited generator power and diesel across a market's outage hours.","/backup-power"),
             new("Area risk map","Explore rule-based area risk and publicly verified issue markers.","/map"),
             new("Transport routes and fares","Compare available catalog routes and estimated BDT fares.","/transport"),
             new("Recent bus occupancy","Check recent community observations for a bus segment.","/transport/occupancy"),

@@ -51,6 +51,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         builder.Services.AddScoped<ReportStatusWorkflowService>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<LoadsheddingRotationEngine>();
+        builder.Services.AddSingleton<BackupPowerSolver>();
         builder.Services.AddScoped<LoadsheddingScheduleService>();
         builder.Services.AddScoped<ResidentScheduleQueryService>();
         builder.Services.AddScoped<TransportSearchService>();
@@ -72,7 +73,10 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
             o.Events = new JwtBearerEvents { OnMessageReceived = c => { c.Token ??= c.Request.Cookies["auth_token"]; return Task.CompletedTask; } };
         });
         builder.Services.AddAuthorization(DispatcherMapAccess.Configure);
-        app = builder.Build(); app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
+        app = builder.Build();
+        _ = app.Services.GetRequiredService<BackupPowerSolver>();
+        await BackupPowerSolver.WarmUpAsync();
+        app.UseStaticFiles(); app.UseAuthentication(); app.UseAuthorization(); app.MapControllers();
         app.MapControllerRoute("default","{controller=Home}/{action=Index}/{id?}");
         await using (var scope = app.Services.CreateAsyncScope())
         {
@@ -93,6 +97,70 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         await app.StartAsync(); url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
     }
 
+    [Theory]
+    [InlineData(1280)]
+    [InlineData(390)]
+    public void BackupPlannerSolvesWorkedExampleRejectsInvalidAndPrintsRoster(int width)
+    {
+        var options = new ChromeOptions(); options.AddArgument("--headless=new"); options.AddArgument($"--window-size={width},1000");
+        var service = ChromeDriverService.CreateDefaultService(); service.HideCommandPromptWindow = true;
+        browser = new ChromeDriver(service, options, TimeSpan.FromSeconds(90));
+        if (width < 600) browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride", new Dictionary<string, object?>
+            { ["width"] = width, ["height"] = 844, ["deviceScaleFactor"] = 1, ["mobile"] = true });
+        var wait = new WebDriverWait(browser, TimeSpan.FromSeconds(25));
+        browser.Navigate().GoToUrl(url + "/backup-power");
+        var input = browser.FindElement(By.Id("backup-input"));
+        var original = input.GetAttribute("value")!;
+        browser.FindElement(By.Id("backup-run")).Click();
+        wait.Until(d => d.FindElements(By.CssSelector("#backup-board tbody tr")).Count == 5);
+        Assert.Contains("Total value: 84", browser.FindElement(By.Id("backup-summary")).Text);
+        Assert.Contains("8.00 / 8.00 L", browser.FindElement(By.Id("backup-summary")).Text);
+        Assert.Contains("Mandatory", browser.FindElement(By.Id("backup-board")).Text);
+        Assert.True(browser.FindElements(By.CssSelector("#backup-reasons li")).Count > 0);
+        Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= innerWidth + 1") is true);
+        var captures = Environment.GetEnvironmentVariable("NAGORIK_SCREENSHOT_DIR");
+        if (!string.IsNullOrWhiteSpace(captures))
+        {
+            Directory.CreateDirectory(captures);
+            browser.ExecuteScript("arguments[0].scrollIntoView({block:'start',behavior:'instant'});", browser.FindElement(By.Id("backup-results")));
+            browser.GetScreenshot().SaveAsFile(Path.Combine(captures, $"backup-power-{width}.png"));
+            var pdf = browser.ExecuteCdpCommand("Page.printToPDF", new Dictionary<string, object?> { ["landscape"] = true, ["printBackground"] = true, ["preferCSSPageSize"] = true }) as Dictionary<string, object>
+                ?? throw new InvalidOperationException("Chrome returned no printable PDF.");
+            File.WriteAllBytes(Path.Combine(captures, $"backup-power-{width}.pdf"), Convert.FromBase64String((string)pdf["data"]));
+            if (width == 1280)
+            {
+                var twelve = System.Text.Json.Nodes.JsonNode.Parse(original)!;
+                twelve["grid_available"] = System.Text.Json.Nodes.JsonNode.Parse("[true,true,true,true,true,true,true,true,true,true]");
+                var shops = new System.Text.Json.Nodes.JsonArray();
+                for (var i = 0; i < 12; i++)
+                {
+                    var shop = twelve["shops"]![0]!.DeepClone();
+                    shop["id"] = $"shop-{i:D2}-" + new string('x', 72); shops.Add(shop);
+                }
+                twelve["shops"] = shops;
+                browser.ExecuteScript("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));", input, twelve.ToJsonString());
+                browser.FindElement(By.Id("backup-run")).Click();
+                wait.Until(d => d.FindElements(By.CssSelector("#backup-board tbody tr")).Count == 12);
+                var maxPdf = browser.ExecuteCdpCommand("Page.printToPDF", new Dictionary<string, object?> { ["landscape"] = true, ["preferCSSPageSize"] = true }) as Dictionary<string, object>
+                    ?? throw new InvalidOperationException("Chrome returned no maximum-size PDF.");
+                File.WriteAllBytes(Path.Combine(captures, "backup-power-12-shops.pdf"), Convert.FromBase64String((string)maxPdf["data"]));
+            }
+        }
+        input.Clear(); input.SendKeys("{}");
+        Assert.False(browser.FindElement(By.Id("backup-results")).Displayed);
+        browser.ExecuteCdpCommand("Emulation.setEmulatedMedia", new Dictionary<string, object?> { ["media"] = "print" });
+        try { Assert.Equal("none", browser.ExecuteScript("return getComputedStyle(document.getElementById('backup-results')).display")); }
+        finally { browser.ExecuteCdpCommand("Emulation.setEmulatedMedia", new Dictionary<string, object?> { ["media"] = "" }); }
+        browser.FindElement(By.Id("backup-run")).Click();
+        wait.Until(d => d.FindElement(By.Id("backup-errors")).Text.Contains("grid_available"));
+        var scenario = System.Text.Json.Nodes.JsonNode.Parse(original)!; scenario["fuel_budget_litres"] = 0;
+        browser.ExecuteScript("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));", input, scenario.ToJsonString());
+        browser.FindElement(By.Id("backup-run")).Click();
+        wait.Until(d => d.FindElement(By.Id("backup-summary")).Text.Contains("infeasible"));
+        Assert.False(browser.FindElement(By.Id("backup-board")).Displayed);
+        Assert.Contains("No roster", browser.FindElement(By.Id("backup-result-message")).Text);
+    }
+
     private sealed class UiNotifications:INotificationService
     {
         public Task<int> SendToUserAsync(string userId,string title,string body,string target,DateTime? predictionTimestampUtc=null,CancellationToken ct=default)=>Task.FromResult(1);
@@ -108,7 +176,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
         if(width<600)browser.ExecuteCdpCommand("Emulation.setDeviceMetricsOverride",new Dictionary<string,object?>{{"width",width},{"height",844},{"deviceScaleFactor",1},{"mobile",true}});
         var wait=new WebDriverWait(browser,TimeSpan.FromSeconds(45));wait.IgnoreExceptionTypes(typeof(StaleElementReferenceException),typeof(NoSuchElementException));
         void Click(By by)=>wait.Until(d=>{try{var e=d.FindElement(by);if(!e.Displayed||!e.Enabled)return false;browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});",e);e.Click();return true;}catch(StaleElementReferenceException){return false;}catch(ElementClickInterceptedException){return false;}});
-        browser.Navigate().GoToUrl(url+"/");Assert.Equal(6,browser.FindElements(By.CssSelector("#dashboard-public .dashboard-card")).Count);Assert.Empty(browser.FindElements(By.Id("dashboard-work")));
+        browser.Navigate().GoToUrl(url+"/");Assert.Equal(7,browser.FindElements(By.CssSelector("#dashboard-public .dashboard-card")).Count);Assert.Empty(browser.FindElements(By.Id("dashboard-work")));
         Click(By.CssSelector(".dashboard-actions a[href^='/login.html']"));browser.FindElement(By.Id("email")).SendKeys("resident@map.invalid");browser.FindElement(By.Id("password")).SendKeys(Password);Click(By.CssSelector("button"));
         wait.Until(d=>d.FindElements(By.CssSelector("#dashboard-work .dashboard-card")).Count==9);Assert.Empty(browser.FindElements(By.CssSelector("#dashboard-work a[href^='/admin/']")));Assert.Contains("Noise concerns",browser.FindElement(By.Id("dashboard-work")).Text);
         Assert.True(browser.ExecuteScript("return document.documentElement.scrollWidth <= window.innerWidth + 1") is true);

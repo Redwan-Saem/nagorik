@@ -65,6 +65,7 @@ Existing account passwords are never reset by seeding.
 | Crew | crew1@test.com / crew2@test.com | `/crew/tasks` |
 | City official | official1@test.com | `/official/reports` |
 | Utility official | utility1@test.com | `/official/loadshedding` |
+| DPDC official | dpdc1@test.com | `/official/loadshedding` |
 | Admin | admin1@test.com | `/admin/data` |
 
 Use the brand to return home. Phone navigation is under **Menu**. Use **Sign out**
@@ -82,6 +83,7 @@ sessions side by side. Creating a resident account is available at `/register.ht
 | Public risk map | http://localhost:5000/map |
 | Transport planner | http://localhost:5000/transport |
 | Bus occupancy | http://localhost:5000/transport/occupancy |
+| Backup generator power planner | http://localhost:5000/backup-power |
 | Water schedule | http://localhost:5000/services/water |
 | Waste schedule | http://localhost:5000/services/waste |
 | Air quality | http://localhost:5000/air-quality |
