@@ -6,13 +6,29 @@ public static class BackupPowerRules
 {
     public const int Slots = 10;
     public static string Hour(int slot) => $"{slot + 10:00}:00";
+    public static int Duration(BackupPowerInput input, int slot) => input.SlotMinutes?[slot] ?? 60;
+    public static int DarkLimit(BackupPowerInput input) => input.MaxConsecutiveDarkMinutes ?? input.MaxConsecutiveDark!.Value * 60;
+    public static string Hour(BackupPowerInput input, int slot)
+    {
+        var minute = (input.StartMinute ?? 600) + (input.SlotMinutes?.Take(slot).Sum() ?? slot * 60);
+        return $"{minute / 60:00}:{minute % 60:00}";
+    }
+
     public static long Cents(decimal litres) => checked((long)(litres * 100));
 
     public static Dictionary<string, string> Validate(BackupPowerInput? input)
     {
         var errors = new Dictionary<string, string>();
         if (input is null) { errors["body"] = "Supply a JSON object."; return errors; }
-        if (input.GridAvailable is not { Length: Slots }) errors["grid_available"] = "Exactly 10 booleans are required, for 10:00 through 19:00.";
+        var count = input.SlotMinutes?.Length ?? Slots;
+        if (input.StartMinute is < 0 or >= 1440 || (input.StartMinute.HasValue && input.SlotMinutes == null))
+            errors["start_minute"] = "Choose a start time within the day for a custom timeline.";
+        if (input.SlotMinutes is { } durations &&
+            (count is < 1 or > 24 || durations.Any(x => x is < 1 or > 1440) || durations.Sum(x => (long)x) + (input.StartMinute ?? 600) > 1440))
+            errors["slot_minutes"] = "Use 1 to 24 positive minute durations ending by midnight.";
+        if (input.GridAvailable?.Length != count) errors["grid_available"] = $"Set grid availability for all {count} slots.";
+        if (input.MaxConsecutiveDarkMinutes is < 0 or > 1440)
+            errors["max_consecutive_dark_minutes"] = "Use 0 to 1440 minutes.";
         if (input.GeneratorCapacityKw is not (>= 1 and <= 1_000_000)) errors["generator_capacity_kw"] = "Use a whole number from 1 to 1,000,000 kW.";
         if (input.FuelBudgetLitres is not { } budget || !ValidLitres(budget)) errors["fuel_budget_litres"] = "Use 0 to 1,000,000 litres with at most two decimal places.";
         if (input.MaxConsecutiveDark is not (>= 0 and <= Slots)) errors["max_consecutive_dark"] = "Use a whole number from 0 to 10.";
@@ -43,8 +59,8 @@ public static class BackupPowerRules
                     errors[$"shops[{i}].id"] = "Use a unique, nonblank ID of at most 80 characters without surrounding whitespace.";
                 if (shop.Kw is not (>= 1 and <= 1_000_000)) errors[$"shops[{i}].kw"] = "Use a positive whole-number demand up to 1,000,000 kW.";
                 if (shop.Type is not ("mandatory" or "normal")) errors[$"shops[{i}].type"] = "Use mandatory or normal.";
-                if (shop.ValuePerSlot is not { Length: Slots } values || values.Any(x => x < 0 || x > 1_000_000))
-                    errors[$"shops[{i}].value_per_slot"] = "Exactly 10 whole-number values from 0 to 1,000,000 are required.";
+                if (shop.ValuePerSlot is not { } values || values.Length != count || values.Any(x => x < 0 || x > 1_000_000))
+                    errors[$"shops[{i}].value_per_slot"] = $"Supply {count} whole-number values from 0 to 1,000,000.";
             }
         }
         return errors;
@@ -64,7 +80,7 @@ public static class BackupPowerRules
         var darkHours = shops.ToDictionary(x => x.Id!, _ => 0);
         long fuel = 0, value = 0;
         if (rows.Count != grid.Count(x => !x)) throw new InvalidOperationException("Missing/extra outage hours.");
-        for (var slot = 0; slot < Slots; slot++)
+        for (var slot = 0; slot < grid.Length; slot++)
         {
             if (grid[slot])
             {
@@ -72,7 +88,7 @@ public static class BackupPowerRules
                 foreach (var shop in shops) runs[shop.Id!] = 0;
                 continue;
             }
-            if (!rows.TryGetValue(slot, out var row) || row.Hour != Hour(slot)) throw new InvalidOperationException("Missing outage slot.");
+            if (!rows.TryGetValue(slot, out var row) || row.Hour != Hour(input, slot)) throw new InvalidOperationException("Missing outage slot.");
             var partition = row.Powered.Concat(row.Dark.Select(x => x.Id)).ToArray();
             if (partition.Length != shops.Count || partition.Distinct(StringComparer.Ordinal).Count() != shops.Count || !partition.ToHashSet(StringComparer.Ordinal).SetEquals(shops.Select(x => x.Id!)))
                 throw new InvalidOperationException("Roster must partition every shop exactly once.");
@@ -86,17 +102,19 @@ public static class BackupPowerRules
                 else
                 {
                     if (shop.Type == "mandatory") throw new InvalidOperationException("Mandatory load was cut.");
-                    darkHours[id]++; runs[id]++;
-                    if (runs[id] > input.MaxConsecutiveDark) throw new InvalidOperationException("Dark-run limit exceeded.");
+                    darkHours[id] += Duration(input, slot); runs[id] += Duration(input, slot);
+                    if (runs[id] > DarkLimit(input)) throw new InvalidOperationException("Dark-run limit exceeded.");
                 }
             }
             if (load > input.GeneratorCapacityKw) throw new InvalidOperationException("Capacity exceeded.");
-            var used = FuelCents(input, load); fuel += used;
-            if (row.LoadKw != load || row.FuelLitres * 100 != used || row.CumulativeFuelLitres * 100 != fuel)
+            var used = FuelCents(input, load) * Duration(input, slot); fuel += used;
+            if (row.LoadKw != load || row.FuelLitres != used / 6000m || row.CumulativeFuelLitres != fuel / 6000m)
                 throw new InvalidOperationException("Incorrect hourly load or fuel totals.");
         }
-        if (fuel > Cents(input.FuelBudgetLitres!.Value) || result.FuelTotalLitres * 100 != fuel || result.ValueTotal != value ||
-            result.DarkHours.Count != darkHours.Count || darkHours.Any(x => !result.DarkHours.TryGetValue(x.Key, out var count) || count != x.Value))
+        if (fuel > Cents(input.FuelBudgetLitres!.Value) * 60 || result.FuelTotalLitres != fuel / 6000m || result.ValueTotal != value ||
+            result.DarkHours.Count != darkHours.Count || darkHours.Any(x => !result.DarkHours.TryGetValue(x.Key, out var count) || count != x.Value / 60) ||
+            (input.SlotMinutes != null && (result.DarkMinutes?.Count != darkHours.Count ||
+                darkHours.Any(x => !result.DarkMinutes.TryGetValue(x.Key, out var minutes) || minutes != x.Value))))
             throw new InvalidOperationException("Incorrect total fuel, value or dark-hour counts.");
     }
 }

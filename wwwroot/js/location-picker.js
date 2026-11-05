@@ -66,7 +66,7 @@ if (typeof document !== 'undefined') {
         const j = await r.json();
 
         if (j.display_name && !input.value) {
-          input.value = j.display_name;
+          input.value = j.display_name.slice(0, input.maxLength).trimEnd();
 
           document.dispatchEvent(
             new CustomEvent('location-changed')

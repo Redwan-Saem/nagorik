@@ -38,7 +38,8 @@ function isFormValid(s) {
          s.latitude != null &&
          s.longitude !== '' &&
          s.longitude != null &&
-         (s.addressText || '').trim().length > 0;
+         (s.addressText || '').trim().length > 0 &&
+         s.addressText.length <= 300;
 }
 
 if (typeof document !== 'undefined') {
@@ -73,7 +74,11 @@ if (typeof document !== 'undefined') {
           ? (validatePhotoFile(s.photo) || '')
           : '';
 
-      $('submit-report').disabled = !isFormValid(s);
+      $('AddressText-error').textContent = s.addressText.length > 300
+        ? 'Use an address or landmark of 300 characters or fewer.'
+        : '';
+
+      $('submit-report').disabled = isSubmitting || !isFormValid(s);
     }
 
     $('Category').addEventListener('change', refresh);
@@ -119,7 +124,7 @@ if (typeof document !== 'undefined') {
 
     async function sendReport() {
 
-      if (isSubmitting) return;
+      if (isSubmitting || !isFormValid(state())) return;
 
       isSubmitting = true;
 
@@ -156,23 +161,25 @@ if (typeof document !== 'undefined') {
         }
 
         if (kind === 'validation') {
-
-          const fe = extractFieldErrors(await res.json());
-
-          if (fe.Photo) {
-            $('Photo-error').textContent = fe.Photo;
+          const problem = await res.json().catch(() => null);
+          const errors = extractFieldErrors(problem);
+          const fields = {
+            Category: 'Category-error',
+            Description: 'Description-error',
+            Photo: 'Photo-error',
+            AddressText: 'AddressText-error',
+            Latitude: 'location-error',
+            Longitude: 'location-error',
+            Location: 'location-error'
+          };
+          for (const [field, id] of Object.entries(fields)) {
+            if (errors[field]) $(id).textContent = errors[field];
           }
-
-          if (fe.Location) {
-            $('location-error').textContent = fe.Location;
-          }
-
-          showError(
-            'Please fix the highlighted problems and submit again.'
-          );
-
+          showError(Object.values(errors).join(' ') ||
+            'The server rejected this submission. Reload the form if the problem continues.');
         } else {
 
+          $('retry-submit').style.display = 'inline-block';
           showError(
             'We could not send your report. Your information is saved on this page. Please retry.'
           );
@@ -180,6 +187,7 @@ if (typeof document !== 'undefined') {
 
       } catch {
 
+        $('retry-submit').style.display = 'inline-block';
         showError(
           'No connection. Your information is saved on this page. Please retry.'
         );
@@ -187,8 +195,7 @@ if (typeof document !== 'undefined') {
 
       isSubmitting = false;
 
-      $('submit-report').disabled = false;
-      $('retry-submit').style.display = 'inline-block';
+      $('submit-report').disabled = !isFormValid(state());
     }
 
     function showError(msg) {

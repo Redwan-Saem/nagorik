@@ -36,16 +36,21 @@ public sealed class BackupPowerSolver : IDisposable
     {
         ct.ThrowIfCancellationRequested();
         var shops = input.Shops!;
-        var outageSlots = Enumerable.Range(0, 10).Where(h => !input.GridAvailable![h]).ToArray();
+        var count = input.GridAvailable!.Length;
+        var outageSlots = Enumerable.Range(0, count).Where(h => !input.GridAvailable![h]).ToArray();
         if (outageSlots.Length == 0 || shops.Count == 0)
         {
-            var rows = outageSlots.Select(h => new BackupPowerHour(h, BackupPowerRules.Hour(h), [], [], 0, 0, 0)).ToArray();
+            var rows = outageSlots.Select(h => new BackupPowerHour(h, BackupPowerRules.Hour(input, h), [], [], 0, 0, 0)).ToArray();
             var empty = new BackupPowerResult("ok", "No generator allocation is needed.", rows, 0, 0,
-                shops.ToDictionary(s => s.Id!, _ => 0), true, "optimal", 0);
+                shops.ToDictionary(s => s.Id!, _ => 0), true, "optimal", 0)
+            {
+                DarkMinutes = input.SlotMinutes == null ? null : shops.ToDictionary(s => s.Id!, _ => 0)
+            };
             BackupPowerRules.Verify(input, empty); return empty;
         }
         var capacity = input.GeneratorCapacityKw!.Value;
-        var budget = BackupPowerRules.Cents(input.FuelBudgetLitres!.Value);
+        // Use hundredths of a litre times 60 so minute-based fuel stays exact in CP-SAT.
+        var budget = BackupPowerRules.Cents(input.FuelBudgetLitres!.Value) * 60;
         var mandatory = shops.Where(s => s.Type == "mandatory").ToArray();
         var mandatoryLoad = mandatory.Sum(s => s.Kw!.Value);
         if (mandatoryLoad > capacity)
@@ -55,11 +60,11 @@ public sealed class BackupPowerSolver : IDisposable
             return Empty("not_solved", "The local optimization engine is starting or unavailable. Retry shortly; if this persists, check the server's native runtime installation. No infeasibility claim has been made.");
 
         var model = new CpModel();
-        var on = new BoolVar[shops.Count, 10];
+        var on = new BoolVar[shops.Count, count];
         var objectiveVars = new List<IntVar>(); var objectiveCoefficients = new List<long>();
         for (var i = 0; i < shops.Count; i++)
         {
-            for (var h = 0; h < 10; h++)
+            for (var h = 0; h < count; h++)
             {
                 on[i, h] = model.NewBoolVar($"on_{i}_{h}");
                 if (input.GridAvailable![h] || shops[i].Type == "mandatory") model.Add(on[i, h] == 1);
@@ -67,9 +72,17 @@ public sealed class BackupPowerSolver : IDisposable
             }
             if (shops[i].Type == "normal")
             {
-                var window = input.MaxConsecutiveDark!.Value + 1;
-                for (var h = 0; h + window <= 10; h++)
-                    model.Add(LinearExpr.Sum(Enumerable.Range(h, window).Select(t => on[i, t])) >= 1);
+                for (var start = 0; start < count; start++)
+                {
+                    var duration = 0;
+                    for (var end = start; end < count && !input.GridAvailable[end]; end++)
+                    {
+                        duration += BackupPowerRules.Duration(input, end);
+                        if (duration <= BackupPowerRules.DarkLimit(input)) continue;
+                        model.Add(LinearExpr.Sum(Enumerable.Range(start, end - start + 1).Select(t => on[i, t])) >= 1);
+                        break;
+                    }
+                }
             }
         }
 
@@ -90,7 +103,7 @@ public sealed class BackupPowerSolver : IDisposable
             model.AddAllowedAssignments(new IntVar[] { load, fuel }).AddTuples(tuples);
             fuelVars.Add(fuel);
         }
-        model.Add(LinearExpr.Sum(fuelVars) <= budget);
+        model.Add(LinearExpr.WeightedSum(fuelVars, outageSlots.Select(h => (long)BackupPowerRules.Duration(input, h))) <= budget);
         model.Maximize(LinearExpr.WeightedSum(objectiveVars, objectiveCoefficients));
         var validation = model.Validate();
         if (validation.Length != 0) throw new InvalidOperationException("Invalid planner model: " + validation);
@@ -99,43 +112,47 @@ public sealed class BackupPowerSolver : IDisposable
         var status = solver.Solve(model);
         ct.ThrowIfCancellationRequested();
         if (status == CpSolverStatus.Infeasible)
-            return Empty("infeasible", $"No roster can jointly satisfy {capacity} kW capacity, {input.FuelBudgetLitres:0.00} L fuel, mandatory loads [{string.Join(", ", mandatory.Select(s => s.Id))}] and at most {input.MaxConsecutiveDark} consecutive dark hours across [{string.Join(", ", outageSlots.Select(BackupPowerRules.Hour))}]. Revise these inputs; no unsafe roster is published.", "infeasible");
+            return Empty("infeasible", $"No roster can jointly satisfy {capacity} kW capacity, {input.FuelBudgetLitres:0.00} L fuel, mandatory loads [{string.Join(", ", mandatory.Select(s => s.Id))}] and at most {BackupPowerRules.DarkLimit(input)} consecutive dark minutes across [{string.Join(", ", outageSlots.Select(h => BackupPowerRules.Hour(input, h)))}]. Revise these inputs; no unsafe roster is published.", "infeasible");
         if (status is not (CpSolverStatus.Optimal or CpSolverStatus.Feasible))
             return Empty("not_solved", "The time limit expired before a feasible plan or infeasibility proof was found. This does not mean the input is infeasible.", status.ToString().ToLowerInvariant());
 
-        var decisions = new bool[shops.Count, 10];
-        for (var i = 0; i < shops.Count; i++) for (var h = 0; h < 10; h++) decisions[i, h] = solver.Value(on[i, h]) == 1;
+        var decisions = new bool[shops.Count, count];
+        for (var i = 0; i < shops.Count; i++) for (var h = 0; h < count; h++) decisions[i, h] = solver.Value(on[i, h]) == 1;
         var hourly = new List<BackupPowerHour>();
         var darkHours = shops.ToDictionary(s => s.Id!, _ => 0);
-        var totalFuel = fuelVars.Sum(f => solver.Value(f));
+        var totalFuel = fuelVars.Select((f, i) => solver.Value(f) * BackupPowerRules.Duration(input, outageSlots[i])).Sum();
         long cumulative = 0, value = 0;
         foreach (var h in outageSlots)
         {
             var active = Enumerable.Range(0, shops.Count).Where(i => decisions[i, h]).ToArray();
             var load = active.Sum(i => shops[i].Kw!.Value);
-            var fuel = BackupPowerRules.FuelCents(input, load); cumulative += fuel;
+            var duration = BackupPowerRules.Duration(input, h);
+            var fuel = BackupPowerRules.FuelCents(input, load) * duration; cumulative += fuel;
             value += active.Sum(i => (long)shops[i].ValuePerSlot![h]);
             var dark = new List<DarkPowerEntry>();
             for (var i = 0; i < shops.Count; i++) if (!decisions[i, h])
             {
-                var shop = shops[i]; darkHours[shop.Id!]++;
+                var shop = shops[i]; darkHours[shop.Id!] += duration;
                 string reason;
                 if (load + shop.Kw > capacity)
                     reason = $"Adding {shop.Id} ({shop.Kw} kW) to the selected {load} kW would exceed {capacity} kW capacity. Whole-day alternatives also preserve fuel and dark-run limits.";
                 else
                 {
-                    var addedFuel = BackupPowerRules.FuelCents(input, load + shop.Kw!.Value) - fuel;
+                    var addedFuel = BackupPowerRules.FuelCents(input, load + shop.Kw!.Value) * duration - fuel;
                     reason = totalFuel + addedFuel > budget
-                        ? $"Adding {shop.Id} to this hour would raise daily fuel from {totalFuel / 100m:0.00} L to {(totalFuel + addedFuel) / 100m:0.00} L, above {budget / 100m:0.00} L."
-                        : $"Whole-day selection: {shop.Id} offers {shop.ValuePerSlot![h]} value here. Current plan uses {totalFuel / 100m:0.00}/{budget / 100m:0.00} L with a {input.MaxConsecutiveDark}-hour dark-run limit; alternative combinations compete across all outage hours.";
+                        ? $"Adding {shop.Id} to this slot would raise daily fuel from {totalFuel / 6000m:0.00} L to {(totalFuel + addedFuel) / 6000m:0.00} L, above {budget / 6000m:0.00} L."
+                        : $"Whole-day selection: {shop.Id} offers {shop.ValuePerSlot![h]} value here. Current plan uses {totalFuel / 6000m:0.00}/{budget / 6000m:0.00} L with a {BackupPowerRules.DarkLimit(input)}-minute dark-run limit; alternative combinations compete across all outage hours.";
                 }
                 dark.Add(new(shop.Id!, reason));
             }
-            hourly.Add(new(h, BackupPowerRules.Hour(h), active.Select(i => shops[i].Id!).ToArray(), dark, load, fuel / 100m, cumulative / 100m));
+            hourly.Add(new(h, BackupPowerRules.Hour(input, h), active.Select(i => shops[i].Id!).ToArray(), dark, load, fuel / 6000m, cumulative / 6000m));
         }
         var optimal = status == CpSolverStatus.Optimal;
         var result = new BackupPowerResult("ok", optimal ? "Optimal whole-day roster proven for these inputs." : "A verified feasible roster was found within the time limit; optimality has not been proven.",
-            hourly, value, totalFuel / 100m, darkHours, optimal, optimal ? "optimal" : "feasible", (long)Math.Ceiling(solver.BestObjectiveBound));
+            hourly, value, totalFuel / 6000m, darkHours.ToDictionary(x => x.Key, x => x.Value / 60), optimal, optimal ? "optimal" : "feasible", (long)Math.Ceiling(solver.BestObjectiveBound))
+        {
+            DarkMinutes = input.SlotMinutes == null ? null : darkHours
+        };
         BackupPowerRules.Verify(input, result);
         return result;
     }

@@ -11,20 +11,19 @@ automatic switching, measured load data or electrical safety certification.
 - The built-in worked example is clearly illustrative: five shops, 10 kW,
   8.00 litres, six outage hours. Generate to obtain a proven value of 84 and
   8.00 litres. Equally optimal rosters may differ from the printed example.
-- Paste/upload JSON, generate, inspect the board and explanations, download input
-  or exact API output, or print the feasible roster on landscape A4.
-- The board shows all ten slots, including neutral grid hours. Hourly load,
-  hourly fuel, cumulative fuel and per-shop dark-hour totals are recomputed.
+- Edit generator settings, fuel bands, timeline slots and shop priorities on the page.
+  Add or remove slots and enter their durations in minutes. Generate and print the roster.
+- The roster includes grid slots, load, fuel per slot, cumulative fuel and each shop's dark minutes.
 - Resident/electricity-official accounts can import a published zone/day through
   `/api/backup-power/published-grid?zoneId=1&date=yyyy-MM-dd`.
 - Unknown/unpublished days are refused, not converted to grid-on. Dates outside
   the current seven-day view or partial-hour windows are refused without silent
-  approximation. Only `grid_available` is replaced; imported hours are a snapshot.
+  approximation. Import replaces the timeline with ten one-hour slots and keeps generator and shop details.
 - Changed inputs invalidate/hide the old result. Import and generate again after
   publication changes. No background replan or external notification is sent.
 - No market plans are stored server-side. No new market role or migration is
-  required for this first version. Inputs are kept in the open page and downloaded
-  only by explicit action; there is no automatic local-storage persistence.
+  required. Inputs are kept in the open page.
+
 
 Development seeding also provisions `dpdc1@test.com` with initial password
 `Test@12345` and role `DPDCOfficial`. Existing account passwords are not reset.
@@ -39,7 +38,10 @@ this is Nagorik's documented contract, not a claim of exact companion-pack parit
 
 | Field | Requirements |
 |---|---|
-| grid_available | Exactly ten booleans, slots 0–9 = 10:00–20:00 Asia/Dhaka |
+| grid_available | One boolean per slot. Legacy calls use ten hourly slots from 10:00 Asia/Dhaka. |
+| slot_minutes | Optional array of 1–24 positive whole-minute durations that end by midnight. |
+| start_minute | Optional start time in minutes since midnight for custom slots. Defaults to 600 (10:00). |
+| max_consecutive_dark_minutes | Optional limit of 0–1440 minutes. Overrides the hourly limit. |
 | generator_capacity_kw | Integer 1–1,000,000 |
 | fuel_budget_litres | Nonnegative decimal up to 1,000,000, at most two decimal places |
 | fuel_table | 1–1,000 strictly increasing positive integer load_kw levels, last equals capacity; each litres_per_hour follows the same decimal bounds |
@@ -48,11 +50,11 @@ this is Nagorik's documented contract, not a claim of exact companion-pack parit
 | shops[].id | Unique, nonblank string of at most 80 characters, no surrounding whitespace |
 | shops[].kw | Integer 1–1,000,000; demand may exceed generator capacity |
 | shops[].type | Exactly mandatory or normal |
-| shops[].value_per_slot | Exactly ten nonnegative integers up to 1,000,000 |
+| shops[].value_per_slot | One nonnegative integer per slot, each up to 1,000,000 |
 
 Limits on field sizes and numeric magnitudes bound public-endpoint resource use.
-There is no rounding tolerance for fuel. Litres are converted to integer hundredths.
-Fuel is charged once at the first band covering combined hourly load; zero load
+The solver multiplies each hourly rate in hundredths of a litre by the slot duration in minutes. It compares the integer total against the fuel budget in the same units.
+Fuel is charged once at the first band covering combined slot load; zero load
 costs zero fuel. Grid hours consume no generator fuel/value and reset dark runs.
 Mandatory shops are on during each outage. Empty shops and all-grid days are valid.
 
@@ -130,8 +132,8 @@ local Nagorik database. This does not assert the entire application runs offline
    agree with an independent exhaustive oracle. Empty shops/grid-only days work.
 3. Invalid inputs identify fields. Proven infeasibility, resource contention and
    a search deadline are separate outcomes; no time-limited result claims proof.
-4. The page uses the real roster API, shows ten hourly columns and dark reasons,
-   imports/exports JSON, prints a landscape A4 roster and fits phone navigation.
+4. The page uses the roster API, shows the configured slots and dark reasons,
+   offers visual editing, prints a landscape A4 roster and fits phone navigation.
 5. Editing/importing inputs invalidates the previous result and aborts late replies.
    Hidden stale results remain hidden when printing from the browser.
 6. Only residents/electricity officials import published hours. Unknown days,
@@ -165,3 +167,9 @@ Tested snapshot: commit 078486b, exported into a temporary checkout.
 - Reports: outputs/backup-power/tests/backend-final.trx and outputs/backup-power/tests/backup-ui.trx.
 - The latest local startup-isolation fix starts optional native warm-up in the background and makes tests explicitly await readiness. It is outside the tested snapshot and still requires a fresh build/run.
 - Five initial owner-attributed task commits are pushed on separate branches. Automatic approval review timed out twice while committing the final local startup-isolation edits. Those edits and this verification note remain local. No PR was merged automatically.
+
+### Verification rerun — 2026-11-05
+
+- The full backend suite passed all 817 tests. The isolated official report list benchmark peaked at 32.09 ms across 50 measured trials against the unchanged 2-second budget.
+- Desktop and mobile Chrome passed the planner and homepage workflows (4 cases). The planner test scrolls the Generate button into view before clicking. A mobile table rule that exposed a previous roster after an infeasible result was corrected.
+- Chrome's desktop and mobile worked-example PDFs were each one landscape A4 page. The 12-shop long-name example occupied two landscape A4 pages with repeated headings. All four pages were rendered and visually reviewed for clipping and legibility.

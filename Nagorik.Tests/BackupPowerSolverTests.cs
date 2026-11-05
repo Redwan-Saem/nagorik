@@ -44,6 +44,33 @@ public sealed class BackupPowerSolverTests : IAsyncLifetime
     }
 
     [Fact]
+    public void CustomSlotsProrateFuelAndEnforceDarkLimitsInMinutes()
+    {
+        using var solver = new BackupPowerSolver();
+        var input = new BackupPowerInput
+        {
+            StartMinute = 495,
+            SlotMinutes = [30, 45, 15],
+            GridAvailable = [false, false, false],
+            GeneratorCapacityKw = 1,
+            FuelBudgetLitres = .45m,
+            FuelTable = [new() { LoadKw = 1, LitresPerHour = .60m }],
+            MaxConsecutiveDarkMinutes = 30,
+            Shops = [new() { Id = "shop", Kw = 1, Type = "normal", ValuePerSlot = [1, 2, 0] }]
+        };
+
+        var result = solver.Solve(input);
+        Assert.Equal("ok", result.Status);
+        Assert.Equal(.45m, result.FuelTotalLitres);
+        Assert.Equal(45, result.DarkMinutes!["shop"]);
+        Assert.Equal("08:45", result.Roster[1].Hour);
+        Assert.Equal(["shop"], result.Roster[1].Powered);
+
+        input.MaxConsecutiveDarkMinutes = 29;
+        Assert.Equal("infeasible", solver.Solve(input).Status);
+    }
+
+    [Fact]
     public void CombinedLoadFuelIsRoundedUpOnceAndZeroLoadCostsNothing()
     {
         var input = Worked(); Assert.Equal(0, BackupPowerRules.FuelCents(input, 0));

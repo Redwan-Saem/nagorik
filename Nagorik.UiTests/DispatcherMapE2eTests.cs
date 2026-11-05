@@ -109,9 +109,7 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
             { ["width"] = width, ["height"] = 844, ["deviceScaleFactor"] = 1, ["mobile"] = true });
         var wait = new WebDriverWait(browser, TimeSpan.FromSeconds(25));
         browser.Navigate().GoToUrl(url + "/backup-power");
-        var input = browser.FindElement(By.Id("backup-input"));
-        var original = input.GetAttribute("value")!;
-        browser.FindElement(By.Id("backup-run")).Click();
+        RunPlanner();
         wait.Until(d => d.FindElements(By.CssSelector("#backup-board tbody tr")).Count == 5);
         Assert.Contains("Total value: 84", browser.FindElement(By.Id("backup-summary")).Text);
         Assert.Contains("8.00 / 8.00 L", browser.FindElement(By.Id("backup-summary")).Text);
@@ -127,38 +125,42 @@ public sealed class DispatcherMapE2eTests : IAsyncLifetime
             var pdf = browser.ExecuteCdpCommand("Page.printToPDF", new Dictionary<string, object?> { ["landscape"] = true, ["printBackground"] = true, ["preferCSSPageSize"] = true }) as Dictionary<string, object>
                 ?? throw new InvalidOperationException("Chrome returned no printable PDF.");
             File.WriteAllBytes(Path.Combine(captures, $"backup-power-{width}.pdf"), Convert.FromBase64String((string)pdf["data"]));
-            if (width == 1280)
-            {
-                var twelve = System.Text.Json.Nodes.JsonNode.Parse(original)!;
-                twelve["grid_available"] = System.Text.Json.Nodes.JsonNode.Parse("[true,true,true,true,true,true,true,true,true,true]");
-                var shops = new System.Text.Json.Nodes.JsonArray();
-                for (var i = 0; i < 12; i++)
-                {
-                    var shop = twelve["shops"]![0]!.DeepClone();
-                    shop["id"] = $"shop-{i:D2}-" + new string('x', 72); shops.Add(shop);
-                }
-                twelve["shops"] = shops;
-                browser.ExecuteScript("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));", input, twelve.ToJsonString());
-                browser.FindElement(By.Id("backup-run")).Click();
-                wait.Until(d => d.FindElements(By.CssSelector("#backup-board tbody tr")).Count == 12);
-                var maxPdf = browser.ExecuteCdpCommand("Page.printToPDF", new Dictionary<string, object?> { ["landscape"] = true, ["preferCSSPageSize"] = true }) as Dictionary<string, object>
-                    ?? throw new InvalidOperationException("Chrome returned no maximum-size PDF.");
-                File.WriteAllBytes(Path.Combine(captures, "backup-power-12-shops.pdf"), Convert.FromBase64String((string)maxPdf["data"]));
-            }
         }
-        input.Clear(); input.SendKeys("{}");
+
+        ClickPlannerButton("backup-add-slot");
+        Assert.Equal(11, browser.FindElements(By.CssSelector("#backup-slots > div")).Count);
+        var duration = browser.FindElement(By.CssSelector("#backup-slots > div:last-child input"));
+        SetValue(duration, "30");
+        Assert.Contains("20:00–20:30", browser.FindElement(By.CssSelector("#backup-slots > div:last-child strong")).Text);
         Assert.False(browser.FindElement(By.Id("backup-results")).Displayed);
         browser.ExecuteCdpCommand("Emulation.setEmulatedMedia", new Dictionary<string, object?> { ["media"] = "print" });
         try { Assert.Equal("none", browser.ExecuteScript("return getComputedStyle(document.getElementById('backup-results')).display")); }
         finally { browser.ExecuteCdpCommand("Emulation.setEmulatedMedia", new Dictionary<string, object?> { ["media"] = "" }); }
-        browser.FindElement(By.Id("backup-run")).Click();
-        wait.Until(d => d.FindElement(By.Id("backup-errors")).Text.Contains("grid_available"));
-        var scenario = System.Text.Json.Nodes.JsonNode.Parse(original)!; scenario["fuel_budget_litres"] = 0;
-        browser.ExecuteScript("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input',{bubbles:true}));", input, scenario.ToJsonString());
-        browser.FindElement(By.Id("backup-run")).Click();
+        SetValue(browser.FindElement(By.CssSelector("#backup-slots > div:last-child select")), "true");
+        RunPlanner();
+        wait.Until(d => d.FindElements(By.CssSelector("#backup-board thead th")).Count == 13);
+        Assert.Contains("20:00–20:30", browser.FindElement(By.Id("backup-board")).Text);
+        var remove = browser.FindElement(By.CssSelector("#backup-slots > div:last-child button"));
+        browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", remove);
+        remove.Click();
+        Assert.Equal(10, browser.FindElements(By.CssSelector("#backup-slots > div")).Count);
+        SetValue(browser.FindElement(By.Id("backup-budget")), "0");
+        RunPlanner();
         wait.Until(d => d.FindElement(By.Id("backup-summary")).Text.Contains("infeasible"));
         Assert.False(browser.FindElement(By.Id("backup-board")).Displayed);
         Assert.Contains("No roster", browser.FindElement(By.Id("backup-result-message")).Text);
+
+        void RunPlanner() => ClickPlannerButton("backup-run");
+
+        void SetValue(IWebElement field, string value) =>
+            browser.ExecuteScript("arguments[0].value=arguments[1];arguments[0].dispatchEvent(new Event('input', {bubbles:true}));", field, value);
+
+        void ClickPlannerButton(string id)
+        {
+            var button = browser.FindElement(By.Id(id));
+            browser.ExecuteScript("arguments[0].scrollIntoView({block:'center',behavior:'instant'});", button);
+            button.Click();
+        }
     }
 
     private sealed class UiNotifications:INotificationService

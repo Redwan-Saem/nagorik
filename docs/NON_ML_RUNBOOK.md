@@ -7,7 +7,7 @@ Acceptance criteria are in `NON_ML_ACCEPTANCE_CRITERIA.md`.
 
 ## Start locally
 
-From `F:\Nagorik\Nagorik.Api`, stop the running application before migration:
+Open PowerShell in the repository root (the folder containing `Nagorik.Api.csproj`). Stop the running application before migration.
 
 ```powershell
 dotnet restore

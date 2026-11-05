@@ -6,6 +6,9 @@ namespace Nagorik.Api.Models;
 [JsonNumberHandling(JsonNumberHandling.Strict)]
 public sealed class BackupPowerInput
 {
+    [JsonPropertyName("start_minute")] public int? StartMinute { get; set; }
+    [JsonPropertyName("slot_minutes")] public int[]? SlotMinutes { get; set; }
+    [JsonPropertyName("max_consecutive_dark_minutes")] public int? MaxConsecutiveDarkMinutes { get; set; }
     [JsonPropertyName("grid_available")] public bool[]? GridAvailable { get; set; }
     [JsonPropertyName("generator_capacity_kw")] public int? GeneratorCapacityKw { get; set; }
     [JsonPropertyName("fuel_budget_litres")] public decimal? FuelBudgetLitres { get; set; }
@@ -37,7 +40,11 @@ public sealed record BackupPowerHour(int Slot, string Hour, IReadOnlyList<string
     IReadOnlyList<DarkPowerEntry> Dark, int LoadKw, decimal FuelLitres, decimal CumulativeFuelLitres);
 public sealed record BackupPowerResult(string Status, string Message, IReadOnlyList<BackupPowerHour> Roster,
     long ValueTotal, decimal FuelTotalLitres, IReadOnlyDictionary<string, int> DarkHours,
-    bool OptimalityProven, string SolverState, long? ValueUpperBound = null);
+    bool OptimalityProven, string SolverState, long? ValueUpperBound = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyDictionary<string, int>? DarkMinutes { get; init; }
+}
 
 // This module deliberately exposes a documented snake_case JSON contract without
 // altering the rest of Nagorik's serializer configuration.

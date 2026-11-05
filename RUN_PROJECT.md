@@ -2,12 +2,11 @@
 
 The application is a single .NET 10 MVC/API service with SQLite and plain browser
 JavaScript. There is no separate frontend build, npm install, ML process or database
-server. Run commands from `F:\Nagorik\Nagorik.Api` in PowerShell.
+server. Open PowerShell in the repository root (the folder containing `Nagorik.Api.csproj`).
 
 ## Setup and start
 
 ```powershell
-Set-Location F:\Nagorik\Nagorik.Api
 dotnet restore
 ```
 

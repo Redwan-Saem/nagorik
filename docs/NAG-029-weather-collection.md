@@ -126,5 +126,4 @@ This story does not calculate risk, change Zone.LastComputedAtUtc, trigger area
 alerts, evaluate an ML model, provision official boundaries, or supply labelled
 ground truth. Those remain later stories. Multiple app instances can contend on
 the unique key; this is not a distributed exactly-once scheduler. There is no
-history-retention job yet. The unrelated `/weatherforecast` template endpoint
-remains random template data and must not be confused with `/api/map/weather`.
+history-retention job yet. The collected weather API is `/api/map/weather`.
